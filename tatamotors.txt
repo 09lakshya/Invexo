@@ -1,1 +1,2 @@
-implement a hard fallback to a second market-data source (NSE/BSE API wrapper) just for symbols Yahoo fails on, so Tata Motors still populates.
+now i need you to add the logo for all the listed companies and format their names as appeared On trading platforms 
+Like show Hero MotoCorp Ltd along with HEROMOTOCO, Vodafone Idea Ltd along with IDEA. This should also be applicable while using search box(exclude logo in search box).

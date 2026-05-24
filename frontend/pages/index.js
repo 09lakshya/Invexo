@@ -274,7 +274,7 @@ export default function Home() {
     let active = true;
     const connect = () => {
       if (!active) return;
-      ws = new WebSocket(process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8000/market/ws");
+      ws = new WebSocket(process.env.NEXT_PUBLIC_WS_URL || "wss://nextrade-1.onrender.com/market/ws");
       ws.onopen = () => { if (active) setConnected(true); };
       ws.onmessage = (e) => {
         if (!active) return;

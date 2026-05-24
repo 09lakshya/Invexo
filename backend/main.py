@@ -6,7 +6,7 @@ from routers import market, predict, search, news, portfolio, advisor, auth
 
 app = FastAPI()
 
-default_origins = "http://localhost:3000,http://127.0.0.1:3000"
+default_origins = "*"
 raw_origins = os.getenv("CORS_ORIGINS", default_origins)
 allowed_origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
 
