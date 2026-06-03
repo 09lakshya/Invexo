@@ -243,21 +243,29 @@ export default function LoginPage() {
         >
           {/* Logo */}
           <div style={{ textAlign: "center", marginBottom: "36px" }}>
-            <img
-              src="/logo-512.png"
-              alt="Invexo Logo"
-              width={96}
-              height={96}
+            <div
               style={{
-                display: "block",
-                margin: "0 auto 16px auto",
-                width: "96px",
-                height: "96px",
-                filter: "drop-shadow(0 4px 20px var(--accent-glow))",
-                objectFit: "contain",
-                borderRadius: "16px",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                marginBottom: "16px",
               }}
-            />
+            >
+              <img
+                src="/logo-512.png"
+                alt="Invexo Logo"
+                width={120}
+                height={120}
+                style={{
+                  width: "120px",
+                  height: "120px",
+                  aspectRatio: "1 / 1",
+                  filter: "drop-shadow(0 4px 20px var(--accent-glow))",
+                  objectFit: "contain",
+                  borderRadius: "20px",
+                }}
+              />
+            </div>
             <p
               style={{
                 color: "var(--text-muted)",
