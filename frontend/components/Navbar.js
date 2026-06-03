@@ -107,11 +107,11 @@ export default function Navbar() {
           style={{
             maxWidth: "1400px",
             margin: "0 auto",
-            padding: "0 clamp(12px, 3vw, 24px)",
-            height: "clamp(52px, 8vw, 64px)",
+            padding: "0 clamp(12px, 3vmin, 24px)",
+            height: "clamp(52px, 8vmin, 64px)",
             display: "flex",
             alignItems: "center",
-            gap: "clamp(12px, 3vw, 32px)",
+            gap: "clamp(12px, 3vmin, 32px)",
           }}
         >
           {/* Logo */}
@@ -136,7 +136,7 @@ export default function Navbar() {
                 style={{
                   fontFamily: "'Space Grotesk', sans-serif",
                   fontWeight: 800,
-                  fontSize: "clamp(0.95rem, 1.5vw, 1.2rem)",
+                  fontSize: "clamp(0.95rem, 1.5vmin, 1.2rem)",
                   background: "linear-gradient(90deg, var(--accent) 0%, var(--purple) 100%)",
                   WebkitBackgroundClip: "text",
                   WebkitTextFillColor: "transparent",

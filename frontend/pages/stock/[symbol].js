@@ -30,7 +30,7 @@ function InfoChip({ label, value, color, sub }) {
       onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border-subtle)"; }}
     >
       <p style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "8px" }}>{label}</p>
-      <p style={{ fontSize: "clamp(1rem, 2vw, 1.3rem)", fontWeight: 800, color: color || "var(--text-primary)", fontFamily: "'Space Grotesk', sans-serif", letterSpacing: "-0.02em" }}>{value}</p>
+      <p style={{ fontSize: "clamp(1rem, 2vmin, 1.3rem)", fontWeight: 800, color: color || "var(--text-primary)", fontFamily: "'Space Grotesk', sans-serif", letterSpacing: "-0.02em" }}>{value}</p>
       {sub && <p style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "4px" }}>{sub}</p>}
     </div>
   );
@@ -124,7 +124,7 @@ export default function StockPage() {
       <div style={{ minHeight: "100vh" }}>
         <Navbar />
 
-        <div style={{ maxWidth: "1300px", margin: "0 auto", padding: "clamp(20px, 4vw, 32px) clamp(12px, 3vw, 24px) clamp(40px, 8vw, 80px)" }}>
+        <div style={{ maxWidth: "1300px", margin: "0 auto", padding: "clamp(20px, 4vmin, 32px) clamp(12px, 3vmin, 24px) clamp(40px, 8vmin, 80px)" }}>
 
           {/* ── Header ─────────────────────────────────────────────── */}
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "16px", marginBottom: "32px", animation: "fadeInUp 0.5s ease forwards" }}>
@@ -154,7 +154,7 @@ export default function StockPage() {
               <h1
                 style={{
                   fontFamily: "'Space Grotesk', sans-serif",
-                  fontSize: "clamp(2rem, 5vw, 3.5rem)",
+                  fontSize: "clamp(2rem, 5vmin, 3.5rem)",
                   fontWeight: 900,
                   letterSpacing: "-0.04em",
                   background: "linear-gradient(90deg, var(--accent) 0%, var(--purple) 100%)",
@@ -262,15 +262,18 @@ export default function StockPage() {
                 <p style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>Loading chart data…</p>
               </div>
             ) : history.length > 0 ? (
-              <div style={{
-                background: "var(--bg-card)",
-                border: "1px solid var(--border-subtle)",
-                borderRadius: "clamp(14px, 2vw, 20px)",
-                padding: "clamp(14px, 3vw, 24px)",
-                height: "clamp(250px, 40vw, 400px)",
-                backdropFilter: "blur(16px)",
-                boxShadow: "var(--shadow-card)",
-              }}>
+              <div
+                className="chart-container-responsive"
+                style={{
+                  background: "var(--bg-card)",
+                  border: "1px solid var(--border-subtle)",
+                  borderRadius: "clamp(14px, 2vmin, 20px)",
+                  padding: "clamp(14px, 3vmin, 24px)",
+                  height: "clamp(250px, 40vmin, 400px)",
+                  backdropFilter: "blur(16px)",
+                  boxShadow: "var(--shadow-card)",
+                }}
+              >
                 <RealChart data={history} />
               </div>
             ) : (
@@ -329,7 +332,7 @@ export default function StockPage() {
                 </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(140px, 100%), 1fr))", gap: "clamp(8px, 1.5vw, 12px)" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(140px, 100%), 1fr))", gap: "clamp(8px, 1.5vmin, 12px)" }}>
                 <InfoChip label="Current Price" value={`₹${pred.current_price}`} />
                 <InfoChip
                   label="24h Change"
@@ -370,7 +373,7 @@ export default function StockPage() {
 
           {/* ── Sentiment + Fundamentals ────────────────────────────── */}
           {pred && (pred.news_sentiment !== undefined || pred.fundamental_score !== undefined) && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))", gap: "clamp(12px, 2vw, 16px)", marginBottom: "24px", animation: "fadeInUp 0.5s 0.25s ease both" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))", gap: "clamp(12px, 2vmin, 16px)", marginBottom: "24px", animation: "fadeInUp 0.5s 0.25s ease both" }}>
 
               {/* News Sentiment */}
               {pred.news_sentiment !== undefined && (

@@ -87,8 +87,8 @@ export default function StockCard({ symbol, price, change, percent, color, small
           ? "var(--bg-card)"
           : "var(--bg-card)",
         border: `1px solid ${hovered ? "var(--accent-glow)" : "var(--border-subtle)"}`,
-        borderRadius: "clamp(12px, 2vw, 16px)",
-        padding: small ? "clamp(12px, 2vw, 16px)" : "clamp(14px, 2.5vw, 20px)",
+        borderRadius: "clamp(12px, 2vmin, 16px)",
+        padding: small ? "clamp(12px, 2vmin, 16px)" : "clamp(14px, 2.5vmin, 20px)",
         cursor: "pointer",
         transition: "all 0.25s ease",
         transform: hovered ? "translateY(-3px)" : "translateY(0)",
@@ -175,7 +175,7 @@ export default function StockCard({ symbol, price, change, percent, color, small
         {hasData ? (
           <p
             style={{
-              fontSize: small ? "clamp(1rem, 2vw, 1.25rem)" : "clamp(1.1rem, 2.5vw, 1.5rem)",
+              fontSize: small ? "clamp(1rem, 2vmin, 1.25rem)" : "clamp(1.1rem, 2.5vmin, 1.5rem)",
               fontWeight: 800,
               color: flash === "up" ? "var(--green)" : flash === "down" ? "var(--red)" : "var(--text-primary)",
               transition: "color 0.3s",

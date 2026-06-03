@@ -252,7 +252,7 @@ export default function SettingsPage() {
             <h1
               style={{
                 fontFamily: "'Space Grotesk', sans-serif",
-                fontSize: "clamp(2rem, 5vw, 3rem)",
+                fontSize: "clamp(2rem, 5vmin, 3rem)",
                 fontWeight: 800,
                 color: "var(--text-primary)",
                 letterSpacing: "-0.02em",
@@ -363,7 +363,7 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(240px, 100%), 1fr))", gap: "16px", marginBottom: "20px" }}>
                 <div>
                   <label style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Full Name</label>
                   <input
@@ -435,7 +435,7 @@ export default function SettingsPage() {
 
             {/* Trading Preferences */}
             <Section title="Trading Setup" subtitle="Configure your default trading environment.">
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(180px, 100%), 1fr))", gap: "16px" }}>
                 <div>
                   <label style={{ color: "var(--text-muted)", fontSize: "0.75rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", display: "block", marginBottom: "8px" }}>Chart Type</label>
                   <select value={settings.trading.chartType} onChange={(e) => updateNested("trading", "chartType", e.target.value)} style={{ width: "100%", background: "var(--input-bg)", color: "var(--text-primary)", border: "1px solid var(--input-border)", borderRadius: "12px", padding: "12px 16px", fontFamily: "inherit" }}>
@@ -516,7 +516,7 @@ export default function SettingsPage() {
 
               <div style={{ marginTop: "24px", paddingTop: "24px", borderTop: "1px solid var(--border-subtle)" }}>
                 <h3 style={{ color: "var(--text-primary)", fontSize: "1rem", fontWeight: 700, marginBottom: "16px" }}>Change Password</h3>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(180px, 100%), 1fr))", gap: "16px", marginBottom: "16px" }}>
                   <div>
                     <label style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>Current Password</label>
                     <input

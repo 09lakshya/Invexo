@@ -140,8 +140,8 @@ function IndexCard({ symbol, data, prevData }) {
         backdropFilter: "blur(24px) saturate(200%)",
         WebkitBackdropFilter: "blur(24px) saturate(200%)",
         border: `1px solid ${flash === "up" ? "var(--green-dim)" : flash === "down" ? "var(--red-dim)" : "var(--border-subtle)"}`,
-        borderRadius: "clamp(14px, 2vw, 20px)",
-        padding: "clamp(16px, 3vw, 24px) clamp(18px, 3vw, 28px)",
+        borderRadius: "clamp(14px, 2vmin, 20px)",
+        padding: "clamp(16px, 3vmin, 24px) clamp(18px, 3vmin, 28px)",
         flex: "1 1 200px",
         minWidth: "min(220px, 100%)",
         position: "relative",
@@ -194,7 +194,7 @@ function IndexCard({ symbol, data, prevData }) {
 
       <p
         style={{
-          fontSize: "clamp(1.4rem, 3vw, 2rem)",
+          fontSize: "clamp(1.4rem, 3vmin, 2rem)",
           fontWeight: 800,
           color: flash === "up" ? "var(--green)" : flash === "down" ? "var(--red)" : "var(--text-primary)",
           transition: "color 0.4s",
@@ -337,7 +337,7 @@ export default function Home() {
         {/* Ticker tape */}
         {isLoaded && <TickerTape stocks={stocks} />}
 
-        <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "clamp(20px, 4vw, 32px) clamp(12px, 3vw, 24px) clamp(40px, 8vw, 64px)" }}>
+        <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "clamp(20px, 4vmin, 32px) clamp(12px, 3vmin, 24px) clamp(40px, 8vmin, 64px)" }}>
 
           {/* ── Header ──────────────────────────────────────────────── */}
           <div
@@ -358,7 +358,7 @@ export default function Home() {
               <h1
                 style={{
                   fontFamily: "'Space Grotesk', sans-serif",
-                  fontSize: "clamp(2rem, 4vw, 3rem)",
+                  fontSize: "clamp(2rem, 4vmin, 3rem)",
                   fontWeight: 800,
                   letterSpacing: "-0.03em",
                   lineHeight: 1.1,
@@ -403,7 +403,7 @@ export default function Home() {
           {indexEntries.length > 0 && (
             <div style={{ marginBottom: "32px", animation: "fadeInUp 0.5s 0.1s ease both" }}>
               <p className="section-label">Market Indices</p>
-              <div style={{ display: "flex", gap: "clamp(10px, 2vw, 16px)", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: "clamp(10px, 2vmin, 16px)", flexWrap: "wrap" }}>
                 {indexEntries.map(([sym, data]) => (
                   <IndexCard key={sym} symbol={sym} data={data} prevData={prevStocks[sym]} />
                 ))}
@@ -531,7 +531,7 @@ export default function Home() {
               style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(auto-fill, minmax(min(220px, 100%), 1fr))",
-                gap: "clamp(10px, 2vw, 16px)",
+                gap: "clamp(10px, 2vmin, 16px)",
               }}
             >
               {Array.from({ length: 9 }).map((_, i) => <SkeletonCard key={i} />)}
@@ -556,7 +556,7 @@ export default function Home() {
               style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(auto-fill, minmax(min(200px, 100%), 1fr))",
-                gap: "clamp(10px, 1.5vw, 14px)",
+                gap: "clamp(10px, 1.5vmin, 14px)",
                 animation: "fadeIn 0.4s ease forwards",
               }}
             >

@@ -84,7 +84,7 @@ function OptionCard({ selected, onClick, label, sub, icon, accentColor }) {
       onMouseLeave={() => setHovered(false)}
       style={{
         cursor: "pointer",
-        padding: "clamp(12px, 2vw, 16px)",
+        padding: "clamp(12px, 2vmin, 16px)",
         minHeight: "60px",
         touchAction: "manipulation",
         borderRadius: "14px",
@@ -192,7 +192,7 @@ function PortfolioSummary({ stocks, budget, investmentType, investmentMonths }) 
       </div>
 
       {/* Key stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(130px, 100%), 1fr))", gap: "clamp(8px, 1.5vw, 12px)", marginBottom: "24px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(130px, 100%), 1fr))", gap: "clamp(8px, 1.5vmin, 12px)", marginBottom: "24px" }}>
         {stats.map(({ label, value, color }) => (
           <div key={label} style={{ background: "var(--input-bg)", border: "1px solid var(--border-subtle)", borderRadius: "14px", padding: "16px" }}>
             <p style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--text-muted)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "8px" }}>{label}</p>
@@ -271,8 +271,8 @@ function RecoCard({ stock, rank, totalBudget }) {
       style={{
         background: "var(--bg-card)",
         border: "1px solid var(--border-subtle)",
-        borderRadius: "clamp(14px, 2vw, 18px)",
-        padding: "clamp(16px, 3vw, 24px)",
+        borderRadius: "clamp(14px, 2vmin, 18px)",
+        padding: "clamp(16px, 3vmin, 24px)",
         transition: "all 0.25s ease",
         backdropFilter: "blur(16px)",
         animation: `fadeInUp 0.4s ${rank * 0.1}s ease both`,
@@ -481,7 +481,7 @@ export default function Advisor() {
       <div style={{ minHeight: "100vh" }}>
         <Navbar />
 
-        <div style={{ maxWidth: "860px", margin: "0 auto", padding: "clamp(20px, 4vw, 40px) clamp(12px, 3vw, 24px) clamp(40px, 8vw, 80px)" }}>
+        <div style={{ maxWidth: "860px", margin: "0 auto", padding: "clamp(20px, 4vmin, 40px) clamp(12px, 3vmin, 24px) clamp(40px, 8vmin, 80px)" }}>
 
           {/* Header */}
           <div style={{ marginBottom: "40px", animation: "fadeInUp 0.5s ease forwards" }}>
@@ -489,7 +489,7 @@ export default function Advisor() {
             <h1
               style={{
                 fontFamily: "'Space Grotesk', sans-serif",
-                fontSize: "clamp(1.8rem, 4vw, 2.8rem)",
+                fontSize: "clamp(1.8rem, 4vmin, 2.8rem)",
                 fontWeight: 800,
                 letterSpacing: "-0.03em",
                 background: "linear-gradient(90deg, var(--accent) 0%, var(--purple) 100%)",
@@ -528,9 +528,9 @@ export default function Advisor() {
           </div>
 
           {/* Step 1 — Goal */}
-          <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "clamp(14px, 2vw, 20px)", padding: "clamp(18px, 3vw, 28px)", marginBottom: "16px", backdropFilter: "blur(16px)", animation: "fadeInUp 0.5s 0.15s ease both" }}>
+          <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "clamp(14px, 2vmin, 20px)", padding: "clamp(18px, 3vmin, 28px)", marginBottom: "16px", backdropFilter: "blur(16px)", animation: "fadeInUp 0.5s 0.15s ease both" }}>
             <StepHeader number={1} title="What's your investment goal?" done={!!goal} />
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(140px, 100%), 1fr))", gap: "clamp(8px, 1.5vw, 12px)" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(140px, 100%), 1fr))", gap: "clamp(8px, 1.5vmin, 12px)" }}>
               {GOALS.map((g) => (
                 <OptionCard
                   key={g.id}
@@ -545,7 +545,7 @@ export default function Advisor() {
           </div>
 
           {/* Step 2 — Duration */}
-          <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "clamp(14px, 2vw, 20px)", padding: "clamp(18px, 3vw, 28px)", marginBottom: "16px", backdropFilter: "blur(16px)", animation: "fadeInUp 0.5s 0.2s ease both" }}>
+          <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "clamp(14px, 2vmin, 20px)", padding: "clamp(18px, 3vmin, 28px)", marginBottom: "16px", backdropFilter: "blur(16px)", animation: "fadeInUp 0.5s 0.2s ease both" }}>
             <StepHeader number={2} title="How long do you plan to stay invested?" done={!!duration} />
             <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
               {DURATIONS.map((d) => (
@@ -566,7 +566,7 @@ export default function Advisor() {
           </div>
 
           {/* Step 3 — Risk */}
-          <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "clamp(14px, 2vw, 20px)", padding: "clamp(18px, 3vw, 28px)", marginBottom: "16px", backdropFilter: "blur(16px)", animation: "fadeInUp 0.5s 0.25s ease both" }}>
+          <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "clamp(14px, 2vmin, 20px)", padding: "clamp(18px, 3vmin, 28px)", marginBottom: "16px", backdropFilter: "blur(16px)", animation: "fadeInUp 0.5s 0.25s ease both" }}>
             <StepHeader number={3} title="How much risk are you comfortable with?" done={!!risk} />
             <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
               {RISKS.map((r) => (
@@ -583,7 +583,7 @@ export default function Advisor() {
           </div>
 
           {/* Step 4 — Budget */}
-          <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "clamp(14px, 2vw, 20px)", padding: "clamp(18px, 3vw, 28px)", marginBottom: "24px", backdropFilter: "blur(16px)", animation: "fadeInUp 0.5s 0.3s ease both" }}>
+          <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "clamp(14px, 2vmin, 20px)", padding: "clamp(18px, 3vmin, 28px)", marginBottom: "24px", backdropFilter: "blur(16px)", animation: "fadeInUp 0.5s 0.3s ease both" }}>
             <StepHeader number={4} title="How much do you want to invest?" done={budgetStepDone} />
 
             {/* Investment type toggle */}

@@ -55,18 +55,18 @@ function StatCard({ label, value, color = "var(--text-primary)", icon, sub }) {
   return (
     <div
       style={{
-        background: "var(--bg-primary)",
+        background: "var(--bg-card)",
         border: "1px solid var(--border-subtle)",
-        borderRadius: "clamp(10px, 1.5vw, 14px)",
-        padding: "clamp(14px, 2vw, 18px) clamp(16px, 2.5vw, 20px)",
-        transition: "all 0.2s",
+        borderRadius: "clamp(10px, 1.5vmin, 14px)",
+        padding: "clamp(14px, 2vmin, 18px) clamp(16px, 2.5vmin, 20px)",
+        backdropFilter: "blur(12px)",
       }}
       onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--accent-glow)"; e.currentTarget.style.background = "var(--accent-dim)"; }}
       onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border-subtle)"; e.currentTarget.style.background = "var(--bg-primary)"; }}
     >
       {icon && <p style={{ fontSize: "1.2rem", marginBottom: "8px" }}>{icon}</p>}
       <p style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "8px" }}>{label}</p>
-      <p style={{ fontSize: "clamp(1rem, 2vw, 1.4rem)", fontWeight: 800, color, fontFamily: "'Space Grotesk', sans-serif", letterSpacing: "-0.02em" }}>{value}</p>
+      <p style={{ fontSize: "clamp(1rem, 2vmin, 1.4rem)", fontWeight: 800, color, fontFamily: "'Space Grotesk', sans-serif", letterSpacing: "-0.02em" }}>{value}</p>
       {sub && <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginTop: "4px" }}>{sub}</p>}
     </div>
   );
@@ -168,7 +168,7 @@ export default function Calculator() {
       <div style={{ minHeight: "100vh" }}>
         <Navbar />
 
-        <div style={{ maxWidth: "860px", margin: "0 auto", padding: "clamp(20px, 4vw, 40px) clamp(12px, 3vw, 24px) clamp(40px, 8vw, 80px)" }}>
+        <div style={{ maxWidth: "860px", margin: "0 auto", padding: "clamp(20px, 4vmin, 40px) clamp(12px, 3vmin, 24px) clamp(40px, 8vmin, 80px)" }}>
 
           {/* Header */}
           <div style={{ marginBottom: "36px", animation: "fadeInUp 0.5s ease forwards" }}>
@@ -176,7 +176,7 @@ export default function Calculator() {
             <h1
               style={{
                 fontFamily: "'Space Grotesk', sans-serif",
-                fontSize: "clamp(1.8rem, 4vw, 2.8rem)",
+                fontSize: "clamp(1.8rem, 4vmin, 2.8rem)",
                 fontWeight: 800,
                 letterSpacing: "-0.03em",
                 background: "linear-gradient(90deg, var(--accent) 0%, var(--purple) 100%)",
@@ -223,8 +223,8 @@ export default function Calculator() {
           </div>
 
           {/* Input card */}
-          <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "clamp(14px, 2vw, 20px)", padding: "clamp(18px, 3vw, 28px)", marginBottom: "24px", backdropFilter: "blur(16px)", animation: "fadeInUp 0.5s 0.15s ease both" }}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(180px, 100%), 1fr))", gap: "clamp(14px, 2.5vw, 20px)", marginBottom: "24px" }}>
+          <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "clamp(14px, 2vmin, 20px)", padding: "clamp(18px, 3vmin, 28px)", marginBottom: "24px", backdropFilter: "blur(16px)", animation: "fadeInUp 0.5s 0.15s ease both" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(180px, 100%), 1fr))", gap: "clamp(14px, 2.5vmin, 20px)", marginBottom: "24px" }}>
               {/* Principal */}
               <div>
                 <label style={{ display: "block", fontSize: "0.72rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "8px" }}>
@@ -312,7 +312,7 @@ export default function Calculator() {
           {calcResult && (
             <div style={{ animation: "fadeInUp 0.5s ease forwards" }}>
               {/* Hero result */}
-              <div style={{ background: "var(--green-dim)", border: "1px solid var(--green-dim)", borderRadius: "clamp(14px, 2vw, 20px)", padding: "clamp(20px, 3vw, 32px)", marginBottom: "16px", display: "flex", gap: "clamp(16px, 3vw, 32px)", flexWrap: "wrap", alignItems: "center" }}>
+              <div style={{ background: "var(--green-dim)", border: "1px solid var(--green-dim)", borderRadius: "clamp(14px, 2vmin, 20px)", padding: "clamp(20px, 3vmin, 32px)", marginBottom: "16px", display: "flex", gap: "clamp(16px, 3vmin, 32px)", flexWrap: "wrap", alignItems: "center" }}>
                 <DonutChart
                   invested={calcResult.total_invested || (calcResult.future_value - calcResult.profit)}
                   profit={calcResult.profit}
@@ -321,7 +321,7 @@ export default function Calculator() {
                   <p style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--green)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "8px" }}>
                     💹 Nominal Returns
                   </p>
-                  <p style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: "clamp(1.4rem, 3vw, 2.2rem)", fontWeight: 900, color: "var(--green)", letterSpacing: "-0.03em", marginBottom: "4px" }}>
+                  <p style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: "clamp(1.4rem, 3vmin, 2.2rem)", fontWeight: 900, color: "var(--green)", letterSpacing: "-0.03em", marginBottom: "4px" }}>
                     ₹{calcResult.future_value.toLocaleString("en-IN")}
                   </p>
                   <p style={{ fontSize: "0.9rem", color: "var(--text-secondary)" }}>
@@ -335,7 +335,7 @@ export default function Calculator() {
               </div>
 
               {/* Nominal stats grid */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(130px, 100%), 1fr))", gap: "clamp(8px, 1.5vw, 12px)", marginBottom: "16px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(130px, 100%), 1fr))", gap: "clamp(8px, 1.5vmin, 12px)", marginBottom: "16px" }}>
                 <StatCard
                   label={calcType === "lumpsum" ? "Amount Invested" : "Total Invested"}
                   value={`₹${(calcResult.total_invested || calcResult.future_value - calcResult.profit).toLocaleString("en-IN")}`}
@@ -347,11 +347,11 @@ export default function Calculator() {
               </div>
 
               {/* Real returns */}
-              <div style={{ background: "var(--purple-dim)", border: "1px solid var(--purple-dim)", borderRadius: "clamp(14px, 2vw, 20px)", padding: "clamp(16px, 3vw, 24px)", marginBottom: "16px" }}>
-                <p style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--purple)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "16px" }}>
-                  🎯 Real Returns — Inflation-Adjusted @ {INFLATION_RATE}% Per Year
+              <div style={{ background: "var(--purple-dim)", border: "1px solid var(--purple-dim)", borderRadius: "clamp(14px, 2vmin, 20px)", padding: "clamp(16px, 3vmin, 24px)", marginBottom: "16px" }}>
+                <p className="section-label" style={{ color: "var(--purple)", marginBottom: "12px" }}>
+                  💡 Wealth Multiplier Effect
                 </p>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(120px, 100%), 1fr))", gap: "clamp(8px, 1.5vw, 12px)" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(120px, 100%), 1fr))", gap: "clamp(8px, 1.5vmin, 12px)" }}>
                   <StatCard
                     label={calcType === "lumpsum" ? "Amount Invested" : "Total Invested"}
                     value={`₹${(calcResult.total_invested || calcResult.future_value - calcResult.profit).toLocaleString("en-IN")}`}

@@ -44,13 +44,13 @@
   --skeleton-from: rgba(255,255,255,0.04);
   --skeleton-mid: rgba(255,255,255,0.08);
 
-  /* Responsive spacing tokens */
-  --page-gutter: clamp(12px, 3vw, 24px);
-  --page-padding-top: clamp(20px, 4vw, 40px);
-  --page-padding-bottom: clamp(40px, 8vw, 80px);
-  --section-gap: clamp(16px, 3vw, 32px);
-  --card-padding: clamp(14px, 2.5vw, 28px);
-  --card-radius: clamp(12px, 2vw, 20px);
+  /* Responsive spacing tokens using vmin to prevent ballooning on landscape orientation */
+  --page-gutter: clamp(12px, 3vmin, 24px);
+  --page-padding-top: clamp(16px, 4vmin, 32px);
+  --page-padding-bottom: clamp(32px, 6vmin, 64px);
+  --section-gap: clamp(12px, 3vmin, 24px);
+  --card-padding: clamp(12px, 2.5vmin, 20px);
+  --card-radius: clamp(10px, 2vmin, 16px);
 }
 
 /* ── CSS Variables — Light Mode ────────────────────────────────── */
@@ -1117,4 +1117,25 @@ html[data-theme] textarea {
 [data-theme="light"] thead[style*="rgba(0,0,0,0.2"],
 [data-theme="light"] thead[style*="rgba(0, 0, 0, 0.2"] {
   background: rgba(0, 0, 0, 0.02) !important;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   MOBILE LANDSCAPE & ORIENTATION OPTIMIZATION
+   ════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 960px) and (orientation: landscape) {
+  :root {
+    --page-padding-top: clamp(12px, 2vh, 16px);
+    --page-padding-bottom: clamp(24px, 4vh, 36px);
+    --section-gap: clamp(12px, 2vh, 18px);
+    --card-padding: clamp(10px, 2vh, 14px);
+  }
+
+  body {
+    background-attachment: scroll; /* Optimize scrolling performance */
+  }
+
+  .chart-container-responsive {
+    height: clamp(180px, 45vh, 250px) !important;
+  }
 }

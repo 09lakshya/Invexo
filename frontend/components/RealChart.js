@@ -211,7 +211,7 @@ export default function RealChart({ data }) {
   );
 
   return (
-    <div style={{ height: "300px", width: "100%" }}>
+    <div style={{ height: "100%", width: "100%" }}>
       <ChartContent />
     </div>
   );

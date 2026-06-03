@@ -49,8 +49,8 @@ function MetricCard({ label, value, color = "var(--text-primary)", icon, delta }
       style={{
         background: "var(--bg-card)",
         border: "1px solid var(--border-subtle)",
-        borderRadius: "clamp(14px, 2vw, 18px)",
-        padding: "clamp(14px, 2.5vw, 20px) clamp(16px, 2.5vw, 22px)",
+        borderRadius: "clamp(14px, 2vmin, 18px)",
+        padding: "clamp(14px, 2.5vmin, 20px) clamp(16px, 2.5vmin, 22px)",
         backdropFilter: "blur(12px)",
         transition: "all 0.25s",
         position: "relative",
@@ -62,7 +62,7 @@ function MetricCard({ label, value, color = "var(--text-primary)", icon, delta }
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, ${color}, transparent)`, opacity: 0.6 }} />
       {icon && <p style={{ fontSize: "1.1rem", marginBottom: "8px" }}>{icon}</p>}
       <p style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "8px" }}>{label}</p>
-      <p style={{ fontSize: "clamp(1.1rem, 2.5vw, 1.6rem)", fontWeight: 900, color, fontFamily: "'Space Grotesk', sans-serif", letterSpacing: "-0.02em" }}>{value}</p>
+      <p style={{ fontSize: "clamp(1.1rem, 2.5vmin, 1.6rem)", fontWeight: 900, color, fontFamily: "'Space Grotesk', sans-serif", letterSpacing: "-0.02em" }}>{value}</p>
       {delta && <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "4px" }}>{delta}</p>}
     </div>
   );
@@ -270,16 +270,16 @@ export default function Portfolio() {
       <div style={{ minHeight: "100vh" }}>
         <Navbar />
 
-        <div style={{ maxWidth: "1300px", margin: "0 auto", padding: "clamp(20px, 4vw, 40px) clamp(12px, 3vw, 24px) clamp(40px, 8vw, 80px)" }}>
+        <div style={{ maxWidth: "1300px", margin: "0 auto", padding: "clamp(20px, 4vmin, 40px) clamp(12px, 3vmin, 24px) clamp(40px, 8vmin, 80px)" }}>
 
           {/* Header */}
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "clamp(12px, 2vw, 16px)", marginBottom: "clamp(24px, 4vw, 36px)", animation: "fadeInUp 0.5s ease forwards" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", flexWrap: "wrap", gap: "clamp(12px, 2vmin, 16px)", marginBottom: "clamp(24px, 4vmin, 36px)", animation: "fadeInUp 0.5s ease forwards" }}>
             <div>
               <p className="section-label">Investments</p>
               <h1
                 style={{
                   fontFamily: "'Space Grotesk', sans-serif",
-                  fontSize: "clamp(1.8rem, 4vw, 2.8rem)",
+                  fontSize: "clamp(1.8rem, 4vmin, 2.8rem)",
                   fontWeight: 800,
                   letterSpacing: "-0.03em",
                   background: "linear-gradient(90deg, var(--accent) 0%, var(--purple) 100%)",
@@ -422,7 +422,7 @@ export default function Portfolio() {
 
           {/* Summary cards */}
           {holdings.length > 0 && (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(160px, 100%), 1fr))", gap: "clamp(10px, 1.5vw, 14px)", marginBottom: "clamp(20px, 3vw, 28px)", animation: "fadeInUp 0.5s 0.1s ease both" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(160px, 100%), 1fr))", gap: "clamp(10px, 1.5vmin, 14px)", marginBottom: "clamp(20px, 3vmin, 28px)", animation: "fadeInUp 0.5s 0.1s ease both" }}>
               <MetricCard label="Total Invested"  value={`₹${fmt(totalInvested)}`}  icon="💼" />
               <MetricCard label="Current Value"   value={`₹${fmt(totalCurrent)}`}   icon="📊" color="var(--accent)" />
               <MetricCard
@@ -503,7 +503,7 @@ export default function Portfolio() {
               </div>
 
               {/* Table footer */}
-              <div style={{ padding: "clamp(10px, 2vw, 14px) clamp(12px, 2vw, 18px)", borderTop: "1px solid var(--border-subtle)", display: "flex", justifyContent: "flex-end", gap: "clamp(12px, 2vw, 24px)", background: "var(--input-bg)", flexWrap: "wrap" }}>
+              <div style={{ padding: "clamp(10px, 2vmin, 14px) clamp(12px, 2vmin, 18px)", borderTop: "1px solid var(--border-subtle)", display: "flex", justifyContent: "flex-end", gap: "clamp(12px, 2vmin, 24px)", background: "var(--input-bg)", flexWrap: "wrap" }}>
                 <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
                   Total Invested: <strong style={{ color: "var(--text-primary)" }}>₹{fmt(totalInvested)}</strong>
                 </span>
