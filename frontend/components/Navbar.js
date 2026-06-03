@@ -157,7 +157,7 @@ export default function Navbar() {
               gap: "4px",
               flex: "0 0 auto",
             }}
-            className="hidden md:flex"
+            className="hidden-mobile"
           >
             {NAV_LINKS.filter(l => !l.isGear).map(({ href, label }) => {
               const active = router.pathname === href;
@@ -366,7 +366,7 @@ export default function Navbar() {
           {/* Settings Gear Icon */}
           <Link
             href="/settings"
-            className="hidden md:flex"
+            className="hidden-mobile"
             title="Settings"
             style={{
               display: "flex",
@@ -576,7 +576,7 @@ export default function Navbar() {
               alignItems: "center",
               justifyContent: "center",
             }}
-            className="md:hidden"
+            className="hidden-desktop"
           >
             {mobileOpen ? "✕" : "☰"}
           </button>

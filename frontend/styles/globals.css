@@ -1139,3 +1139,15 @@ html[data-theme] textarea {
     height: clamp(180px, 45vh, 250px) !important;
   }
 }
+
+/* Responsive visibility helper overrides to resolve inline style conflicts */
+@media (max-width: 768px) {
+  .hidden-mobile {
+    display: none !important;
+  }
+}
+@media (min-width: 769px) {
+  .hidden-desktop {
+    display: none !important;
+  }
+}
