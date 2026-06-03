@@ -118,6 +118,32 @@ if os.path.exists(DB_DIR):
     DB_PATH = os.path.join(DB_DIR, "portfolio.db")
 else:
     DB_PATH = os.path.join(os.path.dirname(__file__), "portfolio.db")
+
+DATABASE_URL = os.environ.get("DATABASE_URL", "")
+
+def get_db_connection():
+    if DATABASE_URL:
+        import psycopg2
+        conn = psycopg2.connect(DATABASE_URL)
+        return conn, True
+    else:
+        conn = sqlite3.connect(DB_PATH)
+        return conn, False
+
+def get_cursor(conn, is_postgres):
+    if is_postgres:
+        import psycopg2.extras
+        return conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    else:
+        conn.row_factory = sqlite3.Row
+        return conn.cursor()
+
+def execute_query(c, sql, params=(), is_postgres=False):
+    if is_postgres:
+        sql = sql.replace("?", "%s")
+    c.execute(sql, params)
+    return c
+
 JWT_SECRET = os.environ.get("JWT_SECRET", "")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRY_DAYS = 30  # Long-lived tokens for "keep me signed in"
@@ -132,18 +158,30 @@ if not JWT_SECRET:
 
 
 def init_users_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn, is_postgres = get_db_connection()
     c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id          INTEGER PRIMARY KEY AUTOINCREMENT,
-            email       TEXT    UNIQUE NOT NULL,
-            password_hash TEXT  NOT NULL,
-            name        TEXT    NOT NULL,
-            age         INTEGER NOT NULL,
-            created_at  TEXT    NOT NULL
-        )
-    """)
+    if is_postgres:
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id            SERIAL PRIMARY KEY,
+                email         VARCHAR(255) UNIQUE NOT NULL,
+                password_hash VARCHAR(255) NOT NULL,
+                name          VARCHAR(255) NOT NULL,
+                age           INTEGER NOT NULL,
+                created_at    VARCHAR(255) NOT NULL
+            )
+        """)
+    else:
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                email       TEXT    UNIQUE NOT NULL,
+                password_hash TEXT  NOT NULL,
+                name        TEXT    NOT NULL,
+                age         INTEGER NOT NULL,
+                created_at  TEXT    NOT NULL
+            )
+        """)
     conn.commit()
     conn.close()
 
@@ -153,12 +191,11 @@ init_users_db()
 
 def signup(email: str, password: str, name: str, age: int) -> dict | None:
     """Create a new user. Returns user dict on success, None if email already exists."""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
+    conn, is_postgres = get_db_connection()
+    c = get_cursor(conn, is_postgres)
 
     # Check if email already exists
-    c.execute("SELECT id FROM users WHERE email = ?", (email.lower(),))
+    execute_query(c, "SELECT id FROM users WHERE email = ?", (email.lower(),), is_postgres)
     if c.fetchone():
         conn.close()
         return None
@@ -166,13 +203,17 @@ def signup(email: str, password: str, name: str, age: int) -> dict | None:
     password_hash = bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    c.execute(
-        """INSERT INTO users (email, password_hash, name, age, created_at)
-           VALUES (?, ?, ?, ?, ?)""",
-        (email.lower(), password_hash, name.strip(), age, now),
-    )
+    sql = """INSERT INTO users (email, password_hash, name, age, created_at)
+             VALUES (?, ?, ?, ?, ?)"""
+    if is_postgres:
+        sql = sql.replace("?", "%s") + " RETURNING id"
+        execute_query(c, sql, (email.lower(), password_hash, name.strip(), age, now), False)
+        user_id = c.fetchone()["id"]
+    else:
+        execute_query(c, sql, (email.lower(), password_hash, name.strip(), age, now), False)
+        user_id = c.lastrowid
+
     conn.commit()
-    user_id = c.lastrowid
     conn.close()
 
     return {"id": user_id, "email": email.lower(), "name": name.strip(), "age": age}
@@ -180,10 +221,9 @@ def signup(email: str, password: str, name: str, age: int) -> dict | None:
 
 def login(email: str, password: str) -> dict | None:
     """Validate credentials. Returns user dict on success, None on failure."""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute("SELECT * FROM users WHERE email = ?", (email.lower(),))
+    conn, is_postgres = get_db_connection()
+    c = get_cursor(conn, is_postgres)
+    execute_query(c, "SELECT * FROM users WHERE email = ?", (email.lower(),), is_postgres)
     row = c.fetchone()
     conn.close()
 
@@ -203,10 +243,9 @@ def login(email: str, password: str) -> dict | None:
 
 def get_user(user_id: int) -> dict | None:
     """Fetch a user by ID."""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute("SELECT id, email, name, age, created_at FROM users WHERE id = ?", (user_id,))
+    conn, is_postgres = get_db_connection()
+    c = get_cursor(conn, is_postgres)
+    execute_query(c, "SELECT id, email, name, age, created_at FROM users WHERE id = ?", (user_id,), is_postgres)
     row = c.fetchone()
     conn.close()
 
@@ -222,9 +261,9 @@ def update_profile(user_id: int, name: str) -> dict | None:
     if not cleaned_name:
         return None
 
-    conn = sqlite3.connect(DB_PATH)
+    conn, is_postgres = get_db_connection()
     c = conn.cursor()
-    c.execute("UPDATE users SET name = ? WHERE id = ?", (cleaned_name, user_id))
+    execute_query(c, "UPDATE users SET name = ? WHERE id = ?", (cleaned_name, user_id), is_postgres)
     conn.commit()
     updated = c.rowcount > 0
     conn.close()
@@ -236,10 +275,9 @@ def update_profile(user_id: int, name: str) -> dict | None:
 
 def change_password(user_id: int, current_password: str, new_password: str) -> bool:
     """Change password for a user after verifying the current password."""
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute("SELECT password_hash FROM users WHERE id = ?", (user_id,))
+    conn, is_postgres = get_db_connection()
+    c = get_cursor(conn, is_postgres)
+    execute_query(c, "SELECT password_hash FROM users WHERE id = ?", (user_id,), is_postgres)
     row = c.fetchone()
 
     if not row:
@@ -251,7 +289,7 @@ def change_password(user_id: int, current_password: str, new_password: str) -> b
         return False
 
     new_hash = bcrypt.hashpw(new_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-    c.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, user_id))
+    execute_query(c, "UPDATE users SET password_hash = ? WHERE id = ?", (new_hash, user_id), is_postgres)
     conn.commit()
     conn.close()
     return True
