@@ -1162,3 +1162,13 @@ input::-webkit-inner-spin-button {
 input[type=number] {
   -moz-appearance: textfield;
 }
+
+/* Prevent auto-zooming on focus in iOS and mobile browsers */
+@media (max-width: 768px) {
+  input,
+  select,
+  textarea,
+  .input-premium {
+    font-size: 16px !important;
+  }
+}
