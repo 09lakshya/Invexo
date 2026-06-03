@@ -11,13 +11,43 @@ from email.mime.text import MIMEText
 otp_store = {}
 
 def send_otp_email(email_addr: str, otp: str):
-    """Prints OTP to console. If SMTP variables are present in environment, sends it via SMTP."""
+    """Prints OTP to console. If SMTP variables or RESEND_API_KEY are present, sends it."""
     # Build clean console banner
     print("\n" + "="*50)
     print(f"[OTP DEBUG] OTP for {email_addr}: {otp}")
     print("="*50 + "\n")
 
-    # Read SMTP credentials
+    # 1. Try Resend HTTP API if configured (Bypasses SMTP port blocks)
+    resend_key = os.environ.get("RESEND_API_KEY", "")
+    if resend_key:
+        try:
+            import requests
+            sender = os.environ.get("RESEND_FROM", "onboarding@resend.dev")
+            res = requests.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {resend_key}"},
+                json={
+                    "from": sender,
+                    "to": [email_addr],
+                    "subject": "Invexo - Verify Your Email",
+                    "text": (
+                        f"Thank you for signing up for Invexo!\n\n"
+                        f"Your 6-digit verification code (OTP) is: {otp}\n\n"
+                        f"This code will expire in 5 minutes. Please do not share it with anyone."
+                    )
+                },
+                timeout=10
+            )
+            if res.status_code in [200, 201]:
+                print(f"[Resend] Successfully sent OTP email to {email_addr}")
+                return
+            else:
+                raise RuntimeError(f"Resend API error (status {res.status_code}): {res.text}")
+        except Exception as e:
+            print(f"[Resend ERROR] Failed to send email to {email_addr}: {e}")
+            raise RuntimeError(f"Email delivery failed via Resend API: {str(e)}")
+
+    # 2. Try SMTP credentials if configured
     host = os.environ.get("SMTP_HOST", "")
     port_str = os.environ.get("SMTP_PORT", "")
     user = os.environ.get("SMTP_USER", "")
