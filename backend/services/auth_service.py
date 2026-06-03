@@ -113,7 +113,11 @@ def verify_signup_otp(email_addr: str, otp: str) -> dict | None:
     del otp_store[key]
     return payload
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "portfolio.db")
+DB_DIR = "/var/data"
+if os.path.exists(DB_DIR):
+    DB_PATH = os.path.join(DB_DIR, "portfolio.db")
+else:
+    DB_PATH = os.path.join(os.path.dirname(__file__), "portfolio.db")
 JWT_SECRET = os.environ.get("JWT_SECRET", "")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRY_DAYS = 30  # Long-lived tokens for "keep me signed in"

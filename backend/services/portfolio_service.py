@@ -2,7 +2,11 @@ import sqlite3
 import os
 from datetime import datetime
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "portfolio.db")
+DB_DIR = "/var/data"
+if os.path.exists(DB_DIR):
+    DB_PATH = os.path.join(DB_DIR, "portfolio.db")
+else:
+    DB_PATH = os.path.join(os.path.dirname(__file__), "portfolio.db")
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
