@@ -159,7 +159,7 @@ export default function Calculator() {
   return (
     <>
       <Head>
-        <title>Calculator — NexTrade</title>
+        <title>Calculator — Invexo</title>
         <meta name="description" content="Calculate investment returns with compound interest, SIP, and inflation adjustments." />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />

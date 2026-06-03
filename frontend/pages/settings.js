@@ -241,8 +241,8 @@ export default function SettingsPage() {
   return (
     <>
       <Head>
-        <title>Settings - NexTrade</title>
-        <meta name="description" content="Manage your NexTrade account, security, preferences, and privacy." />
+        <title>Settings - Invexo</title>
+        <meta name="description" content="Manage your Invexo account, security, preferences, and privacy." />
       </Head>
 
       <div style={{ minHeight: "100vh", background: "var(--bg-primary)" }}>

@@ -119,7 +119,7 @@ export default function Navbar() {
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               <img
                 src="/logo-512.png"
-                alt="NexTrade"
+                alt="Invexo"
                 width={36}
                 height={36}
                 style={{
@@ -144,7 +144,7 @@ export default function Navbar() {
                   letterSpacing: "-0.02em",
                 }}
               >
-                NexTrade
+                Invexo
               </span>
             </div>
           </Link>

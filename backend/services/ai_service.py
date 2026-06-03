@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 import os
 
 try:
-    _yf_cache_dir = os.path.join(os.getenv("TEMP", "C:\\tmp"), "nextrade-yfinance-cache")
+    _yf_cache_dir = os.path.join(os.getenv("TEMP", "C:\\tmp"), "invexo-yfinance-cache")
     os.makedirs(_yf_cache_dir, exist_ok=True)
     yf.set_tz_cache_location(_yf_cache_dir)
 except Exception:

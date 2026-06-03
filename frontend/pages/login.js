@@ -164,8 +164,8 @@ export default function LoginPage() {
   return (
     <>
       <Head>
-        <title>{mode === "login" ? "Sign In" : "Create Account"} — NexTrade</title>
-        <meta name="description" content="Sign in to NexTrade to access your portfolio, AI advisor, and live market data." />
+        <title>{mode === "login" ? "Sign In" : "Create Account"} — Invexo</title>
+        <meta name="description" content="Sign in to Invexo to access your portfolio, AI advisor, and live market data." />
       </Head>
 
       <div
@@ -203,7 +203,7 @@ export default function LoginPage() {
             >
               <img
                 src="/logo-512.png"
-                alt="NexTrade"
+                alt="Invexo"
                 width={44}
                 height={44}
                 style={{
@@ -226,7 +226,7 @@ export default function LoginPage() {
                   letterSpacing: "-0.02em",
                 }}
               >
-                NexTrade
+                Invexo
               </span>
             </div>
             <p
@@ -641,7 +641,7 @@ export default function LoginPage() {
               color: "var(--text-muted)",
             }}
           >
-            By continuing, you agree to NexTrade's Terms of Service.
+            By continuing, you agree to Invexo's Terms of Service.
           </p>
         </div>
       </div>

@@ -35,7 +35,7 @@ function AuthGuard({ children }) {
         <div style={{ textAlign: 'center' }}>
           <div className="spinner" style={{ margin: '0 auto 16px' }} />
           <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-            Loading NexTrade…
+            Loading Invexo…
           </p>
         </div>
       </div>

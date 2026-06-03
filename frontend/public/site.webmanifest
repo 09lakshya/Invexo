@@ -1,6 +1,6 @@
 {
-  "name": "NexTrade",
-  "short_name": "NexTrade",
+  "name": "Invexo",
+  "short_name": "Invexo",
   "description": "Live Market Dashboard & Trading Platform",
   "start_url": "/",
   "display": "standalone",

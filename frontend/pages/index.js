@@ -327,7 +327,7 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>NexTrade — Live Market Dashboard</title>
+        <title>Invexo — Live Market Dashboard</title>
         <meta name="description" content="Real-time Indian stock market data, live prices, AI advisor, and portfolio tracker." />
       </Head>
 

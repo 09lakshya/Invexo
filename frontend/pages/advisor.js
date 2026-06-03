@@ -469,7 +469,7 @@ export default function Advisor() {
   return (
     <>
       <Head>
-        <title>AI Advisor — NexTrade</title>
+        <title>AI Advisor — Invexo</title>
         <meta name="description" content="Get AI-powered stock recommendations tailored to your investment goals, duration, and risk appetite." />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
