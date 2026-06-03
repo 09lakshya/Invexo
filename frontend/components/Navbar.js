@@ -13,12 +13,52 @@ const GearIcon = ({ size = 18, color = "currentColor" }) => (
   </svg>
 );
 
+// Dashboard Icon SVG
+const DashboardIcon = ({ size = 18, color = "currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="7" height="9" />
+    <rect x="14" y="3" width="7" height="5" />
+    <rect x="14" y="12" width="7" height="9" />
+    <rect x="3" y="16" width="7" height="5" />
+  </svg>
+);
+
+// Sparkles Icon SVG for AI Advisor
+const SparklesIcon = ({ size = 18, color = "currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
+    <path d="m5 3 1 2.5L8.5 6 6 7 5 9.5 4 7 1.5 6 4 5.5Z" />
+    <path d="m19 17 1 2.5 2.5.5-2.5 1-1 2.5-1-2.5-2.5-1 2.5-1Z" />
+  </svg>
+);
+
+// Calculator Icon SVG
+const CalculatorIcon = ({ size = 18, color = "currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="4" y="2" width="16" height="20" rx="2" ry="2" />
+    <line x1="8" y1="6" x2="16" y2="6" />
+    <line x1="16" y1="14" x2="16" y2="18" />
+    <line x1="8" y1="14" x2="12" y2="14" />
+    <line x1="8" y1="18" x2="12" y2="18" />
+    <line x1="8" y1="10" x2="10" y2="10" />
+    <line x1="14" y1="10" x2="16" y2="10" />
+  </svg>
+);
+
+// Briefcase/Portfolio Icon SVG
+const PortfolioIcon = ({ size = 18, color = "currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
+    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
+  </svg>
+);
+
 const NAV_LINKS = [
-  { href: "/", label: "Dashboard", icon: "D" },
-  { href: "/advisor", label: "AI Advisor", icon: "A" },
-  { href: "/calculator", label: "Calculator", icon: "C" },
-  { href: "/portfolio", label: "Portfolio", icon: "P" },
-  { href: "/settings", label: "Settings", icon: "S", isGear: true },
+  { href: "/", label: "Dashboard", icon: DashboardIcon },
+  { href: "/advisor", label: "AI Advisor", icon: SparklesIcon },
+  { href: "/calculator", label: "Calculator", icon: CalculatorIcon },
+  { href: "/portfolio", label: "Portfolio", icon: PortfolioIcon },
+  { href: "/settings", label: "Settings", icon: GearIcon, isGear: true },
 ];
 
 export default function Navbar() {
@@ -366,7 +406,7 @@ export default function Navbar() {
           }}
           className="md:hidden"
         >
-          {NAV_LINKS.map(({ href, label, icon, isGear }) => {
+          {NAV_LINKS.map(({ href, label, icon: IconComponent }) => {
             const active = router.pathname === href;
             return (
               <Link
@@ -387,7 +427,7 @@ export default function Navbar() {
                   gap: "12px",
                 }}
               >
-                {isGear ? <GearIcon size={20} /> : <span style={{ fontSize: "1.2rem" }}>{icon}</span>}
+                <IconComponent size={20} color={active ? "var(--accent)" : "var(--text-secondary)"} />
                 {label}
                 {active && <span style={{ marginLeft: "auto", fontSize: "0.75rem", color: "var(--accent)", opacity: 0.7 }}>●</span>}
               </Link>
