@@ -53,6 +53,15 @@ const PortfolioIcon = ({ size = 18, color = "currentColor" }) => (
   </svg>
 );
 
+// Logout Icon SVG
+const LogOutIcon = ({ size = 18, color = "currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+    <polyline points="16 17 21 12 16 7" />
+    <line x1="21" y1="12" x2="9" y2="12" />
+  </svg>
+);
+
 const NAV_LINKS = [
   { href: "/", label: "Dashboard", icon: DashboardIcon },
   { href: "/advisor", label: "AI Advisor", icon: SparklesIcon },
@@ -334,7 +343,7 @@ export default function Navbar() {
                     onMouseEnter={e => e.currentTarget.style.background = "var(--red-dim)"}
                     onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                   >
-                    <span style={{ fontSize: "1rem" }}>⏻</span>
+                    <LogOutIcon size={16} color="var(--red)" />
                     Sign Out
                   </button>
                 </div>
@@ -433,8 +442,34 @@ export default function Navbar() {
               </Link>
             );
           })}
-
-
+          {user && (
+            <button
+              onClick={() => {
+                setMobileOpen(false);
+                logout();
+                router.replace("/login");
+              }}
+              style={{
+                marginTop: "auto",
+                padding: "16px 20px",
+                borderRadius: "14px",
+                fontSize: "1rem",
+                fontWeight: 600,
+                color: "var(--red)",
+                background: "var(--red-dim)",
+                border: "1px solid var(--red-dim)",
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+                cursor: "pointer",
+                textAlign: "left",
+                fontFamily: "inherit",
+              }}
+            >
+              <LogOutIcon size={20} color="var(--red)" />
+              Sign Out
+            </button>
+          )}
         </div>
       )}
     </>
