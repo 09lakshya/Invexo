@@ -3,6 +3,7 @@ import asyncio
 import io
 from contextlib import redirect_stdout, redirect_stderr
 import yfinance as yf
+import gc
 from services.data_service import get_stock_price, get_history
 
 router = APIRouter(prefix="/market")
@@ -109,6 +110,11 @@ async def update_market_cache():
                     await connection.send_json(GLOBAL_CACHE)
                 except Exception:
                     _active_connections.discard(connection)
+            
+            # Aggressive garbage collection to prevent memory leaks from yfinance bulk download
+            if 'df' in locals():
+                del df
+            gc.collect()
                     
         except Exception as e:
             print(f"[Background Fetch] Failed to bulk fetch market data: {e}")

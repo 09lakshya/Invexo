@@ -5,6 +5,28 @@ from textblob import TextBlob
 import requests
 from bs4 import BeautifulSoup
 import os
+import time
+import gc
+from functools import wraps
+
+def ttl_cache(maxsize=100, ttl=60):
+    def decorator(func):
+        cache = {}
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            key = str(args) + str(kwargs)
+            now = time.time()
+            if key in cache:
+                result, timestamp = cache[key]
+                if now - timestamp < ttl:
+                    return result
+            result = func(*args, **kwargs)
+            if len(cache) >= maxsize:
+                cache.pop(next(iter(cache)))
+            cache[key] = (result, now)
+            return result
+        return wrapper
+    return decorator
 
 try:
     _yf_cache_dir = os.path.join(os.getenv("TEMP", "C:\\tmp"), "invexo-yfinance-cache")
@@ -144,6 +166,7 @@ def _market_sentiment_proxy(symbol: str):
         return {"sentiment_score": 50, "news_count": 0, "impact": "neutral", "source": "none"}
 
 
+@ttl_cache(maxsize=100, ttl=300)
 def fetch_news_sentiment(symbol: str):
     """Fetch and analyze news sentiment for a stock"""
     try:
@@ -190,6 +213,7 @@ def fetch_news_sentiment(symbol: str):
         return _market_sentiment_proxy(symbol)
 
 
+@ttl_cache(maxsize=100, ttl=600)
 def get_fundamental_data(symbol: str):
     """Get fundamental data for a stock"""
     try:
@@ -314,11 +338,12 @@ def calculate_technical_quality_score(close, volume):
     return max(20, min(80, score))
 
 
+@ttl_cache(maxsize=100, ttl=60)
 def predict_stock(symbol: str):
     try:
         # Get more historical data for better accuracy
         stock = yf.Ticker(_get_working_ticker(symbol))
-        df = stock.history(period="1y")  # 1 year of daily data to support long moving averages
+        df = stock.history(period="6mo")  # Reduced from 1y to 6mo to save memory
         
         if df.empty or len(df) < 50:
             return {"error": "Not enough data"}
@@ -494,7 +519,7 @@ def predict_stock(symbol: str):
         day_close_prediction = max(day_close_prediction, lower_bb.iloc[-1])
         day_close_prediction = min(day_close_prediction, upper_bb.iloc[-1])
 
-        return {
+        result = {
             "current_price": round(current_price, 2),
             "change": round(change, 2),
             "percent_change": round(percent_change, 2),
@@ -518,6 +543,12 @@ def predict_stock(symbol: str):
             "earnings_growth": fundamentals.get("earnings_growth"),
             "revenue_growth": fundamentals.get("revenue_growth"),
         }
+
+        # Aggressive Garbage Collection to prevent OOM
+        del df, close, volume, stock
+        gc.collect()
+        
+        return result
 
     except Exception as e:
         print("Prediction Error:", e)
