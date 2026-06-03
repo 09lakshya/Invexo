@@ -2,10 +2,11 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import { useAuth } from "../context/AuthContext";
+import API from "../services/api";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, loading, login, signup } = useAuth();
+  const { user, loading, login, signup, setUser } = useAuth();
 
   const [mode, setMode] = useState("login"); // "login" | "signup"
   const [email, setEmail] = useState("");
@@ -18,11 +19,32 @@ export default function LoginPage() {
   const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState("");
+  const [resending, setResending] = useState(false);
 
   // Already logged in → go home
   useEffect(() => {
     if (!loading && user) router.replace("/");
   }, [loading, user]);
+
+  const handleResendOtp = async () => {
+    setResending(true);
+    setError("");
+    try {
+      await API.post("/auth/signup/initiate", {
+        email,
+        password,
+        name: name.trim(),
+        age: parseInt(age),
+      });
+      setError("A new OTP verification code has been sent.");
+    } catch (err) {
+      setError(err?.response?.data?.detail || "Could not resend OTP. Please try again.");
+    } finally {
+      setResending(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -79,10 +101,36 @@ export default function LoginPage() {
     try {
       if (mode === "login") {
         await login(email, password, rememberMe);
+        router.replace("/");
       } else {
-        await signup(email, password, name.trim(), parseInt(age), rememberMe);
+        if (!otpSent) {
+          // Initiate OTP
+          await API.post("/auth/signup/initiate", {
+            email,
+            password,
+            name: name.trim(),
+            age: parseInt(age),
+          });
+          setOtpSent(true);
+          setError("");
+        } else {
+          // Verify OTP
+          if (!otp || otp.length !== 6) {
+            setError("Please enter a valid 6-digit OTP code.");
+            setSubmitting(false);
+            return;
+          }
+          const res = await API.post("/auth/signup/verify", { email, otp });
+          const { token: tk, user: u } = res.data;
+          if (rememberMe) {
+            localStorage.setItem("ntrade_token", tk);
+          } else {
+            sessionStorage.setItem("ntrade_token", tk);
+          }
+          setUser(u);
+          router.replace("/");
+        }
       }
-      router.replace("/");
     } catch (err) {
       const msg =
         err?.response?.data?.detail || "Something went wrong. Please try again.";
@@ -96,6 +144,8 @@ export default function LoginPage() {
               onClick={() => {
                 setError("");
                 setMode("login");
+                setOtpSent(false);
+                setOtp("");
               }}
               style={{
                 background: "none",
@@ -283,251 +333,317 @@ export default function LoginPage() {
             </h2>
 
             <form onSubmit={handleSubmit}>
-              {/* Name & Age — signup only */}
-              {mode === "signup" && (
-                <div
-                  style={{
-                    display: "flex",
-                    gap: "12px",
-                    marginBottom: "18px",
-                    animation: "fadeInUp 0.3s ease forwards",
-                  }}
-                >
-                  <div style={{ flex: "2 1 0" }}>
-                    <label style={labelStyle}>Full Name</label>
+              {otpSent ? (
+                <div style={{ animation: "fadeInUp 0.3s ease forwards" }}>
+                  <div style={{ marginBottom: "20px", textAlign: "center" }}>
+                    <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>
+                      We sent a 6-digit OTP verification code to:
+                    </p>
+                    <p style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--accent)", marginTop: "4px" }}>
+                      {email}
+                    </p>
+                  </div>
+
+                  {/* OTP Code Input */}
+                  <div style={{ marginBottom: "20px" }}>
+                    <label style={labelStyle}>6-Digit Verification Code</label>
                     <input
                       type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="John Doe"
-                      style={inputStyle}
-                      onFocus={(e) =>
-                        (e.target.style.borderColor = "var(--accent)")
-                      }
-                      onBlur={(e) =>
-                        (e.target.style.borderColor = "var(--input-border)")
-                      }
+                      maxLength={6}
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                      placeholder="123456"
+                      style={{ ...inputStyle, textAlign: "center", fontSize: "1.4rem", fontWeight: 800, letterSpacing: "8px" }}
+                      onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
+                      onBlur={(e) => (e.target.style.borderColor = "var(--input-border)")}
                     />
                   </div>
-                  <div style={{ flex: "1 1 0", minWidth: "80px" }}>
-                    <label style={labelStyle}>Age</label>
-                    <input
-                      type="number"
-                      value={age}
-                      onChange={(e) => setAge(e.target.value)}
-                      placeholder="25"
-                      min="1"
-                      max="150"
-                      style={inputStyle}
-                      onFocus={(e) =>
-                        (e.target.style.borderColor = "var(--accent)")
-                      }
-                      onBlur={(e) =>
-                        (e.target.style.borderColor = "var(--input-border)")
-                      }
-                    />
-                  </div>
-                </div>
-              )}
 
-              {/* Email */}
-              <div style={{ marginBottom: "18px" }}>
-                <label style={labelStyle}>Email Address</label>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="you@example.com"
-                  autoComplete="email"
-                  style={inputStyle}
-                  onFocus={(e) =>
-                    (e.target.style.borderColor = "var(--accent)")
-                  }
-                  onBlur={(e) =>
-                    (e.target.style.borderColor = "var(--input-border)")
-                  }
-                />
-              </div>
-
-              {/* Password */}
-              <div style={{ marginBottom: mode === "signup" ? "18px" : "20px" }}>
-                <label style={labelStyle}>Password</label>
-                <div style={{ position: "relative" }}>
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    autoComplete={
-                      mode === "login" ? "current-password" : "new-password"
-                    }
-                    style={{ ...inputStyle, paddingRight: "46px" }}
-                    onFocus={(e) =>
-                      (e.target.style.borderColor = "var(--accent)")
-                    }
-                    onBlur={(e) =>
-                      (e.target.style.borderColor = "var(--input-border)")
-                    }
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    style={{
-                      position: "absolute",
-                      right: "14px",
-                      top: "50%",
-                      transform: "translateY(-50%)",
-                      background: "none",
-                      border: "none",
-                      cursor: "pointer",
-                      padding: "4px",
-                      color: "var(--text-muted)",
-                      display: "flex",
-                      alignItems: "center",
-                      transition: "color 0.2s",
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
-                    tabIndex={-1}
-                    title={showPassword ? "Hide password" : "Show password"}
-                  >
-                    {showPassword ? (
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-                        <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-                        <line x1="1" y1="1" x2="23" y2="23"/>
-                      </svg>
-                    ) : (
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                        <circle cx="12" cy="12" r="3"/>
-                      </svg>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* Confirm Password — signup only */}
-              {mode === "signup" && (
-                <div
-                  style={{
-                    marginBottom: "20px",
-                    animation: "fadeInUp 0.3s ease forwards",
-                  }}
-                >
-                  <label style={labelStyle}>Confirm Password</label>
-                  <div style={{ position: "relative" }}>
-                    <input
-                      type={showConfirmPw ? "text" : "password"}
-                      value={confirmPw}
-                      onChange={(e) => setConfirmPw(e.target.value)}
-                      placeholder="••••••••"
-                      autoComplete="new-password"
-                      style={{ ...inputStyle, paddingRight: "46px" }}
-                      onFocus={(e) =>
-                        (e.target.style.borderColor = "var(--accent)")
-                      }
-                      onBlur={(e) =>
-                        (e.target.style.borderColor = "var(--input-border)")
-                      }
-                    />
+                  {/* Resend and Edit details */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
                     <button
                       type="button"
-                      onClick={() => setShowConfirmPw(!showConfirmPw)}
+                      onClick={handleResendOtp}
+                      disabled={resending}
                       style={{
-                        position: "absolute",
-                        right: "14px",
-                        top: "50%",
-                        transform: "translateY(-50%)",
                         background: "none",
                         border: "none",
+                        color: "var(--accent)",
+                        fontWeight: 600,
                         cursor: "pointer",
-                        padding: "4px",
-                        color: "var(--text-muted)",
-                        display: "flex",
-                        alignItems: "center",
-                        transition: "color 0.2s",
+                        fontSize: "0.8rem",
+                        textDecoration: "underline",
+                        padding: 0,
                       }}
-                      onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent)")}
-                      onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
-                      tabIndex={-1}
-                      title={showConfirmPw ? "Hide password" : "Show password"}
                     >
-                      {showConfirmPw ? (
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-                          <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-                          <line x1="1" y1="1" x2="23" y2="23"/>
-                        </svg>
-                      ) : (
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                          <circle cx="12" cy="12" r="3"/>
-                        </svg>
-                      )}
+                      {resending ? "Sending..." : "Resend OTP"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setOtpSent(false)}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "var(--text-muted)",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        fontSize: "0.8rem",
+                        padding: 0,
+                      }}
+                    >
+                      ← Edit Details
                     </button>
                   </div>
                 </div>
-              )}
-
-              {/* Remember me */}
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  marginBottom: "24px",
-                }}
-              >
-                <div
-                  onClick={() => setRememberMe(!rememberMe)}
-                  style={{
-                    width: "18px",
-                    height: "18px",
-                    borderRadius: "5px",
-                    border: `1.5px solid ${
-                      rememberMe
-                        ? "var(--accent)"
-                        : "var(--border-medium)"
-                    }`,
-                    background: rememberMe
-                      ? "var(--accent-dim)"
-                      : "transparent",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    cursor: "pointer",
-                    transition: "all 0.2s",
-                    flexShrink: 0,
-                  }}
-                >
-                  {rememberMe && (
-                    <svg
-                      width="11"
-                      height="11"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="var(--accent)"
-                      strokeWidth="3.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
+              ) : (
+                <>
+                  {/* Name & Age — signup only */}
+                  {mode === "signup" && (
+                    <div
+                      style={{
+                        display: "flex",
+                        gap: "12px",
+                        marginBottom: "18px",
+                        animation: "fadeInUp 0.3s ease forwards",
+                      }}
                     >
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
+                      <div style={{ flex: "2 1 0" }}>
+                        <label style={labelStyle}>Full Name</label>
+                        <input
+                          type="text"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          placeholder="John Doe"
+                          style={inputStyle}
+                          onFocus={(e) =>
+                            (e.target.style.borderColor = "var(--accent)")
+                          }
+                          onBlur={(e) =>
+                            (e.target.style.borderColor = "var(--input-border)")
+                          }
+                        />
+                      </div>
+                      <div style={{ flex: "1 1 0", minWidth: "80px" }}>
+                        <label style={labelStyle}>Age</label>
+                        <input
+                          type="number"
+                          value={age}
+                          onChange={(e) => setAge(e.target.value)}
+                          placeholder="25"
+                          min="1"
+                          max="150"
+                          style={inputStyle}
+                          onFocus={(e) =>
+                            (e.target.style.borderColor = "var(--accent)")
+                          }
+                          onBlur={(e) =>
+                            (e.target.style.borderColor = "var(--input-border)")
+                          }
+                        />
+                      </div>
+                    </div>
                   )}
-                </div>
-                <span
-                  onClick={() => setRememberMe(!rememberMe)}
-                  style={{
-                    fontSize: "0.85rem",
-                    color: "var(--text-muted)",
-                    cursor: "pointer",
-                    userSelect: "none",
-                  }}
-                >
-                  Keep me signed in
-                </span>
-              </div>
+
+                  {/* Email */}
+                  <div style={{ marginBottom: "18px" }}>
+                    <label style={labelStyle}>Email Address</label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      autoComplete="email"
+                      style={inputStyle}
+                      onFocus={(e) =>
+                        (e.target.style.borderColor = "var(--accent)")
+                      }
+                      onBlur={(e) =>
+                        (e.target.style.borderColor = "var(--input-border)")
+                      }
+                    />
+                  </div>
+
+                  {/* Password */}
+                  <div style={{ marginBottom: mode === "signup" ? "18px" : "20px" }}>
+                    <label style={labelStyle}>Password</label>
+                    <div style={{ position: "relative" }}>
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder="••••••••"
+                        autoComplete={
+                          mode === "login" ? "current-password" : "new-password"
+                        }
+                        style={{ ...inputStyle, paddingRight: "46px" }}
+                        onFocus={(e) =>
+                          (e.target.style.borderColor = "var(--accent)")
+                        }
+                        onBlur={(e) =>
+                          (e.target.style.borderColor = "var(--input-border)")
+                        }
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        style={{
+                          position: "absolute",
+                          right: "14px",
+                          top: "50%",
+                          transform: "translateY(-50%)",
+                          background: "none",
+                          border: "none",
+                          cursor: "pointer",
+                          padding: "4px",
+                          color: "var(--text-muted)",
+                          display: "flex",
+                          alignItems: "center",
+                          transition: "color 0.2s",
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
+                        tabIndex={-1}
+                        title={showPassword ? "Hide password" : "Show password"}
+                      >
+                        {showPassword ? (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                            <line x1="1" y1="1" x2="23" y2="23"/>
+                          </svg>
+                        ) : (
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                            <circle cx="12" cy="12" r="3"/>
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Confirm Password — signup only */}
+                  {mode === "signup" && (
+                    <div
+                      style={{
+                        marginBottom: "20px",
+                        animation: "fadeInUp 0.3s ease forwards",
+                      }}
+                    >
+                      <label style={labelStyle}>Confirm Password</label>
+                      <div style={{ position: "relative" }}>
+                        <input
+                          type={showConfirmPw ? "text" : "password"}
+                          value={confirmPw}
+                          onChange={(e) => setConfirmPw(e.target.value)}
+                          placeholder="••••••••"
+                          autoComplete="new-password"
+                          style={{ ...inputStyle, paddingRight: "46px" }}
+                          onFocus={(e) =>
+                            (e.target.style.borderColor = "var(--accent)")
+                          }
+                          onBlur={(e) =>
+                            (e.target.style.borderColor = "var(--input-border)")
+                          }
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPw(!showConfirmPw)}
+                          style={{
+                            position: "absolute",
+                            right: "14px",
+                            top: "50%",
+                            transform: "translateY(-50%)",
+                            background: "none",
+                            border: "none",
+                            cursor: "pointer",
+                            padding: "4px",
+                            color: "var(--text-muted)",
+                            display: "flex",
+                            alignItems: "center",
+                            transition: "color 0.2s",
+                          }}
+                          onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent)")}
+                          onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
+                          tabIndex={-1}
+                          title={showConfirmPw ? "Hide password" : "Show password"}
+                        >
+                          {showConfirmPw ? (
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                              <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                              <line x1="1" y1="1" x2="23" y2="23"/>
+                            </svg>
+                          ) : (
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                              <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Remember me */}
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      marginBottom: "24px",
+                    }}
+                  >
+                    <div
+                      onClick={() => setRememberMe(!rememberMe)}
+                      style={{
+                        width: "18px",
+                        height: "18px",
+                        borderRadius: "5px",
+                        border: `1.5px solid ${
+                          rememberMe
+                            ? "var(--accent)"
+                            : "var(--border-medium)"
+                        }`,
+                        background: rememberMe
+                          ? "var(--accent-dim)"
+                          : "transparent",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        cursor: "pointer",
+                        transition: "all 0.2s",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {rememberMe && (
+                        <svg
+                          width="11"
+                          height="11"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="var(--accent)"
+                          strokeWidth="3.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                    </div>
+                    <span
+                      onClick={() => setRememberMe(!rememberMe)}
+                      style={{
+                        fontSize: "0.85rem",
+                        color: "var(--text-muted)",
+                        cursor: "pointer",
+                        userSelect: "none",
+                      }}
+                    >
+                      Keep me signed in
+                    </span>
+                  </div>
+                </>
+              )}
 
               {/* Error */}
               {error && (
@@ -591,12 +707,14 @@ export default function LoginPage() {
                     }}
                   >
                     <span className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }} />
-                    {mode === "login" ? "Signing in…" : "Creating account…"}
+                    {otpSent ? "Verifying..." : mode === "login" ? "Signing in…" : "Sending OTP…"}
                   </span>
+                ) : otpSent ? (
+                  "Verify & Sign Up"
                 ) : mode === "login" ? (
                   "Sign In"
                 ) : (
-                  "Create Account"
+                  "Send Verification OTP"
                 )}
               </button>
             </form>

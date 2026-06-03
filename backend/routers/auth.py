@@ -10,6 +10,8 @@ from services.auth_service import (
     change_password,
     create_token,
     verify_token,
+    initiate_signup_otp,
+    verify_signup_otp,
 )
 
 router = APIRouter(prefix="/auth")
@@ -25,6 +27,36 @@ class SignupInput(BaseModel):
 class LoginInput(BaseModel):
     email: str
     password: str
+
+
+class VerifySignupInput(BaseModel):
+    email: str
+    otp: str
+
+
+ALLOWED_DOMAINS = {
+    "gmail.com", "googlemail.com", "yahoo.com", "yahoo.in", "yahoo.co.in",
+    "yahoo.co.uk", "outlook.com", "hotmail.com", "live.com", "msn.com",
+    "icloud.com", "me.com", "mac.com", "aol.com", "protonmail.com",
+    "proton.me", "zoho.com", "zoho.in", "yandex.com", "mail.com",
+    "gmx.com", "gmx.net", "tutanota.com", "tuta.io", "fastmail.com",
+    "hey.com", "pm.me", "rediffmail.com", "in.com", "sify.com",
+    "email.com", "usa.com", "inbox.com", "mail.ru", "rambler.ru",
+    "cox.net", "sbcglobal.net", "att.net", "comcast.net", "verizon.net",
+    "bellsouth.net", "charter.net", "earthlink.net", "optonline.net",
+    "web.de", "t-online.de", "libero.it", "virgilio.it",
+    "laposte.net", "orange.fr", "wanadoo.fr", "free.fr",
+    "naver.com", "hanmail.net", "daum.net", "qq.com", "163.com",
+    "126.com", "sina.com", "yeah.net"
+}
+
+
+def _is_allowed_domain(email: str) -> bool:
+    parts = email.split("@")
+    if len(parts) < 2:
+        return False
+    domain = parts[1].lower().strip()
+    return domain in ALLOWED_DOMAINS
 
 
 class UpdateProfileInput(BaseModel):
@@ -60,6 +92,8 @@ def handle_signup(payload: SignupInput):
         raise HTTPException(status_code=400, detail="Email and password are required")
     if not _is_valid_email(payload.email):
         raise HTTPException(status_code=400, detail="Please enter a valid email address")
+    if not _is_allowed_domain(payload.email):
+        raise HTTPException(status_code=400, detail="Please use a valid email provider (e.g. Gmail, Yahoo, Outlook)")
     if len(payload.password) < 6:
         raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
     if not payload.name or not payload.name.strip():
@@ -68,6 +102,59 @@ def handle_signup(payload: SignupInput):
         raise HTTPException(status_code=400, detail="Please enter a valid age")
 
     user = signup(payload.email, payload.password, payload.name, payload.age)
+    if user is None:
+        raise HTTPException(status_code=409, detail="An account with this email already exists")
+
+    token = create_token(user["id"])
+    return {"token": token, "user": user}
+
+
+@router.post("/signup/initiate")
+def handle_signup_initiate(payload: SignupInput):
+    if not payload.email or not payload.password:
+        raise HTTPException(status_code=400, detail="Email and password are required")
+    if not _is_valid_email(payload.email):
+        raise HTTPException(status_code=400, detail="Please enter a valid email address")
+    if not _is_allowed_domain(payload.email):
+        raise HTTPException(status_code=400, detail="Please use a valid email provider (e.g. Gmail, Yahoo, Outlook)")
+    if len(payload.password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+    if not payload.name or not payload.name.strip():
+        raise HTTPException(status_code=400, detail="Name is required")
+    if payload.age < 1 or payload.age > 150:
+        raise HTTPException(status_code=400, detail="Please enter a valid age")
+
+    # Check if user already exists
+    from services.auth_service import DB_PATH
+    import sqlite3
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("SELECT id FROM users WHERE email = ?", (payload.email.lower(),))
+    exists = c.fetchone()
+    conn.close()
+    if exists:
+        raise HTTPException(status_code=409, detail="An account with this email already exists")
+
+    initiate_signup_otp(payload.email, payload.dict())
+    return {"message": "Verification OTP sent"}
+
+
+@router.post("/signup/verify")
+def handle_signup_verify(payload: VerifySignupInput):
+    if not payload.email or not payload.otp:
+        raise HTTPException(status_code=400, detail="Email and OTP code are required")
+
+    signup_payload = verify_signup_otp(payload.email, payload.otp)
+    if signup_payload is None:
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP code")
+
+    # Register user in database
+    user = signup(
+        signup_payload["email"],
+        signup_payload["password"],
+        signup_payload["name"],
+        signup_payload["age"]
+    )
     if user is None:
         raise HTTPException(status_code=409, detail="An account with this email already exists")
 

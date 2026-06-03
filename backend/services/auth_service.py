@@ -3,7 +3,80 @@ import os
 import bcrypt
 import jwt
 import warnings
+import random
 from datetime import datetime, timedelta
+from email.mime.text import MIMEText
+
+# Global in-memory OTP store. Format: { email: { "otp": str, "expires": datetime, "payload": dict } }
+otp_store = {}
+
+def send_otp_email(email_addr: str, otp: str):
+    """Prints OTP to console. If SMTP variables are present in environment, sends it via SMTP."""
+    # Build clean console banner
+    print("\n" + "="*50)
+    print(f"[OTP DEBUG] OTP for {email_addr}: {otp}")
+    print("="*50 + "\n")
+
+    # Read SMTP credentials
+    host = os.environ.get("SMTP_HOST", "")
+    port = os.environ.get("SMTP_PORT", "")
+    user = os.environ.get("SMTP_USER", "")
+    password = os.environ.get("SMTP_PASSWORD", "")
+    sender = os.environ.get("SMTP_FROM", user)
+
+    if host and port and user and password:
+        try:
+            msg = MIMEText(
+                f"Thank you for signing up for Invexo!\n\n"
+                f"Your 6-digit verification code (OTP) is: {otp}\n\n"
+                f"This code will expire in 5 minutes. Please do not share it with anyone."
+            )
+            msg["Subject"] = "Invexo - Verify Your Email"
+            msg["From"] = sender
+            msg["To"] = email_addr
+
+            # Connect and send
+            import smtplib
+            server = smtplib.SMTP(host, int(port))
+            server.starttls()
+            server.login(user, password)
+            server.sendmail(sender, [email_addr], msg.as_string())
+            server.quit()
+            print(f"[SMTP] Successfully sent OTP email to {email_addr}")
+        except Exception as e:
+            print(f"[SMTP ERROR] Failed to send email to {email_addr}: {e}")
+
+
+def initiate_signup_otp(email_addr: str, payload: dict) -> str:
+    """Generates 6-digit OTP, stores signup payload, and triggers send."""
+    otp = f"{random.randint(100000, 999999)}"
+    expiry = datetime.now() + timedelta(minutes=5)
+    otp_store[email_addr.lower()] = {
+        "otp": otp,
+        "expires": expiry,
+        "payload": payload
+    }
+    send_otp_email(email_addr, otp)
+    return otp
+
+
+def verify_signup_otp(email_addr: str, otp: str) -> dict | None:
+    """Verifies OTP. Returns stored user payload on success, None on invalid/expired."""
+    key = email_addr.lower()
+    if key not in otp_store:
+        return None
+    
+    record = otp_store[key]
+    if datetime.now() > record["expires"]:
+        del otp_store[key]
+        return None
+        
+    if record["otp"] != otp:
+        return None
+        
+    payload = record["payload"]
+    del otp_store[key]
+    return payload
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "portfolio.db")
 JWT_SECRET = os.environ.get("JWT_SECRET", "")
