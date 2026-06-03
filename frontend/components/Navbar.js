@@ -363,42 +363,7 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* Settings Gear Icon */}
-          <Link
-            href="/settings"
-            className="hidden-mobile"
-            title="Settings"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              width: "36px",
-              height: "36px",
-              borderRadius: "10px",
-              background: router.pathname === "/settings" ? "var(--accent-dim)" : "transparent",
-              border: router.pathname === "/settings" ? "1px solid var(--accent-glow)" : "1px solid transparent",
-              color: router.pathname === "/settings" ? "var(--accent)" : "var(--text-muted)",
-              transition: "all 0.25s ease",
-              flexShrink: 0,
-              textDecoration: "none",
-            }}
-            onMouseEnter={e => {
-              if (router.pathname !== "/settings") {
-                e.currentTarget.style.color = "var(--text-primary)";
-                e.currentTarget.style.background = "var(--hover-overlay)";
-                e.currentTarget.style.transform = "rotate(45deg)";
-              }
-            }}
-            onMouseLeave={e => {
-              if (router.pathname !== "/settings") {
-                e.currentTarget.style.color = "var(--text-muted)";
-                e.currentTarget.style.background = "transparent";
-                e.currentTarget.style.transform = "rotate(0deg)";
-              }
-            }}
-          >
-            <GearIcon size={18} />
-          </Link>
+
 
           {/* User Menu / Login */}
           {user ? (
