@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import Navbar from "../components/Navbar";
@@ -111,6 +111,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const { user, setUser, refreshUser, logout, avatar, updateAvatar } = useAuth();
   const { theme, setThemeMode } = useTheme();
+  const fileInputRef = useRef(null);
 
   const [settings, setSettings] = useState(defaultSettings);
   const [profileName, setProfileName] = useState(user?.name || "");
@@ -352,8 +353,73 @@ export default function SettingsPage() {
                   <label style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em" }}>
                     Profile Photo
                   </label>
-                  <div style={{ marginTop: "8px" }}>
-                    <input type="file" accept="image/*" onChange={handleAvatarUpload} style={{ color: "var(--text-secondary)", fontSize: "0.85rem" }} />
+                  <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarUpload}
+                      style={{ display: "none" }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      style={{
+                        padding: "8px 16px",
+                        borderRadius: "10px",
+                        border: "1px solid var(--border-medium)",
+                        background: "var(--input-bg)",
+                        color: "var(--text-primary)",
+                        fontSize: "0.85rem",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        transition: "all 0.2s",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = "var(--accent)";
+                        e.currentTarget.style.background = "var(--accent-dim)";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = "var(--border-medium)";
+                        e.currentTarget.style.background = "var(--input-bg)";
+                      }}
+                    >
+                      Choose Image
+                    </button>
+                    {avatar && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          updateAvatar("");
+                          if (fileInputRef.current) {
+                            fileInputRef.current.value = "";
+                          }
+                        }}
+                        style={{
+                          padding: "8px 16px",
+                          borderRadius: "10px",
+                          border: "1px solid var(--red-dim)",
+                          background: "var(--red-dim)",
+                          color: "var(--red)",
+                          fontSize: "0.85rem",
+                          fontWeight: 600,
+                          cursor: "pointer",
+                          transition: "all 0.2s",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = "var(--red)";
+                          e.currentTarget.style.color = "white";
+                          e.currentTarget.style.borderColor = "var(--red)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = "var(--red-dim)";
+                          e.currentTarget.style.color = "var(--red)";
+                          e.currentTarget.style.borderColor = "var(--red-dim)";
+                        }}
+                      >
+                        Remove Photo
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
