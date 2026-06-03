@@ -1,6 +1,47 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import API from "../services/api";
 
+const resizeImage = (base64Str, maxWidth = 150, maxHeight = 150) => {
+  return new Promise((resolve) => {
+    if (typeof window === "undefined") {
+      resolve(base64Str);
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+      } else {
+        if (height > maxHeight) {
+          width = Math.round((width * maxHeight) / height);
+          height = maxHeight;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(base64Str);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/jpeg", 0.7));
+    };
+    img.onerror = () => {
+      resolve(base64Str);
+    };
+    img.src = base64Str;
+  });
+};
+
 const AuthContext = createContext(null);
 
 export function useAuth() {
@@ -106,17 +147,34 @@ export function AuthProvider({ children }) {
   }, [user]);
 
   const updateAvatar = async (data) => {
-    setAvatar(data);
-    if (user?.id) {
-      localStorage.setItem(`ntrade_profile_photo_${user.id}`, data);
-      try {
-        const res = await API.patch("/auth/profile", { profile_photo: data });
-        setUser(res.data);
-      } catch (err) {
-        console.error("Failed to sync profile photo to backend:", err);
+    if (!data) {
+      setAvatar("");
+      if (user?.id) {
+        localStorage.removeItem(`ntrade_profile_photo_${user.id}`);
+        try {
+          const res = await API.patch("/auth/profile", { profile_photo: "" });
+          setUser(res.data);
+        } catch (err) {
+          console.error("Failed to clear profile photo on backend:", err);
+        }
       }
+      localStorage.removeItem("ntrade_profile_photo");
+      return;
     }
-    localStorage.setItem("ntrade_profile_photo", data);
+
+    try {
+      const compressed = await resizeImage(data);
+      setAvatar(compressed);
+      if (user?.id) {
+        localStorage.setItem(`ntrade_profile_photo_${user.id}`, compressed);
+        const res = await API.patch("/auth/profile", { profile_photo: compressed });
+        setUser(res.data);
+      }
+      localStorage.setItem("ntrade_profile_photo", compressed);
+    } catch (err) {
+      console.error("Failed to sync profile photo to backend:", err);
+      setAvatar(data);
+    }
   };
 
   return (
