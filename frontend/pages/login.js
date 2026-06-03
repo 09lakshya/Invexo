@@ -19,32 +19,11 @@ export default function LoginPage() {
   const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
-  const [otp, setOtp] = useState("");
-  const [resending, setResending] = useState(false);
 
   // Already logged in → go home
   useEffect(() => {
     if (!loading && user) router.replace("/");
   }, [loading, user]);
-
-  const handleResendOtp = async () => {
-    setResending(true);
-    setError("");
-    try {
-      await API.post("/auth/signup/initiate", {
-        email,
-        password,
-        name: name.trim(),
-        age: parseInt(age),
-      });
-      setError("A new OTP verification code has been sent.");
-    } catch (err) {
-      setError(err?.response?.data?.detail || "Could not resend OTP. Please try again.");
-    } finally {
-      setResending(false);
-    }
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -103,33 +82,8 @@ export default function LoginPage() {
         await login(email, password, rememberMe);
         router.replace("/");
       } else {
-        if (!otpSent) {
-          // Initiate OTP
-          await API.post("/auth/signup/initiate", {
-            email,
-            password,
-            name: name.trim(),
-            age: parseInt(age),
-          });
-          setOtpSent(true);
-          setError("");
-        } else {
-          // Verify OTP
-          if (!otp || otp.length !== 6) {
-            setError("Please enter a valid 6-digit OTP code.");
-            setSubmitting(false);
-            return;
-          }
-          const res = await API.post("/auth/signup/verify", { email, otp });
-          const { token: tk, user: u } = res.data;
-          if (rememberMe) {
-            localStorage.setItem("ntrade_token", tk);
-          } else {
-            sessionStorage.setItem("ntrade_token", tk);
-          }
-          setUser(u);
-          router.replace("/");
-        }
+        await signup(email, password, name.trim(), parseInt(age), rememberMe);
+        router.replace("/");
       }
     } catch (err) {
       const msg =
@@ -144,8 +98,6 @@ export default function LoginPage() {
               onClick={() => {
                 setError("");
                 setMode("login");
-                setOtpSent(false);
-                setOtp("");
               }}
               style={{
                 background: "none",
@@ -320,70 +272,6 @@ export default function LoginPage() {
             </h2>
 
             <form onSubmit={handleSubmit}>
-              {otpSent ? (
-                <div style={{ animation: "fadeInUp 0.3s ease forwards" }}>
-                  <div style={{ marginBottom: "20px", textAlign: "center" }}>
-                    <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", lineHeight: 1.5 }}>
-                      We sent a 6-digit OTP verification code to:
-                    </p>
-                    <p style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--accent)", marginTop: "4px" }}>
-                      {email}
-                    </p>
-                  </div>
-
-                  {/* OTP Code Input */}
-                  <div style={{ marginBottom: "20px" }}>
-                    <label style={labelStyle}>6-Digit Verification Code</label>
-                    <input
-                      type="text"
-                      maxLength={6}
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                      placeholder="123456"
-                      style={{ ...inputStyle, textAlign: "center", fontSize: "1.4rem", fontWeight: 800, letterSpacing: "8px" }}
-                      onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
-                      onBlur={(e) => (e.target.style.borderColor = "var(--input-border)")}
-                    />
-                  </div>
-
-                  {/* Resend and Edit details */}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
-                    <button
-                      type="button"
-                      onClick={handleResendOtp}
-                      disabled={resending}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        color: "var(--accent)",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        fontSize: "0.8rem",
-                        textDecoration: "underline",
-                        padding: 0,
-                      }}
-                    >
-                      {resending ? "Sending..." : "Resend OTP"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setOtpSent(false)}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        color: "var(--text-muted)",
-                        fontWeight: 600,
-                        cursor: "pointer",
-                        fontSize: "0.8rem",
-                        padding: 0,
-                      }}
-                    >
-                      ← Edit Details
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <>
                   {/* Name & Age — signup only */}
                   {mode === "signup" && (
                     <div
@@ -629,8 +517,6 @@ export default function LoginPage() {
                       Keep me signed in
                     </span>
                   </div>
-                </>
-              )}
 
               {/* Error */}
               {error && (
@@ -694,14 +580,12 @@ export default function LoginPage() {
                     }}
                   >
                     <span className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }} />
-                    {otpSent ? "Verifying..." : mode === "login" ? "Signing in…" : "Sending OTP…"}
+                    {mode === "login" ? "Signing in…" : "Signing up…"}
                   </span>
-                ) : otpSent ? (
-                  "Verify & Sign Up"
                 ) : mode === "login" ? (
                   "Sign In"
                 ) : (
-                  "Send Verification OTP"
+                  "Create Account"
                 )}
               </button>
             </form>
