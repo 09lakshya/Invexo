@@ -93,17 +93,28 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     if (user?.id) {
-      const savedAvatar = localStorage.getItem(`ntrade_profile_photo_${user.id}`) || localStorage.getItem("ntrade_profile_photo");
-      setAvatar(savedAvatar || "");
+      if (user.profile_photo) {
+        setAvatar(user.profile_photo);
+        localStorage.setItem(`ntrade_profile_photo_${user.id}`, user.profile_photo);
+      } else {
+        const savedAvatar = localStorage.getItem(`ntrade_profile_photo_${user.id}`) || localStorage.getItem("ntrade_profile_photo");
+        setAvatar(savedAvatar || "");
+      }
     } else {
       setAvatar("");
     }
   }, [user]);
 
-  const updateAvatar = (data) => {
+  const updateAvatar = async (data) => {
     setAvatar(data);
     if (user?.id) {
       localStorage.setItem(`ntrade_profile_photo_${user.id}`, data);
+      try {
+        const res = await API.patch("/auth/profile", { profile_photo: data });
+        setUser(res.data);
+      } catch (err) {
+        console.error("Failed to sync profile photo to backend:", err);
+      }
     }
     localStorage.setItem("ntrade_profile_photo", data);
   };

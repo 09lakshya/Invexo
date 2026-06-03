@@ -7,6 +7,7 @@ from services.auth_service import (
     login,
     get_user,
     update_profile,
+    update_profile_fields,
     change_password,
     create_token,
     verify_token,
@@ -60,7 +61,8 @@ def _is_allowed_domain(email: str) -> bool:
 
 
 class UpdateProfileInput(BaseModel):
-    name: str
+    name: Optional[str] = None
+    profile_photo: Optional[str] = None
 
 
 class ChangePasswordInput(BaseModel):
@@ -194,10 +196,21 @@ def handle_me(authorization: Optional[str] = Header(None)):
 @router.patch("/profile")
 def handle_update_profile(payload: UpdateProfileInput, authorization: Optional[str] = Header(None)):
     user_id = _require_user_id(authorization)
-    if not payload.name or not payload.name.strip():
-        raise HTTPException(status_code=400, detail="Name is required")
+    
+    updated_fields = {}
+    if payload.name is not None:
+        name = payload.name.strip()
+        if not name:
+            raise HTTPException(status_code=400, detail="Name cannot be empty")
+        updated_fields["name"] = name
+        
+    if payload.profile_photo is not None:
+        updated_fields["profile_photo"] = payload.profile_photo
 
-    user = update_profile(user_id, payload.name)
+    if not updated_fields:
+        raise HTTPException(status_code=400, detail="No fields to update")
+
+    user = update_profile_fields(user_id, updated_fields)
     if user is None:
         raise HTTPException(status_code=400, detail="Could not update profile")
     return user

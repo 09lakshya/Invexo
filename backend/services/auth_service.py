@@ -168,7 +168,8 @@ def init_users_db():
                 password_hash VARCHAR(255) NOT NULL,
                 name          VARCHAR(255) NOT NULL,
                 age           INTEGER NOT NULL,
-                created_at    VARCHAR(255) NOT NULL
+                created_at    VARCHAR(255) NOT NULL,
+                profile_photo TEXT
             )
         """)
     else:
@@ -179,10 +180,16 @@ def init_users_db():
                 password_hash TEXT  NOT NULL,
                 name        TEXT    NOT NULL,
                 age         INTEGER NOT NULL,
-                created_at  TEXT    NOT NULL
+                created_at  TEXT    NOT NULL,
+                profile_photo TEXT
             )
         """)
     conn.commit()
+    try:
+        c.execute("ALTER TABLE users ADD COLUMN profile_photo TEXT")
+        conn.commit()
+    except Exception:
+        pass
     conn.close()
 
 
@@ -216,14 +223,14 @@ def signup(email: str, password: str, name: str, age: int) -> dict | None:
     conn.commit()
     conn.close()
 
-    return {"id": user_id, "email": email.lower(), "name": name.strip(), "age": age}
+    return {"id": user_id, "email": email.lower(), "name": name.strip(), "age": age, "profile_photo": None}
 
 
 def login(email: str, password: str) -> dict | None:
     """Validate credentials. Returns user dict on success, None on failure."""
     conn, is_postgres = get_db_connection()
     c = get_cursor(conn, is_postgres)
-    execute_query(c, "SELECT * FROM users WHERE email = ?", (email.lower(),), is_postgres)
+    execute_query(c, "SELECT id, email, name, age, password_hash, created_at, profile_photo FROM users WHERE email = ?", (email.lower(),), is_postgres)
     row = c.fetchone()
     conn.close()
 
@@ -238,6 +245,7 @@ def login(email: str, password: str) -> dict | None:
         "email": row["email"],
         "name": row["name"],
         "age": row["age"],
+        "profile_photo": row.get("profile_photo") if is_postgres else row["profile_photo"]
     }
 
 
@@ -245,7 +253,7 @@ def get_user(user_id: int) -> dict | None:
     """Fetch a user by ID."""
     conn, is_postgres = get_db_connection()
     c = get_cursor(conn, is_postgres)
-    execute_query(c, "SELECT id, email, name, age, created_at FROM users WHERE id = ?", (user_id,), is_postgres)
+    execute_query(c, "SELECT id, email, name, age, created_at, profile_photo FROM users WHERE id = ?", (user_id,), is_postgres)
     row = c.fetchone()
     conn.close()
 
@@ -264,6 +272,33 @@ def update_profile(user_id: int, name: str) -> dict | None:
     conn, is_postgres = get_db_connection()
     c = conn.cursor()
     execute_query(c, "UPDATE users SET name = ? WHERE id = ?", (cleaned_name, user_id), is_postgres)
+    conn.commit()
+    updated = c.rowcount > 0
+    conn.close()
+
+    if not updated:
+        return None
+    return get_user(user_id)
+
+
+def update_profile_fields(user_id: int, fields: dict) -> dict | None:
+    """Update dynamic fields for a user and return the updated user dict."""
+    if not fields:
+        return None
+
+    conn, is_postgres = get_db_connection()
+    c = conn.cursor()
+    
+    set_clauses = []
+    params = []
+    for k, v in fields.items():
+        set_clauses.append(f"{k} = ?")
+        params.append(v)
+    
+    params.append(user_id)
+    sql = f"UPDATE users SET {', '.join(set_clauses)} WHERE id = ?"
+    
+    execute_query(c, sql, tuple(params), is_postgres)
     conn.commit()
     updated = c.rowcount > 0
     conn.close()
