@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/router";
 import StockCard from "../components/StockCard";
 import Navbar from "../components/Navbar";
+import API from "../services/api";
 import Head from "next/head";
 
 // ── Market hours helper (NSE: Mon–Fri 9:15–15:30 IST) ────────────────────
@@ -260,11 +262,62 @@ function SkeletonCard() {
 
 // ── Main Dashboard ────────────────────────────────────────────────────────
 export default function Home() {
+  const router = useRouter();
   const [stocks, setStocks] = useState({});
   const [prevStocks, setPrevStocks] = useState({});
   const [connected, setConnected] = useState(false);
   const [filterCategory, setFilterCategory] = useState("All");
   const [viewAll, setViewAll] = useState(false);
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [recentSearches, setRecentSearches] = useState([]);
+  const [showRecents, setShowRecents] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const searchRef = useRef(null);
+
+  // Load recent searches from localStorage
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem("ntrade_recent_searches") || "[]");
+      setRecentSearches(stored.slice(0, 5));
+    } catch { setRecentSearches([]); }
+  }, []);
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (searchRef.current && !searchRef.current.contains(e.target)) {
+        setResults([]);
+        setShowRecents(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const handleSearch = async (val) => {
+    setQuery(val);
+    if (!val.trim()) { setResults([]); setShowRecents(true); return; }
+    setShowRecents(false);
+    try {
+      const res = await API.get(`/search?q=${val}`);
+      setResults((res.data || []).slice(0, 8));
+    } catch {
+      setResults([]);
+    }
+  };
+
+  const goToStock = (sym) => {
+    setQuery(""); setResults([]); setShowRecents(false);
+    // Save to recent searches
+    try {
+      const stored = JSON.parse(localStorage.getItem("ntrade_recent_searches") || "[]");
+      const updated = [sym, ...stored.filter(s => s !== sym)].slice(0, 5);
+      localStorage.setItem("ntrade_recent_searches", JSON.stringify(updated));
+      setRecentSearches(updated);
+    } catch {}
+    router.push(`/stock/${sym}`);
+  };
 
   const indexSymbols = ["NIFTY50", "SENSEX"];
 
@@ -399,6 +452,176 @@ export default function Home() {
               )}
               <MarketStatusBadge connected={connected} />
             </div>
+          </div>
+
+          {/* ── Search Bar ──────────────────────────────────────────── */}
+          <div
+            ref={searchRef}
+            style={{
+              position: "relative",
+              maxWidth: "480px",
+              marginBottom: "32px",
+              zIndex: 30,
+              animation: "fadeInUp 0.5s 0.05s ease both",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "10px",
+                background: focused ? "var(--accent-dim)" : "var(--search-bg)",
+                border: `1.5px solid ${focused ? "var(--accent)" : "var(--search-border)"}`,
+                borderRadius: "16px",
+                padding: "12px 18px",
+                transition: "all 0.25s ease",
+                boxShadow: focused ? "0 0 24px var(--accent-glow), var(--shadow-card)" : "var(--shadow-card)",
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={focused ? "var(--accent)" : "var(--text-muted)"} strokeWidth="2.5" style={{ flexShrink: 0 }}>
+                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+              </svg>
+              <input
+                type="text"
+                value={query}
+                onChange={e => handleSearch(e.target.value)}
+                placeholder="Search stocks by name or symbol…"
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  outline: "none",
+                  color: "var(--text-primary)",
+                  fontSize: "0.95rem",
+                  fontFamily: "inherit",
+                  width: "100%",
+                }}
+                onFocus={() => {
+                  setFocused(true);
+                  if (!query.trim()) setShowRecents(true);
+                }}
+                onBlur={() => setFocused(false)}
+              />
+              {query && (
+                <button
+                  onClick={() => { setQuery(""); setResults([]); }}
+                  style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: "16px", padding: 0 }}
+                >✕</button>
+              )}
+            </div>
+
+            {/* Search Results Dropdown */}
+            {results.length > 0 && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 8px)",
+                  left: 0,
+                  right: 0,
+                  background: "var(--dropdown-bg)",
+                  border: "1px solid var(--border-medium)",
+                  borderRadius: "16px",
+                  overflow: "hidden",
+                  boxShadow: "var(--shadow-dropdown)",
+                  zIndex: 200,
+                }}
+              >
+                {results.map((sym) => (
+                  <div
+                    key={sym}
+                    onClick={() => goToStock(sym)}
+                    style={{
+                      padding: "14px 18px",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "12px",
+                      borderBottom: "1px solid var(--border-subtle)",
+                      transition: "background 0.15s",
+                      fontSize: "0.95rem",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = "var(--hover-overlay)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                  >
+                    <div
+                      style={{
+                        width: "32px",
+                        height: "32px",
+                        borderRadius: "10px",
+                        background: "var(--accent-dim)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        fontSize: "11px",
+                        fontWeight: 700,
+                        color: "var(--accent)",
+                        flexShrink: 0,
+                      }}
+                    >
+                      {sym.slice(0, 2)}
+                    </div>
+                    <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{sym}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Recent Searches Dropdown */}
+            {showRecents && results.length === 0 && !query.trim() && recentSearches.length > 0 && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 8px)",
+                  left: 0,
+                  right: 0,
+                  background: "var(--dropdown-bg)",
+                  border: "1px solid var(--border-medium)",
+                  borderRadius: "16px",
+                  overflow: "hidden",
+                  boxShadow: "var(--shadow-dropdown)",
+                  zIndex: 200,
+                  animation: "fadeIn 0.15s ease",
+                }}
+              >
+                <div style={{ padding: "12px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--border-subtle)" }}>
+                  <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>Recent Searches</span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      localStorage.removeItem("ntrade_recent_searches");
+                      setRecentSearches([]);
+                      setShowRecents(false);
+                    }}
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: "0.72rem", fontWeight: 600, padding: 0, fontFamily: "inherit" }}
+                    onMouseEnter={e => e.currentTarget.style.color = "var(--red)"}
+                    onMouseLeave={e => e.currentTarget.style.color = "var(--text-muted)"}
+                  >Clear</button>
+                </div>
+                {recentSearches.map((sym) => (
+                  <div
+                    key={sym}
+                    onClick={() => goToStock(sym)}
+                    style={{
+                      padding: "14px 18px",
+                      cursor: "pointer",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "12px",
+                      borderBottom: "1px solid var(--border-subtle)",
+                      transition: "background 0.15s",
+                      fontSize: "0.95rem",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = "var(--hover-overlay)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                      <polyline points="1 4 1 10 7 10" />
+                      <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
+                    </svg>
+                    <span style={{ fontWeight: 600, color: "var(--accent)" }}>{sym}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* ── Index Cards ──────────────────────────────────────────── */}
