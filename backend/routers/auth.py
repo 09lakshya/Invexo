@@ -135,7 +135,10 @@ def handle_signup_initiate(payload: SignupInput):
     if exists:
         raise HTTPException(status_code=409, detail="An account with this email already exists")
 
-    initiate_signup_otp(payload.email, payload.dict())
+    try:
+        initiate_signup_otp(payload.email, payload.dict())
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
     return {"message": "Verification OTP sent"}
 
 

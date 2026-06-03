@@ -109,11 +109,10 @@ function Section({ title, children, subtitle }) {
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { user, setUser, refreshUser, logout } = useAuth();
+  const { user, setUser, refreshUser, logout, avatar, updateAvatar } = useAuth();
   const { theme, setThemeMode } = useTheme();
 
   const [settings, setSettings] = useState(defaultSettings);
-  const [avatar, setAvatar] = useState("");
   const [profileName, setProfileName] = useState(user?.name || "");
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMessage, setProfileMessage] = useState("");
@@ -144,9 +143,6 @@ export default function SettingsPage() {
         setSettings(defaultSettings);
       }
     }
-
-    const savedAvatar = localStorage.getItem(AVATAR_KEY);
-    if (savedAvatar) setAvatar(savedAvatar);
   }, []);
 
   useEffect(() => {
@@ -177,8 +173,7 @@ export default function SettingsPage() {
     const reader = new FileReader();
     reader.onload = () => {
       const data = String(reader.result || "");
-      setAvatar(data);
-      localStorage.setItem(AVATAR_KEY, data);
+      updateAvatar(data);
     };
     reader.readAsDataURL(file);
   };
@@ -341,7 +336,7 @@ export default function SettingsPage() {
                     width: "64px",
                     height: "64px",
                     borderRadius: "16px",
-                    background: avatar ? `url(${avatar}) center / cover no-repeat` : "linear-gradient(135deg, var(--accent), var(--purple))",
+                    background: avatar ? `url("${avatar}") center / cover no-repeat` : "linear-gradient(135deg, var(--accent), var(--purple))",
                     border: "1px solid var(--border-medium)",
                     display: "flex",
                     alignItems: "center",

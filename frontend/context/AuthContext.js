@@ -89,9 +89,28 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("ntrade_uid");
   };
 
+  const [avatar, setAvatar] = useState("");
+
+  useEffect(() => {
+    if (user?.id) {
+      const savedAvatar = localStorage.getItem(`ntrade_profile_photo_${user.id}`) || localStorage.getItem("ntrade_profile_photo");
+      setAvatar(savedAvatar || "");
+    } else {
+      setAvatar("");
+    }
+  }, [user]);
+
+  const updateAvatar = (data) => {
+    setAvatar(data);
+    if (user?.id) {
+      localStorage.setItem(`ntrade_profile_photo_${user.id}`, data);
+    }
+    localStorage.setItem("ntrade_profile_photo", data);
+  };
+
   return (
     <AuthContext.Provider
-      value={{ user, token, loading, login, signup, logout, refreshUser, setUser }}
+      value={{ user, token, loading, login, signup, logout, refreshUser, setUser, avatar, updateAvatar }}
     >
       {children}
     </AuthContext.Provider>

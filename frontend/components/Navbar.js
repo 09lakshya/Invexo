@@ -63,7 +63,7 @@ const NAV_LINKS = [
 
 export default function Navbar() {
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, avatar } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -227,7 +227,7 @@ export default function Navbar() {
                     width: "32px",
                     height: "32px",
                     borderRadius: "10px",
-                    background: "linear-gradient(135deg, var(--accent) 0%, var(--purple) 100%)",
+                    background: avatar ? `url("${avatar}") center / cover no-repeat` : "linear-gradient(135deg, var(--accent) 0%, var(--purple) 100%)",
                     display: "flex",
                     alignItems: "center",
                     justifyContent: "center",
@@ -238,7 +238,7 @@ export default function Navbar() {
                     flexShrink: 0,
                   }}
                 >
-                  {user.name ? user.name.charAt(0).toUpperCase() : "U"}
+                  {!avatar ? (user.name ? user.name.charAt(0).toUpperCase() : "U") : ""}
                 </div>
                 <span
                   style={{

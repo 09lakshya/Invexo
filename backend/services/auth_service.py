@@ -19,13 +19,14 @@ def send_otp_email(email_addr: str, otp: str):
 
     # Read SMTP credentials
     host = os.environ.get("SMTP_HOST", "")
-    port = os.environ.get("SMTP_PORT", "")
+    port_str = os.environ.get("SMTP_PORT", "")
     user = os.environ.get("SMTP_USER", "")
     password = os.environ.get("SMTP_PASSWORD", "")
     sender = os.environ.get("SMTP_FROM", user)
 
-    if host and port and user and password:
+    if host and port_str and user and password:
         try:
+            port = int(port_str)
             msg = MIMEText(
                 f"Thank you for signing up for Invexo!\n\n"
                 f"Your 6-digit verification code (OTP) is: {otp}\n\n"
@@ -37,14 +38,18 @@ def send_otp_email(email_addr: str, otp: str):
 
             # Connect and send
             import smtplib
-            server = smtplib.SMTP(host, int(port))
-            server.starttls()
+            if port == 465:
+                server = smtplib.SMTP_SSL(host, port, timeout=10)
+            else:
+                server = smtplib.SMTP(host, port, timeout=10)
+                server.starttls()
             server.login(user, password)
             server.sendmail(sender, [email_addr], msg.as_string())
             server.quit()
             print(f"[SMTP] Successfully sent OTP email to {email_addr}")
         except Exception as e:
             print(f"[SMTP ERROR] Failed to send email to {email_addr}: {e}")
+            raise RuntimeError(f"Email delivery failed: {str(e)}")
 
 
 def initiate_signup_otp(email_addr: str, payload: dict) -> str:
