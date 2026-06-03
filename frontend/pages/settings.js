@@ -331,7 +331,7 @@ export default function SettingsPage() {
 
             {/* Account Profile */}
             <Section title="Account Profile" subtitle="Update your personal information.">
-              <div style={{ display: "flex", gap: "20px", alignItems: "center", marginBottom: "20px" }}>
+              <div style={{ display: "flex", gap: "20px", alignItems: "center", marginBottom: "20px", flexWrap: "wrap" }}>
                 <div
                   style={{
                     width: "64px",
