@@ -246,15 +246,16 @@ export default function LoginPage() {
             <img
               src="/logo-512.png"
               alt="Invexo Logo"
-              width={54}
-              height={54}
+              width={96}
+              height={96}
               style={{
-                width: "54px",
-                height: "54px",
-                filter: "drop-shadow(0 4px 16px var(--accent-glow))",
+                display: "block",
+                margin: "0 auto 16px auto",
+                width: "96px",
+                height: "96px",
+                filter: "drop-shadow(0 4px 20px var(--accent-glow))",
                 objectFit: "contain",
-                borderRadius: "8px",
-                marginBottom: "12px",
+                borderRadius: "16px",
               }}
             />
             <p
