@@ -861,10 +861,7 @@ export default function Home() {
           {/* ── Footer note ─────────────────────────────────── */}
           <div style={{ marginTop: "48px", textAlign: "center" }}>
             <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontWeight: 500 }}>
-              Data is for informational purposes only. Not financial advice. Prices may be delayed. ·{" "}
-              <Link href="/settings#credits" style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>
-                Credits & About
-              </Link>
+              Data is for informational purposes only. Not financial advice. Prices may be delayed.
             </p>
           </div>
         </div>

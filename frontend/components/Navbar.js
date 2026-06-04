@@ -321,32 +321,7 @@ export default function Navbar() {
                     Settings
                   </button>
 
-                  {/* Credits */}
-                  <button
-                    onClick={() => { setUserMenuOpen(false); router.push('/settings#credits'); }}
-                    style={{
-                      width: "100%",
-                      padding: "14px 18px",
-                      background: "transparent",
-                      border: "none",
-                      cursor: "pointer",
-                      textAlign: "left",
-                      fontSize: "0.875rem",
-                      fontWeight: 600,
-                      color: "var(--text-secondary)",
-                      fontFamily: "inherit",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "10px",
-                      transition: "background 0.15s",
-                      borderBottom: "1px solid var(--border-subtle)",
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = "var(--hover-overlay)"}
-                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                  >
-                    <span style={{ fontSize: "16px", width: "16px", textAlign: "center" }}>ℹ️</span>
-                    Credits & About
-                  </button>
+
 
                   {/* Logout */}
                   <button

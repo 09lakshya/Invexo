@@ -61,8 +61,21 @@ export default function App({ Component, pageProps }) {
         <AuthProvider>
           <WebSocketProvider>
             <AuthGuard>
-              <div style={{ paddingBottom: '48px' }}>
-                <Component {...pageProps} />
+              <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', paddingBottom: '48px', boxSizing: 'border-box' }}>
+                <div style={{ flex: 1 }}>
+                  <Component {...pageProps} />
+                </div>
+                <footer style={{
+                  padding: '20px 16px',
+                  textAlign: 'center',
+                  borderTop: '1px solid var(--border-subtle)',
+                  fontSize: '0.72rem',
+                  color: 'var(--text-muted)',
+                  fontFamily: "'Inter', sans-serif",
+                  lineHeight: '1.4',
+                }}>
+                  Invexo is for educational purposes only. Developed by Lakshya Hindocha.
+                </footer>
               </div>
               <div
                 style={{
