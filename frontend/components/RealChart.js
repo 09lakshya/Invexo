@@ -46,6 +46,13 @@ function CandlestickChart({ data, colors, isIntraday }) {
   const [setRef, size] = useElementSize();
   const { width, height } = size;
   const [hoveredIndex, setHoveredIndex] = useState(null);
+  const [zoomRange, setZoomRange] = useState({ start: 0, end: data.length - 1 });
+
+  useEffect(() => {
+    setZoomRange({ start: 0, end: data.length - 1 });
+  }, [data]);
+
+  const visibleData = data.slice(zoomRange.start, zoomRange.end + 1);
 
   const marginTop = 36; // Extra spacing for HUD
   const marginBottom = 28;
@@ -55,13 +62,13 @@ function CandlestickChart({ data, colors, isIntraday }) {
   const plotWidth = Math.max(50, width - marginLeft - marginRight);
   const plotHeight = Math.max(50, height - marginTop - marginBottom);
 
-  const lows = data.map((d) => Number(d.Low));
-  const highs = data.map((d) => Number(d.High));
+  const lows = visibleData.map((d) => Number(d.Low));
+  const highs = visibleData.map((d) => Number(d.High));
   const minPrice = Math.min(...lows);
   const maxPrice = Math.max(...highs);
   const priceRange = (maxPrice - minPrice) || 1.0;
 
-  const getX = (index) => marginLeft + (index / (data.length - 1)) * plotWidth;
+  const getX = (index) => marginLeft + (index / (visibleData.length - 1)) * plotWidth;
   const getY = (price) => height - marginBottom - ((price - minPrice) / priceRange) * plotHeight;
 
   const formatXLabel = (dateString) => {
@@ -87,16 +94,24 @@ function CandlestickChart({ data, colors, isIntraday }) {
 
   const xTicksCount = 4;
   const xTicks = Array.from({ length: xTicksCount + 1 }).map((_, i) => {
-    const index = Math.floor((i / xTicksCount) * (data.length - 1));
-    return { label: formatXLabel(data[index].Date), x: getX(index) };
+    const index = Math.floor((i / xTicksCount) * (visibleData.length - 1));
+    return { label: formatXLabel(visibleData[index].Date), x: getX(index) };
   });
 
   const handleMouseMove = (e) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    // The zoomable and hoverable area should be inside the margins of the graph
+    if (x < marginLeft || x > width - marginRight || y < marginTop || y > height - marginBottom) {
+      setHoveredIndex(null);
+      return;
+    }
+
     const relativeX = x - marginLeft;
     const pct = relativeX / plotWidth;
-    const index = Math.max(0, Math.min(data.length - 1, Math.round(pct * (data.length - 1))));
+    const index = Math.max(0, Math.min(visibleData.length - 1, Math.round(pct * (visibleData.length - 1))));
     setHoveredIndex(index);
   };
 
@@ -104,7 +119,127 @@ function CandlestickChart({ data, colors, isIntraday }) {
     setHoveredIndex(null);
   };
 
-  const activeItem = hoveredIndex !== null ? data[hoveredIndex] : null;
+  const svgRef = useRef(null);
+
+  // References for touch zoom tracking
+  const touchStartDistance = useRef(0);
+  const touchStartStart = useRef(0);
+  const touchStartEnd = useRef(data.length - 1);
+
+  const handleTouchStart = (e) => {
+    if (e.touches.length === 2) {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x0 = e.touches[0].clientX - rect.left;
+      const y0 = e.touches[0].clientY - rect.top;
+      const x1 = e.touches[1].clientX - rect.left;
+      const y1 = e.touches[1].clientY - rect.top;
+
+      // Both touches must start inside the margins of the graph
+      const inside0 = x0 >= marginLeft && x0 <= (width - marginRight) && y0 >= marginTop && y0 <= (height - marginBottom);
+      const inside1 = x1 >= marginLeft && x1 <= (width - marginRight) && y1 >= marginTop && y1 <= (height - marginBottom);
+
+      if (inside0 && inside1) {
+        const dist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        touchStartDistance.current = dist;
+        touchStartStart.current = zoomRange.start;
+        touchStartEnd.current = zoomRange.end;
+      }
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    if (e.touches.length === 2 && touchStartDistance.current > 0) {
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const ratio = touchStartDistance.current / dist;
+      
+      const initialSpan = touchStartEnd.current - touchStartStart.current;
+      const targetSpan = Math.max(4, Math.min(data.length - 1, Math.round(initialSpan * ratio)));
+      
+      const diff = targetSpan - initialSpan;
+      const leftDiff = Math.floor(diff / 2);
+      const rightDiff = diff - leftDiff;
+      
+      let newStart = touchStartStart.current - leftDiff;
+      let newEnd = touchStartEnd.current + rightDiff;
+      
+      if (newStart < 0) {
+        newEnd = Math.min(data.length - 1, newEnd - newStart);
+        newStart = 0;
+      }
+      if (newEnd > data.length - 1) {
+        newStart = Math.max(0, newStart - (newEnd - (data.length - 1)));
+        newEnd = data.length - 1;
+      }
+
+      setZoomRange({ start: newStart, end: newEnd });
+    }
+  };
+
+  const handleTouchEnd = () => {
+    touchStartDistance.current = 0;
+  };
+
+  const handleZoom = (direction) => {
+    setZoomRange(prev => {
+      const span = prev.end - prev.start;
+      const delta = Math.max(1, Math.round(span * 0.1));
+      if (direction > 0) {
+        if (span > 4) {
+          return { start: prev.start + delta, end: prev.end - delta };
+        }
+      } else {
+        return {
+          start: Math.max(0, prev.start - delta),
+          end: Math.min(data.length - 1, prev.end + delta)
+        };
+      }
+      return prev;
+    });
+  };
+
+  // Passive wheel event handling inside the graph margins
+  useEffect(() => {
+    const svgEl = svgRef.current;
+    if (!svgEl) return;
+
+    const onWheel = (e) => {
+      const rect = svgEl.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      if (x >= marginLeft && x <= (width - marginRight) && y >= marginTop && y <= (height - marginBottom)) {
+        e.preventDefault();
+        const direction = e.deltaY < 0 ? 1 : -1;
+        
+        setZoomRange(prev => {
+          const span = prev.end - prev.start;
+          const delta = Math.max(1, Math.round(span * 0.08));
+          if (direction > 0) {
+            if (span > 4) {
+              return { start: prev.start + delta, end: prev.end - delta };
+            }
+          } else {
+            return {
+              start: Math.max(0, prev.start - delta),
+              end: Math.min(data.length - 1, prev.end + delta)
+            };
+          }
+          return prev;
+        });
+      }
+    };
+
+    svgEl.addEventListener("wheel", onWheel, { passive: false });
+    return () => svgEl.removeEventListener("wheel", onWheel);
+  }, [width, height, data.length, marginLeft, marginRight, marginTop, marginBottom]);
+
+  const activeItem = hoveredIndex !== null ? visibleData[hoveredIndex] : null;
   const activeChangePct = activeItem ? ((activeItem.Close - activeItem.Open) / activeItem.Open) * 100 : 0;
 
   return (
@@ -153,10 +288,14 @@ function CandlestickChart({ data, colors, isIntraday }) {
       </div>
 
       <svg
+        ref={svgRef}
         width={width}
         height={height}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
         style={{ cursor: "crosshair", display: "block" }}
       >
         {/* Horizontal Gridlines & Y-Axis Ticks */}
@@ -209,7 +348,7 @@ function CandlestickChart({ data, colors, isIntraday }) {
         ))}
 
         {/* Candlestick bars */}
-        {data.map((d, i) => {
+        {visibleData.map((d, i) => {
           const x = getX(i);
           const yOpen = getY(d.Open);
           const yClose = getY(d.Close);
@@ -220,7 +359,7 @@ function CandlestickChart({ data, colors, isIntraday }) {
           const color = isBullish ? colors.green : colors.red;
 
           // Compute custom bar width
-          const candleW = Math.max(3, (plotWidth / data.length) * 0.65);
+          const candleW = Math.max(3, (plotWidth / visibleData.length) * 0.65);
           const halfW = candleW / 2;
 
           const yTop = Math.min(yOpen, yClose);
@@ -270,9 +409,9 @@ function CandlestickChart({ data, colors, isIntraday }) {
             {/* Horizontal cross line */}
             <line
               x1={marginLeft}
-              y1={getY(data[hoveredIndex].Close)}
+              y1={getY(visibleData[hoveredIndex].Close)}
               x2={width - marginRight}
-              y2={getY(data[hoveredIndex].Close)}
+              y2={getY(visibleData[hoveredIndex].Close)}
               stroke={colors.green}
               strokeWidth="0.75"
               strokeDasharray="4 4"
@@ -281,15 +420,122 @@ function CandlestickChart({ data, colors, isIntraday }) {
             {/* Focus Point */}
             <circle
               cx={getX(hoveredIndex)}
-              cy={getY(data[hoveredIndex].Close)}
+              cy={getY(visibleData[hoveredIndex].Close)}
               r="3.5"
-              fill={data[hoveredIndex].Close >= data[hoveredIndex].Open ? colors.green : colors.red}
+              fill={visibleData[hoveredIndex].Close >= visibleData[hoveredIndex].Open ? colors.green : colors.red}
               stroke="#fff"
               strokeWidth="1"
             />
           </g>
         )}
       </svg>
+
+      {/* Floating Zoom Controls inside chart margins */}
+      <div style={{
+        position: "absolute",
+        bottom: `${marginBottom + 12}px`,
+        right: `${marginRight + 12}px`,
+        display: "flex",
+        gap: "6px",
+        zIndex: 10,
+        pointerEvents: "auto",
+      }}>
+        <button
+          onClick={() => handleZoom(1)}
+          title="Zoom In"
+          style={{
+            width: "28px",
+            height: "28px",
+            borderRadius: "6px",
+            border: `1px solid ${colors.borderSubtle}`,
+            background: colors.bgCard,
+            color: colors.textPrimary,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontWeight: "bold",
+            fontSize: "1rem",
+            backdropFilter: "blur(8px)",
+            transition: "all 0.2s",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.borderColor = "var(--accent)";
+            e.currentTarget.style.background = "var(--accent-dim)";
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.borderColor = colors.borderSubtle;
+            e.currentTarget.style.background = colors.bgCard;
+          }}
+        >
+          +
+        </button>
+        <button
+          onClick={() => handleZoom(-1)}
+          title="Zoom Out"
+          style={{
+            width: "28px",
+            height: "28px",
+            borderRadius: "6px",
+            border: `1px solid ${colors.borderSubtle}`,
+            background: colors.bgCard,
+            color: colors.textPrimary,
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontWeight: "bold",
+            fontSize: "1.1rem",
+            backdropFilter: "blur(8px)",
+            transition: "all 0.2s",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.borderColor = "var(--accent)";
+            e.currentTarget.style.background = "var(--accent-dim)";
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.borderColor = colors.borderSubtle;
+            e.currentTarget.style.background = colors.bgCard;
+          }}
+        >
+          −
+        </button>
+        {(zoomRange.start > 0 || zoomRange.end < data.length - 1) && (
+          <button
+            onClick={() => setZoomRange({ start: 0, end: data.length - 1 })}
+            title="Reset Zoom"
+            style={{
+              width: "28px",
+              height: "28px",
+              borderRadius: "6px",
+              border: `1px solid ${colors.borderSubtle}`,
+              background: colors.bgCard,
+              color: colors.textPrimary,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: "0.75rem",
+              fontWeight: "bold",
+              backdropFilter: "blur(8px)",
+              transition: "all 0.2s",
+              boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.borderColor = "var(--accent)";
+              e.currentTarget.style.background = "var(--accent-dim)";
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.borderColor = colors.borderSubtle;
+              e.currentTarget.style.background = colors.bgCard;
+            }}
+          >
+            ↺
+          </button>
+        )}
+      </div>
     </div>
   );
 }
