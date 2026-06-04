@@ -1,5 +1,5 @@
 import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import API from "../../services/api";
 import RealChart from "../../components/RealChart";
 import Navbar from "../../components/Navbar";
@@ -66,6 +66,8 @@ export default function StockPage() {
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState(null);
   const [logoError, setLogoError]   = useState(false);
+  const [isZoomed, setIsZoomed]     = useState(false);
+  const zoomRef                     = useRef(null);
 
   const metadata = STOCK_METADATA[normalizedSymbol] || {};
   const companyName = metadata.name || symbol;
@@ -368,48 +370,143 @@ export default function StockPage() {
               ))}
             </div>
 
-            {/* Chart Type Selector */}
-            <div style={{
-              display: "flex",
-              background: "var(--filter-tab-bg)",
-              border: "1px solid var(--filter-tab-border)",
-              borderRadius: "12px",
-              padding: "4px",
-            }}>
-              <button
-                onClick={() => setChartType("line")}
-                style={{
-                  padding: "7px 14px",
-                  borderRadius: "9px",
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: "0.8rem",
-                  fontWeight: 700,
-                  background: chartType === "line" ? "var(--accent-dim)" : "transparent",
-                  color: chartType === "line" ? "var(--accent)" : "var(--filter-tab-inactive)",
-                  transition: "all 0.2s",
-                  fontFamily: "inherit",
-                }}
-              >
-                Line
-              </button>
-              <button
-                onClick={() => setChartType("candle")}
-                style={{
-                  padding: "7px 14px",
-                  borderRadius: "9px",
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: "0.8rem",
-                  fontWeight: 700,
-                  background: chartType === "candle" ? "var(--accent-dim)" : "transparent",
-                  color: chartType === "candle" ? "var(--accent)" : "var(--filter-tab-inactive)",
-                  transition: "all 0.2s",
-                  fontFamily: "inherit",
-                }}
-              >
-                Candle
-              </button>
+            {/* Chart Type Selector + Zoom Controls (positioned next to each other) */}
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <div style={{
+                display: "flex",
+                background: "var(--filter-tab-bg)",
+                border: "1px solid var(--filter-tab-border)",
+                borderRadius: "12px",
+                padding: "4px",
+              }}>
+                <button
+                  onClick={() => setChartType("line")}
+                  style={{
+                    padding: "7px 14px",
+                    borderRadius: "9px",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: "0.8rem",
+                    fontWeight: 700,
+                    background: chartType === "line" ? "var(--accent-dim)" : "transparent",
+                    color: chartType === "line" ? "var(--accent)" : "var(--filter-tab-inactive)",
+                    transition: "all 0.2s",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  Line
+                </button>
+                <button
+                  onClick={() => setChartType("candle")}
+                  style={{
+                    padding: "7px 14px",
+                    borderRadius: "9px",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: "0.8rem",
+                    fontWeight: 700,
+                    background: chartType === "candle" ? "var(--accent-dim)" : "transparent",
+                    color: chartType === "candle" ? "var(--accent)" : "var(--filter-tab-inactive)",
+                    transition: "all 0.2s",
+                    fontFamily: "inherit",
+                  }}
+                >
+                  Candle
+                </button>
+              </div>
+
+              {chartType === "candle" && (
+                <div style={{
+                  display: "flex",
+                  gap: "4px",
+                  background: "var(--filter-tab-bg)",
+                  border: "1px solid var(--filter-tab-border)",
+                  borderRadius: "12px",
+                  padding: "4px",
+                  animation: "fadeIn 0.2s ease-in-out",
+                }}>
+                  <button
+                    onClick={() => zoomRef.current?.zoomIn()}
+                    title="Zoom In"
+                    style={{
+                      padding: "7px 12px",
+                      borderRadius: "9px",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "0.8rem",
+                      fontWeight: 700,
+                      background: "transparent",
+                      color: "var(--filter-tab-inactive)",
+                      transition: "all 0.2s",
+                      fontFamily: "inherit",
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = "var(--accent-dim)";
+                      e.currentTarget.style.color = "var(--accent)";
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = "transparent";
+                      e.currentTarget.style.color = "var(--filter-tab-inactive)";
+                    }}
+                  >
+                    +
+                  </button>
+                  <button
+                    onClick={() => zoomRef.current?.zoomOut()}
+                    title="Zoom Out"
+                    style={{
+                      padding: "7px 12px",
+                      borderRadius: "9px",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "0.8rem",
+                      fontWeight: 700,
+                      background: "transparent",
+                      color: "var(--filter-tab-inactive)",
+                      transition: "all 0.2s",
+                      fontFamily: "inherit",
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = "var(--accent-dim)";
+                      e.currentTarget.style.color = "var(--accent)";
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = "transparent";
+                      e.currentTarget.style.color = "var(--filter-tab-inactive)";
+                    }}
+                  >
+                    −
+                  </button>
+                  {isZoomed && (
+                    <button
+                      onClick={() => zoomRef.current?.reset()}
+                      title="Reset View"
+                      style={{
+                        padding: "7px 12px",
+                        borderRadius: "9px",
+                        border: "none",
+                        cursor: "pointer",
+                        fontSize: "0.75rem",
+                        fontWeight: 700,
+                        background: "transparent",
+                        color: "var(--filter-tab-inactive)",
+                        transition: "all 0.2s",
+                        fontFamily: "inherit",
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = "var(--accent-dim)";
+                        e.currentTarget.style.color = "var(--accent)";
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = "transparent";
+                        e.currentTarget.style.color = "var(--filter-tab-inactive)";
+                      }}
+                    >
+                      ↺
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
@@ -443,7 +540,13 @@ export default function StockPage() {
                   boxShadow: "var(--shadow-card)",
                 }}
               >
-                <RealChart data={history} chartType={chartType} setChartType={setChartType} />
+                <RealChart
+                  data={history}
+                  chartType={chartType}
+                  setChartType={setChartType}
+                  zoomRef={zoomRef}
+                  onZoomStateChange={setIsZoomed}
+                />
               </div>
             ) : (
               <div style={{

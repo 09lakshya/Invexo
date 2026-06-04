@@ -42,7 +42,7 @@ function useElementSize() {
 }
 
 // ── CUSTOM HIGH-FIDELITY CANDLESTICK CHART COMPONENT ────────────────────────
-function CandlestickChart({ data, colors, isIntraday, showSwitcher }) {
+function CandlestickChart({ data, colors, isIntraday, showSwitcher, zoomRef, onZoomStateChange }) {
   const [setRef, size] = useElementSize();
   const { width, height } = size;
   const [hoveredIndex, setHoveredIndex] = useState(null);
@@ -123,6 +123,7 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher }) {
     const y = e.clientY - rect.top;
 
     if (x >= marginLeft && x <= (width - marginRight) && y >= marginTop && y <= (height - marginBottom)) {
+      e.preventDefault(); // Prevent text selection and default dragging behaviors
       isDragging.current = true;
       setIsPanning(true);
       dragStartX.current = e.clientX;
@@ -215,6 +216,28 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher }) {
     priceRangeRef.current = priceRange;
   }, [priceRange]);
 
+  // Expose zoom controls via ref to parent components
+  useEffect(() => {
+    if (zoomRef) {
+      zoomRef.current = {
+        zoomIn: () => handleZoom(1),
+        zoomOut: () => handleZoom(-1),
+        reset: handleReset
+      };
+    }
+    return () => {
+      if (zoomRef) zoomRef.current = null;
+    };
+  }, [zoomRef, zoomRange, yOffset, data.length]);
+
+  // Propagate zoom state changes to parent (so parent can conditionally show Reset button)
+  useEffect(() => {
+    const zoomed = zoomRange.start > 0 || zoomRange.end < data.length - 1 || yOffset !== 0;
+    if (onZoomStateChange) {
+      onZoomStateChange(zoomed);
+    }
+  }, [zoomRange, yOffset, data.length, onZoomStateChange]);
+
   // Active/Passive Touch event handling inside the graph margins to prevent whole-screen scrolling
   useEffect(() => {
     const svgEl = svgRef.current;
@@ -227,6 +250,7 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher }) {
         const y = e.touches[0].clientY - rect.top;
 
         if (x >= marginLeft && x <= (width - marginRight) && y >= marginTop && y <= (height - marginBottom)) {
+          if (e.cancelable) e.preventDefault(); // Prevent viewport scrolling/panning during chart dragging
           isDragging.current = true;
           setIsPanning(true);
           dragStartX.current = e.touches[0].clientX;
@@ -610,112 +634,6 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher }) {
         </g>
       </svg>
 
-      {/* Floating Zoom Controls inside top-right corner of the card */}
-      <div style={{
-        position: "absolute",
-        top: "8px",
-        right: showSwitcher ? "110px" : "12px",
-        display: "flex",
-        gap: "6px",
-        zIndex: 10,
-        pointerEvents: "auto",
-      }}>
-        <button
-          onClick={() => handleZoom(1)}
-          title="Zoom In"
-          style={{
-            width: "28px",
-            height: "28px",
-            borderRadius: "6px",
-            border: `1px solid ${colors.borderSubtle}`,
-            background: colors.bgCard,
-            color: colors.textPrimary,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontWeight: "bold",
-            fontSize: "1rem",
-            backdropFilter: "blur(8px)",
-            transition: "all 0.2s",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.borderColor = "var(--accent)";
-            e.currentTarget.style.background = "var(--accent-dim)";
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.borderColor = colors.borderSubtle;
-            e.currentTarget.style.background = colors.bgCard;
-          }}
-        >
-          +
-        </button>
-        <button
-          onClick={() => handleZoom(-1)}
-          title="Zoom Out"
-          style={{
-            width: "28px",
-            height: "28px",
-            borderRadius: "6px",
-            border: `1px solid ${colors.borderSubtle}`,
-            background: colors.bgCard,
-            color: colors.textPrimary,
-            cursor: "pointer",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontWeight: "bold",
-            fontSize: "1.1rem",
-            backdropFilter: "blur(8px)",
-            transition: "all 0.2s",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.borderColor = "var(--accent)";
-            e.currentTarget.style.background = "var(--accent-dim)";
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.borderColor = colors.borderSubtle;
-            e.currentTarget.style.background = colors.bgCard;
-          }}
-        >
-          −
-        </button>
-        {(zoomRange.start > 0 || zoomRange.end < data.length - 1 || yOffset !== 0) && (
-          <button
-            onClick={handleReset}
-            title="Reset View"
-            style={{
-              width: "28px",
-              height: "28px",
-              borderRadius: "6px",
-              border: `1px solid ${colors.borderSubtle}`,
-              background: colors.bgCard,
-              color: colors.textPrimary,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "0.75rem",
-              fontWeight: "bold",
-              backdropFilter: "blur(8px)",
-              transition: "all 0.2s",
-              boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
-            }}
-            onMouseEnter={e => {
-              e.currentTarget.style.borderColor = "var(--accent)";
-              e.currentTarget.style.background = "var(--accent-dim)";
-            }}
-            onMouseLeave={e => {
-              e.currentTarget.style.borderColor = colors.borderSubtle;
-              e.currentTarget.style.background = colors.bgCard;
-            }}
-          >
-            ↺
-          </button>
-        )}
-      </div>
     </div>
   );
 }
@@ -729,11 +647,23 @@ function getCSSVar(varName, fallback = "#888") {
   return val || fallback;
 }
 
-export default function RealChart({ data, chartType: externalChartType, setChartType: externalSetChartType }) {
+export default function RealChart({
+  data,
+  chartType: externalChartType,
+  setChartType: externalSetChartType,
+  zoomRef: externalZoomRef,
+  onZoomStateChange: externalOnZoomStateChange
+}) {
   const [internalChartType, internalSetChartType] = useState("line");
   const chartType = externalChartType !== undefined ? externalChartType : internalChartType;
   const setChartType = externalSetChartType !== undefined ? externalSetChartType : internalSetChartType;
   const showSwitcher = externalChartType === undefined;
+
+  const internalZoomRef = useRef(null);
+  const zoomRef = externalZoomRef || internalZoomRef;
+
+  const [localIsZoomed, setLocalIsZoomed] = useState(false);
+  const onZoomStateChange = externalOnZoomStateChange || setLocalIsZoomed;
 
   // 🔥 FORCE VALID DATA (Normalize keys and sanitize nulls/NaNs)
   const cleaned = (data || []).map((d) => {
@@ -937,47 +867,148 @@ export default function RealChart({ data, chartType: externalChartType, setChart
           top: "8px",
           right: "12px",
           display: "flex",
-          background: "var(--filter-tab-bg)",
-          border: "1px solid var(--filter-tab-border)",
-          borderRadius: "10px",
-          padding: "2px",
+          gap: "6px",
           zIndex: 10,
-          backdropFilter: "blur(8px)",
         }}>
-          <button
-            onClick={() => setChartType("line")}
-            style={{
-              padding: "4px 10px",
-              borderRadius: "7px",
-              border: "none",
-              cursor: "pointer",
-              fontSize: "0.7rem",
-              fontWeight: 700,
-              background: chartType === "line" ? "var(--accent-dim)" : "transparent",
-              color: chartType === "line" ? "var(--accent)" : "var(--filter-tab-inactive)",
-              transition: "all 0.2s",
-              fontFamily: "inherit",
-            }}
-          >
-            Line
-          </button>
-          <button
-            onClick={() => setChartType("candle")}
-            style={{
-              padding: "4px 10px",
-              borderRadius: "7px",
-              border: "none",
-              cursor: "pointer",
-              fontSize: "0.7rem",
-              fontWeight: 700,
-              background: chartType === "candle" ? "var(--accent-dim)" : "transparent",
-              color: chartType === "candle" ? "var(--accent)" : "var(--filter-tab-inactive)",
-              transition: "all 0.2s",
-              fontFamily: "inherit",
-            }}
-          >
-            Candle
-          </button>
+          {/* Switcher */}
+          <div style={{
+            display: "flex",
+            background: "var(--filter-tab-bg)",
+            border: "1px solid var(--filter-tab-border)",
+            borderRadius: "10px",
+            padding: "2px",
+            backdropFilter: "blur(8px)",
+          }}>
+            <button
+              onClick={() => setChartType("line")}
+              style={{
+                padding: "4px 10px",
+                borderRadius: "7px",
+                border: "none",
+                cursor: "pointer",
+                fontSize: "0.7rem",
+                fontWeight: 700,
+                background: chartType === "line" ? "var(--accent-dim)" : "transparent",
+                color: chartType === "line" ? "var(--accent)" : "var(--filter-tab-inactive)",
+                transition: "all 0.2s",
+                fontFamily: "inherit",
+              }}
+            >
+              Line
+            </button>
+            <button
+              onClick={() => setChartType("candle")}
+              style={{
+                padding: "4px 10px",
+                borderRadius: "7px",
+                border: "none",
+                cursor: "pointer",
+                fontSize: "0.7rem",
+                fontWeight: 700,
+                background: chartType === "candle" ? "var(--accent-dim)" : "transparent",
+                color: chartType === "candle" ? "var(--accent)" : "var(--filter-tab-inactive)",
+                transition: "all 0.2s",
+                fontFamily: "inherit",
+              }}
+            >
+              Candle
+            </button>
+          </div>
+
+          {/* Zoom Controls inside switcher row */}
+          {chartType === "candle" && (
+            <div style={{
+              display: "flex",
+              gap: "2px",
+              background: "var(--filter-tab-bg)",
+              border: "1px solid var(--filter-tab-border)",
+              borderRadius: "10px",
+              padding: "2px",
+              backdropFilter: "blur(8px)",
+              animation: "fadeIn 0.2s ease-in-out",
+            }}>
+              <button
+                onClick={() => zoomRef.current?.zoomIn()}
+                title="Zoom In"
+                style={{
+                  padding: "4px 8px",
+                  borderRadius: "7px",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: "0.7rem",
+                  fontWeight: 700,
+                  background: "transparent",
+                  color: "var(--filter-tab-inactive)",
+                  transition: "all 0.2s",
+                  fontFamily: "inherit",
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = "var(--accent-dim)";
+                  e.currentTarget.style.color = "var(--accent)";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.color = "var(--filter-tab-inactive)";
+                }}
+              >
+                +
+              </button>
+              <button
+                onClick={() => zoomRef.current?.zoomOut()}
+                title="Zoom Out"
+                style={{
+                  padding: "4px 8px",
+                  borderRadius: "7px",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: "0.7rem",
+                  fontWeight: 700,
+                  background: "transparent",
+                  color: "var(--filter-tab-inactive)",
+                  transition: "all 0.2s",
+                  fontFamily: "inherit",
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = "var(--accent-dim)";
+                  e.currentTarget.style.color = "var(--accent)";
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.color = "var(--filter-tab-inactive)";
+                }}
+              >
+                −
+              </button>
+              {localIsZoomed && (
+                <button
+                  onClick={() => zoomRef.current?.reset()}
+                  title="Reset View"
+                  style={{
+                    padding: "4px 8px",
+                    borderRadius: "7px",
+                    border: "none",
+                    cursor: "pointer",
+                    fontSize: "0.65rem",
+                    fontWeight: 700,
+                    background: "transparent",
+                    color: "var(--filter-tab-inactive)",
+                    transition: "all 0.2s",
+                    fontFamily: "inherit",
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = "var(--accent-dim)";
+                    e.currentTarget.style.color = "var(--accent)";
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = "transparent";
+                    e.currentTarget.style.color = "var(--filter-tab-inactive)";
+                  }}
+                >
+                  ↺
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -986,7 +1017,14 @@ export default function RealChart({ data, chartType: externalChartType, setChart
           <Line data={chartData} options={chartOptions} />
         </div>
       ) : (
-        <CandlestickChart data={cleaned} colors={colors} isIntraday={isIntraday} showSwitcher={showSwitcher} />
+        <CandlestickChart
+          data={cleaned}
+          colors={colors}
+          isIntraday={isIntraday}
+          showSwitcher={showSwitcher}
+          zoomRef={zoomRef}
+          onZoomStateChange={onZoomStateChange}
+        />
       )}
     </div>
   );
