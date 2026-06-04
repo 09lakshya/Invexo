@@ -75,28 +75,38 @@ export default function StockPage() {
 
   useEffect(() => {
     if (!router.isReady || !normalizedSymbol) return;
-    const load = async () => {
+    const loadPrediction = async () => {
       try {
-        setLoading(true);
         setError(null);
-        const [histRes, predRes] = await Promise.all([
-          API.get(`/market/${normalizedSymbol}/history?period=${getPeriodFormat(period)}`),
-          API.get(`/predict/${normalizedSymbol}.NS`),
-        ]);
+        const predRes = await API.get(`/predict/${normalizedSymbol}.NS`);
         if (predRes.data && predRes.data.error) {
           throw new Error(predRes.data.error);
         }
-        setHistory(Array.isArray(histRes.data) ? histRes.data : []);
         setPrediction(predRes.data);
       } catch (err) {
-        console.error("ERROR:", err);
-        setHistory([]);
+        console.error("ERROR loading prediction:", err);
+        setError("Data unavailable — market may be closed");
+      }
+    };
+    loadPrediction();
+  }, [router.isReady, normalizedSymbol]);
+
+  useEffect(() => {
+    if (!router.isReady || !normalizedSymbol) return;
+    const loadHistory = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const histRes = await API.get(`/market/${normalizedSymbol}/history?period=${getPeriodFormat(period)}`);
+        setHistory(Array.isArray(histRes.data) ? histRes.data : []);
+      } catch (err) {
+        console.error("ERROR loading history:", err);
         setError("Data unavailable — market may be closed");
       } finally {
         setLoading(false);
       }
     };
-    load();
+    loadHistory();
   }, [router.isReady, normalizedSymbol, period]);
 
   useEffect(() => {
@@ -396,7 +406,29 @@ export default function StockPage() {
           </div>
 
           {/* ── AI Prediction ───────────────────────────────────────── */}
-          {pred && pred.current_price && (
+          {!prediction && !error ? (
+            <div style={{
+              background: "var(--bg-card)",
+              border: "1px solid var(--border-subtle)",
+              borderRadius: "20px",
+              padding: "28px",
+              marginBottom: "24px",
+              backdropFilter: "blur(16px)",
+              boxShadow: "var(--shadow-card)",
+            }}>
+              <div style={{ marginBottom: "24px" }}>
+                <div className="skeleton" style={{ width: "150px", height: "24px" }} />
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(140px, 100%), 1fr))", gap: "clamp(8px, 1.5vmin, 12px)" }}>
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "14px", padding: "16px 18px", height: "80px" }}>
+                    <div className="skeleton" style={{ width: "50%", height: "10px", marginBottom: "12px" }} />
+                    <div className="skeleton" style={{ width: "80%", height: "18px" }} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : pred && pred.current_price ? (
             <div style={{
               background: "var(--bg-card)",
               border: "1px solid var(--accent-glow)",
@@ -459,10 +491,25 @@ export default function StockPage() {
                 />
               </div>
             </div>
-          )}
+          ) : null}
 
           {/* ── Sentiment + Fundamentals ────────────────────────────── */}
-          {pred && (pred.news_sentiment !== undefined || pred.fundamental_score !== undefined) && (
+          {!prediction && !error ? (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))", gap: "clamp(12px, 2vmin, 16px)", marginBottom: "24px" }}>
+              <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "20px", padding: "24px", height: "240px" }}>
+                <div className="skeleton" style={{ width: "30%", height: "10px", marginBottom: "16px" }} />
+                <div className="skeleton" style={{ width: "50%", height: "20px", marginBottom: "24px" }} />
+                <div className="skeleton" style={{ width: "80%", height: "14px", marginBottom: "12px" }} />
+                <div className="skeleton" style={{ width: "100%", height: "8px" }} />
+              </div>
+              <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "20px", padding: "24px", height: "240px" }}>
+                <div className="skeleton" style={{ width: "30%", height: "10px", marginBottom: "16px" }} />
+                <div className="skeleton" style={{ width: "50%", height: "20px", marginBottom: "24px" }} />
+                <div className="skeleton" style={{ width: "80%", height: "14px", marginBottom: "12px" }} />
+                <div className="skeleton" style={{ width: "100%", height: "8px" }} />
+              </div>
+            </div>
+          ) : pred && (pred.news_sentiment !== undefined || pred.fundamental_score !== undefined) ? (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))", gap: "clamp(12px, 2vmin, 16px)", marginBottom: "24px", animation: "fadeInUp 0.5s 0.25s ease both" }}>
 
               {/* News Sentiment */}
@@ -563,7 +610,7 @@ export default function StockPage() {
                 </div>
               )}
             </div>
-          )}
+          ) : null}
 
           {/* ── News ────────────────────────────────────────────────── */}
           {news.length > 0 && (

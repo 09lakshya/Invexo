@@ -1,7 +1,28 @@
 import yfinance as yf
 from curl_cffi.requests import Session as curl_Session
+import time
+from functools import wraps
 
 _yf_session = curl_Session(impersonate="chrome120")
+
+def ttl_cache(maxsize=100, ttl=300):
+    def decorator(func):
+        cache = {}
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            key = str(args) + str(kwargs)
+            now = time.time()
+            if key in cache:
+                result, timestamp = cache[key]
+                if now - timestamp < ttl:
+                    return result
+            result = func(*args, **kwargs)
+            if len(cache) >= maxsize:
+                cache.pop(next(iter(cache)))
+            cache[key] = (result, now)
+            return result
+        return wrapper
+    return decorator
 
 YF_SYMBOL_OVERRIDES = {
     "TATAMOTORS": "TATAMOTORS.BO",
@@ -51,6 +72,7 @@ def get_stock_price(symbol: str):
 # =========================
 # 📈 HISTORY FUNCTION
 # =========================
+@ttl_cache(maxsize=100, ttl=300)
 def get_history(symbol: str, period: str = "1mo"):
     for ticker_symbol in _ticker_candidates(symbol):
         try:

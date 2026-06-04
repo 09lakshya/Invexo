@@ -67,6 +67,7 @@ def _ticker_candidates(symbol: str):
     return [f"{symbol}.NS", f"{symbol}.BO"]
 
 
+@ttl_cache(maxsize=100, ttl=86400)
 def _get_working_ticker(symbol: str):
     for candidate in _ticker_candidates(symbol):
         try:
@@ -454,7 +455,7 @@ def calculate_technical_quality_score(close, volume):
     return max(20, min(80, score))
 
 
-@ttl_cache(maxsize=100, ttl=60)
+@ttl_cache(maxsize=100, ttl=300)
 def predict_stock(symbol: str):
     try:
         # Get more historical data for better accuracy
@@ -516,10 +517,14 @@ def predict_stock(symbol: str):
         volume_signal = current_volume / avg_volume if avg_volume > 0 else 1
 
         # ===== SENTIMENT & FUNDAMENTAL ANALYSIS =====
-        news_data = fetch_news_sentiment(symbol)
+        import concurrent.futures
+        with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+            future_news = executor.submit(fetch_news_sentiment, symbol)
+            future_fundamentals = executor.submit(get_fundamental_data, symbol)
+            news_data = future_news.result()
+            fundamentals = future_fundamentals.result()
+            
         news_sentiment = news_data.get("sentiment_score", 50)
-        
-        fundamentals = get_fundamental_data(symbol)
         fundamental_score = calculate_fundamental_score(fundamentals)
         fundamental_source = "fundamentals"
         if fundamental_score is None:
