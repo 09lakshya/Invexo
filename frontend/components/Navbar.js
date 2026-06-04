@@ -323,7 +323,7 @@ export default function Navbar() {
 
                   {/* Credits */}
                   <button
-                    onClick={() => { setUserMenuOpen(false); router.push('/credits'); }}
+                    onClick={() => { setUserMenuOpen(false); router.push('/settings#credits'); }}
                     style={{
                       width: "100%",
                       padding: "14px 18px",

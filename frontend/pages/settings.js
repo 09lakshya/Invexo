@@ -35,6 +35,38 @@ const defaultSettings = {
   },
 };
 
+const creditItems = [
+  {
+    category: "Developer",
+    credits: [
+      { name: "Lakshya Hindocha", role: "Full Stack Developer & Student Creator" }
+    ]
+  },
+  {
+    category: "Data Services & APIs",
+    credits: [
+      { name: "Yahoo Finance (yfinance)", role: "Historical & real-time stock pricing feed" },
+      { name: "Clearbit Logo API", role: "Real-time automated company branding metadata" }
+    ]
+  },
+  {
+    category: "Backend Stack",
+    credits: [
+      { name: "FastAPI", role: "High-performance Python web gateway & WebSockets engine" },
+      { name: "curl_cffi", role: "TLS fingerprint client impersonation (bypassing rate limits)" },
+      { name: "TextBlob", role: "NLP polarity parsing adjusted with custom financial lexicons" }
+    ]
+  },
+  {
+    category: "Frontend Stack",
+    credits: [
+      { name: "Next.js & React", role: "Declarative framework for the single page app application structure" },
+      { name: "Tailwind CSS", role: "Responsive glassmorphism layout utility styles" },
+      { name: "Chart.js", role: "Market historical chart rendering" }
+    ]
+  }
+];
+
 function ToggleRow({ label, description, checked, onChange, disabled }) {
   return (
     <div
@@ -87,15 +119,17 @@ function ToggleRow({ label, description, checked, onChange, disabled }) {
   );
 }
 
-function Section({ title, children, subtitle }) {
+function Section({ title, children, subtitle, id }) {
   return (
     <div
+      id={id}
       style={{
         background: "var(--bg-card)",
         border: "1px solid var(--border-subtle)",
         borderRadius: "20px",
         padding: "28px",
         boxShadow: "var(--shadow-card)",
+        scrollMarginTop: "24px",
       }}
     >
       <div style={{ marginBottom: "20px" }}>
@@ -643,6 +677,41 @@ export default function SettingsPage() {
                 >
                   Log Out All Sessions
                 </button>
+              </div>
+            </Section>
+
+            {/* Credits & About */}
+            <Section id="credits" title="Credits & About" subtitle="Invexo creators and third-party data providers.">
+              <p style={{ color: "var(--text-secondary)", fontSize: "0.88rem", lineHeight: 1.6, marginBottom: "20px" }}>
+                Invexo is an Indian stock market tracker and predictive analysis tool designed to guide investors using artificial intelligence algorithms.
+              </p>
+              
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                {creditItems.map((sec) => (
+                  <div key={sec.category} style={{ borderBottom: "1px solid var(--border-subtle)", paddingBottom: "14px" }}>
+                    <h3 style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "10px" }}>
+                      {sec.category}
+                    </h3>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                      {sec.credits.map((item) => (
+                        <div key={item.name} style={{ borderLeft: "2px solid var(--border-medium)", paddingLeft: "10px" }}>
+                          <p style={{ fontWeight: 700, color: "var(--text-primary)", fontSize: "0.85rem", margin: "0 0 2px 0" }}>
+                            {item.name}
+                          </p>
+                          <p style={{ color: "var(--text-muted)", fontSize: "0.75rem", margin: 0, lineHeight: 1.3 }}>
+                            {item.role}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ marginTop: "16px", textAlign: "center" }}>
+                <p style={{ fontSize: "0.7rem", color: "var(--text-muted)", margin: 0 }}>
+                  Invexo is for educational purposes only. Developed by Lakshya Hindocha.
+                </p>
               </div>
             </Section>
 
