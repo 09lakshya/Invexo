@@ -270,7 +270,7 @@ function RecoCard({ stock, rank, totalBudget }) {
   const cleanSymbol = stock.symbol ? stock.symbol.replace(/\.NS$/i, "").replace(/\.BO$/i, "") : "";
   const metadata = STOCK_METADATA[cleanSymbol] || {};
   const [logoError, setLogoError] = useState(false);
-  const logoUrl = metadata.domain && !logoError ? `https://logo.clearbit.com/${metadata.domain}` : null;
+  const logoUrl = metadata.domain && !logoError ? `https://www.google.com/s2/favicons?domain=${metadata.domain}&sz=128` : null;
 
   return (
     <div

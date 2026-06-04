@@ -63,7 +63,7 @@ export default function StockCard({ symbol, price, change, percent, color, small
   const companyName = metadata.name || symbol;
   const companyDomain = metadata.domain;
   const [logoError, setLogoError] = useState(false);
-  const logoUrl = companyDomain && !logoError ? `https://logo.clearbit.com/${companyDomain}` : null;
+  const logoUrl = companyDomain && !logoError ? `https://www.google.com/s2/favicons?domain=${companyDomain}&sz=128` : null;
 
   useEffect(() => {
     if (hasData && prevPriceRef.current !== prc) {

@@ -416,7 +416,7 @@ export default function Home() {
   const activeMetadata = STOCK_METADATA[normalizedActiveSymbol] || {};
   const activeCompanyName = activeMetadata.name || activeStockSymbol;
   const activeCompanyDomain = activeMetadata.domain;
-  const activeLogoUrl = activeCompanyDomain && !modalLogoError ? `https://logo.clearbit.com/${activeCompanyDomain}` : null;
+  const activeLogoUrl = activeCompanyDomain && !modalLogoError ? `https://www.google.com/s2/favicons?domain=${activeCompanyDomain}&sz=128` : null;
 
   return (
     <>

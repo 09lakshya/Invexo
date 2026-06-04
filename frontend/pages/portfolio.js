@@ -81,7 +81,7 @@ function HoldingRow({ h, onRemove }) {
   const metadata = STOCK_METADATA[cleanSymbol] || {};
   const companyName = metadata.name || h.symbol;
   const [logoError, setLogoError] = useState(false);
-  const logoUrl = metadata.domain && !logoError ? `https://logo.clearbit.com/${metadata.domain}` : null;
+  const logoUrl = metadata.domain && !logoError ? `https://www.google.com/s2/favicons?domain=${metadata.domain}&sz=128` : null;
 
   const handleRemove = async () => {
     setRemoving(true);
