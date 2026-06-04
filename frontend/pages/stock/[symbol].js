@@ -407,34 +407,19 @@ export default function StockPage() {
               boxShadow: "var(--shadow-card)",
               animation: "fadeInUp 0.5s 0.2s ease both",
             }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "24px" }}>
-                <div style={{
-                  width: "36px",
-                  height: "36px",
-                  borderRadius: "10px",
-                  background: "var(--accent-dim)",
-                  border: "1px solid var(--accent-glow)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "18px",
+              <div style={{ marginBottom: "24px" }}>
+                <h2 style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontSize: "1.3rem",
+                  fontWeight: 800,
+                  background: "linear-gradient(90deg, var(--accent), var(--purple))",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  backgroundClip: "text",
+                  margin: 0,
                 }}>
-                  🤖
-                </div>
-                <div>
-                  <p className="section-label" style={{ margin: 0 }}>Machine Learning</p>
-                  <h2 style={{
-                    fontFamily: "'Space Grotesk', sans-serif",
-                    fontSize: "1.3rem",
-                    fontWeight: 800,
-                    background: "linear-gradient(90deg, var(--accent), var(--purple))",
-                    WebkitBackgroundClip: "text",
-                    WebkitTextFillColor: "transparent",
-                    backgroundClip: "text",
-                  }}>
-                    AI Prediction
-                  </h2>
-                </div>
+                  AI Prediction
+                </h2>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(140px, 100%), 1fr))", gap: "clamp(8px, 1.5vmin, 12px)" }}>
