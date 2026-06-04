@@ -50,7 +50,12 @@ function CandlestickChart({ data, colors, isIntraday }) {
 
   useEffect(() => {
     setZoomRange({ start: 0, end: data.length - 1 });
+    setHoveredIndex(null);
   }, [data]);
+
+  useEffect(() => {
+    setHoveredIndex(null);
+  }, [zoomRange]);
 
   const visibleData = data.slice(zoomRange.start, zoomRange.end + 1);
 
@@ -239,8 +244,8 @@ function CandlestickChart({ data, colors, isIntraday }) {
     return () => svgEl.removeEventListener("wheel", onWheel);
   }, [width, height, data.length, marginLeft, marginRight, marginTop, marginBottom]);
 
-  const activeItem = hoveredIndex !== null ? visibleData[hoveredIndex] : null;
-  const activeChangePct = activeItem ? ((activeItem.Close - activeItem.Open) / activeItem.Open) * 100 : 0;
+  const activeItem = (hoveredIndex !== null && visibleData[hoveredIndex]) ? visibleData[hoveredIndex] : null;
+  const activeChangePct = (activeItem && activeItem.Open) ? ((activeItem.Close - activeItem.Open) / activeItem.Open) * 100 : 0;
 
   return (
     <div ref={setRef} style={{ width: "100%", height: "100%", position: "relative" }}>
@@ -393,7 +398,7 @@ function CandlestickChart({ data, colors, isIntraday }) {
         })}
 
         {/* Crosshair overlays */}
-        {hoveredIndex !== null && (
+        {hoveredIndex !== null && visibleData[hoveredIndex] && (
           <g pointerEvents="none">
             {/* Vertical cross line */}
             <line
