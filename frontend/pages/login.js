@@ -114,6 +114,31 @@ export default function LoginPage() {
             </button>
           </span>
         );
+      } else if (mode === "login" && (msg.toLowerCase().includes("email not found") || msg.toLowerCase().includes("details not found"))) {
+        setError(
+          <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+            Details not found.{" "}
+            <button
+              type="button"
+              onClick={() => {
+                setError("");
+                setMode("signup");
+              }}
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--accent)",
+                fontWeight: 700,
+                cursor: "pointer",
+                padding: 0,
+                textDecoration: "underline",
+                fontSize: "inherit"
+              }}
+            >
+              Sign up instead
+            </button>
+          </span>
+        );
       } else {
         setError(msg);
       }

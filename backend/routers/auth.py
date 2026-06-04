@@ -174,6 +174,17 @@ def handle_login(payload: LoginInput):
     if not _is_valid_email(payload.email):
         raise HTTPException(status_code=400, detail="Please enter a valid email address")
 
+    # Check if user exists
+    from services.auth_service import get_db_connection, get_cursor, execute_query
+    conn, is_postgres = get_db_connection()
+    c = get_cursor(conn, is_postgres)
+    execute_query(c, "SELECT id FROM users WHERE email = ?", (payload.email.lower(),), is_postgres)
+    exists = c.fetchone()
+    conn.close()
+
+    if not exists:
+        raise HTTPException(status_code=404, detail="Details not found")
+
     user = login(payload.email, payload.password)
     if user is None:
         raise HTTPException(status_code=401, detail="Invalid email or password")
