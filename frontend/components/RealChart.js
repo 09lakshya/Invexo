@@ -139,12 +139,12 @@ function CandlestickChart({ data, colors, isIntraday }) {
                 minute: isIntraday ? "2-digit" : undefined,
               })}
             </span>
-            <span>O:<span style={{ color: activeItem.Close >= activeItem.Open ? colors.green : colors.red, marginLeft: "2px", fontWeight: 700 }}>₹{activeItem.Open.toFixed(2)}</span></span>
-            <span>H:<span style={{ color: activeItem.Close >= activeItem.Open ? colors.green : colors.red, marginLeft: "2px", fontWeight: 700 }}>₹{activeItem.High.toFixed(2)}</span></span>
-            <span>L:<span style={{ color: activeItem.Close >= activeItem.Open ? colors.green : colors.red, marginLeft: "2px", fontWeight: 700 }}>₹{activeItem.Low.toFixed(2)}</span></span>
-            <span>C:<span style={{ color: activeItem.Close >= activeItem.Open ? colors.green : colors.red, marginLeft: "2px", fontWeight: 700 }}>₹{activeItem.Close.toFixed(2)}</span></span>
-            <span style={{ color: activeChangePct >= 0 ? colors.green : colors.red, fontWeight: 700, marginLeft: "4px" }}>
-              {activeChangePct >= 0 ? "\u25B2 +" : "\u25BC "}{activeChangePct.toFixed(2)}%
+            <span>O:<span style={{ color: (activeItem.Close || 0) >= (activeItem.Open || 0) ? colors.green : colors.red, marginLeft: "2px", fontWeight: 700 }}>₹{Number(activeItem.Open || 0).toFixed(2)}</span></span>
+            <span>H:<span style={{ color: (activeItem.Close || 0) >= (activeItem.Open || 0) ? colors.green : colors.red, marginLeft: "2px", fontWeight: 700 }}>₹{Number(activeItem.High || 0).toFixed(2)}</span></span>
+            <span>L:<span style={{ color: (activeItem.Close || 0) >= (activeItem.Open || 0) ? colors.green : colors.red, marginLeft: "2px", fontWeight: 700 }}>₹{Number(activeItem.Low || 0).toFixed(2)}</span></span>
+            <span>C:<span style={{ color: (activeItem.Close || 0) >= (activeItem.Open || 0) ? colors.green : colors.red, marginLeft: "2px", fontWeight: 700 }}>₹{Number(activeItem.Close || 0).toFixed(2)}</span></span>
+            <span style={{ color: (activeChangePct || 0) >= 0 ? colors.green : colors.red, fontWeight: 700, marginLeft: "4px" }}>
+              {(activeChangePct || 0) >= 0 ? "\u25B2 +" : "\u25BC "}{Number(activeChangePct || 0).toFixed(2)}%
             </span>
           </>
         ) : (
@@ -306,9 +306,29 @@ function getCSSVar(varName, fallback = "#888") {
 export default function RealChart({ data }) {
   const [chartType, setChartType] = useState("line"); // "line" | "candle"
 
-  // 🔥 FORCE VALID DATA
-  const cleaned = (data || []).filter(
-    (d) => d && d.Date && d.Close !== null && d.Close !== undefined,
+  // 🔥 FORCE VALID DATA (Normalize keys and sanitize nulls/NaNs)
+  const cleaned = (data || []).map((d) => {
+    if (!d) return null;
+    const open = d.Open !== undefined && d.Open !== null ? Number(d.Open) : (d.open !== undefined && d.open !== null ? Number(d.open) : null);
+    const high = d.High !== undefined && d.High !== null ? Number(d.High) : (d.high !== undefined && d.high !== null ? Number(d.high) : null);
+    const low = d.Low !== undefined && d.Low !== null ? Number(d.Low) : (d.low !== undefined && d.low !== null ? Number(d.low) : null);
+    const close = d.Close !== undefined && d.Close !== null ? Number(d.Close) : (d.close !== undefined && d.close !== null ? Number(d.close) : null);
+    const date = d.Date || d.date;
+
+    const finalClose = close !== null && !isNaN(close) ? close : null;
+    const finalOpen = open !== null && !isNaN(open) ? open : finalClose;
+    const finalHigh = high !== null && !isNaN(high) ? high : Math.max(finalOpen || 0, finalClose || 0);
+    const finalLow = low !== null && !isNaN(low) ? low : Math.min(finalOpen || 999999, finalClose || 999999);
+
+    return {
+      Date: date,
+      Open: finalOpen,
+      High: finalHigh,
+      Low: finalLow,
+      Close: finalClose,
+    };
+  }).filter(
+    (d) => d && d.Date && d.Close !== null && d.Open !== null && d.High !== null && d.Low !== null
   );
 
   // Resolve CSS vars to real colors for Chart.js (re-resolve on theme change)
