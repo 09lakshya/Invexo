@@ -391,13 +391,15 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher }) {
               strokeWidth="1"
               strokeDasharray="3 3"
               clipPath="url(#chart-plot-area)"
+              shapeRendering="crispEdges"
             />
             <text
               x={width - marginRight + 8}
               y={tick.y + 3}
               fill={colors.textSecondary}
-              fontSize="9"
-              fontFamily="monospace"
+              fontSize="10"
+              fontWeight="600"
+              fontFamily="'Space Grotesk', sans-serif"
             >
               ₹{tick.val.toFixed(1)}
             </text>
@@ -416,14 +418,16 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher }) {
               strokeWidth="1"
               strokeDasharray="3 3"
               clipPath="url(#chart-plot-area)"
+              shapeRendering="crispEdges"
             />
             <text
               x={tick.x}
               y={height - marginBottom + 14}
               textAnchor="middle"
               fill={colors.textSecondary}
-              fontSize="9"
-              fontFamily="sans-serif"
+              fontSize="10"
+              fontWeight="600"
+              fontFamily="'Space Grotesk', sans-serif"
             >
               {tick.label}
             </text>
@@ -434,18 +438,18 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher }) {
         <g clipPath="url(#chart-plot-area)">
           {/* Candlestick bars */}
           {visibleData.map((d, i) => {
-            const x = getX(i);
-            const yOpen = getY(d.Open);
-            const yClose = getY(d.Close);
-            const yHigh = getY(d.High);
-            const yLow = getY(d.Low);
+            const x = Math.round(getX(i));
+            const yOpen = Math.round(getY(d.Open));
+            const yClose = Math.round(getY(d.Close));
+            const yHigh = Math.round(getY(d.High));
+            const yLow = Math.round(getY(d.Low));
 
             const isBullish = d.Close >= d.Open;
             const color = isBullish ? colors.green : colors.red;
 
             // Compute custom bar width
-            const candleW = Math.max(3, (plotWidth / visibleData.length) * 0.65);
-            const halfW = candleW / 2;
+            const candleW = Math.max(3, Math.round((plotWidth / visibleData.length) * 0.65));
+            const halfW = Math.round(candleW / 2);
 
             const yTop = Math.min(yOpen, yClose);
             const yBottom = Math.max(yOpen, yClose);
@@ -460,7 +464,8 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher }) {
                   x2={x}
                   y2={yLow}
                   stroke={color}
-                  strokeWidth="1.2"
+                  strokeWidth="1"
+                  shapeRendering="crispEdges"
                 />
                 {/* Candle Body */}
                 <rect
@@ -470,8 +475,8 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher }) {
                   height={bodyH}
                   fill={color}
                   stroke={color}
-                  strokeWidth="0.8"
-                  rx="0.5"
+                  strokeWidth="1"
+                  shapeRendering="crispEdges"
                 />
               </g>
             );
@@ -482,30 +487,32 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher }) {
             <g pointerEvents="none">
               {/* Vertical cross line */}
               <line
-                x1={getX(hoveredIndex)}
+                x1={Math.round(getX(hoveredIndex))}
                 y1={marginTop}
-                x2={getX(hoveredIndex)}
+                x2={Math.round(getX(hoveredIndex))}
                 y2={height - marginBottom}
                 stroke={colors.green}
-                strokeWidth="0.75"
+                strokeWidth="1"
                 strokeDasharray="4 4"
                 opacity="0.6"
+                shapeRendering="crispEdges"
               />
               {/* Horizontal cross line */}
               <line
                 x1={marginLeft}
-                y1={getY(visibleData[hoveredIndex].Close)}
+                y1={Math.round(getY(visibleData[hoveredIndex].Close))}
                 x2={width - marginRight}
-                y2={getY(visibleData[hoveredIndex].Close)}
+                y2={Math.round(getY(visibleData[hoveredIndex].Close))}
                 stroke={colors.green}
-                strokeWidth="0.75"
+                strokeWidth="1"
                 strokeDasharray="4 4"
                 opacity="0.6"
+                shapeRendering="crispEdges"
               />
               {/* Focus Point */}
               <circle
-                cx={getX(hoveredIndex)}
-                cy={getY(visibleData[hoveredIndex].Close)}
+                cx={Math.round(getX(hoveredIndex))}
+                cy={Math.round(getY(visibleData[hoveredIndex].Close))}
                 r="3.5"
                 fill={visibleData[hoveredIndex].Close >= visibleData[hoveredIndex].Open ? colors.green : colors.red}
                 stroke="#fff"
