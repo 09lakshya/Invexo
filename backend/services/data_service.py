@@ -63,6 +63,10 @@ def get_stock_price(symbol: str):
             if df.empty:
                 continue
 
+            df = df.dropna(subset=["Close"])
+            if df.empty:
+                continue
+
             return float(df["Close"].iloc[-1])
         except Exception:
             continue
@@ -93,6 +97,10 @@ def get_history(symbol: str, period: str = "1mo"):
                 df = stock.history(period=period, interval="1d")
                 if df.empty:
                     continue
+
+            df = df.dropna(subset=["Close"])
+            if df.empty:
+                continue
 
             df = df.reset_index()
             # yfinance returns 'Datetime' for intraday and 'Date' for daily

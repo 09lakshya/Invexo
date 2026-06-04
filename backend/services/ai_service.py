@@ -72,6 +72,7 @@ def _get_working_ticker(symbol: str):
     for candidate in _ticker_candidates(symbol):
         try:
             df = yf.Ticker(candidate, session=_yf_session).history(period="5d")
+            df = df.dropna(subset=["Close"])
             if not df.empty:
                 return candidate
         except Exception:
@@ -257,6 +258,7 @@ def _market_sentiment_proxy(symbol: str):
     try:
         stock = yf.Ticker(_get_working_ticker(symbol), session=_yf_session)
         df = stock.history(period="3mo", interval="1d")
+        df = df.dropna(subset=["Close"])
         if df.empty or len(df) < 15:
             return {"sentiment_score": 50, "news_count": 0, "impact": "neutral", "source": "none"}
 
@@ -461,6 +463,7 @@ def predict_stock(symbol: str):
         # Get more historical data for better accuracy
         stock = yf.Ticker(_get_working_ticker(symbol), session=_yf_session)
         df = stock.history(period="6mo")  # Reduced from 1y to 6mo to save memory
+        df = df.dropna(subset=["Close"])
         
         if df.empty or len(df) < 50:
             return {"error": "Not enough data"}

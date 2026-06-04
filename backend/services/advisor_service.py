@@ -50,6 +50,7 @@ def _working_ticker(symbol: str):
     for candidate in _ticker_candidates(symbol):
         try:
             df = yf.Ticker(candidate, session=_yf_session).history(period="5d")
+            df = df.dropna(subset=["Close"])
             if not df.empty:
                 return candidate
         except Exception:
@@ -244,6 +245,7 @@ def _fetch_signals(symbol: str):
     for ticker_symbol in _ticker_candidates(symbol):
         try:
             df = yf.Ticker(ticker_symbol, session=_yf_session).history(period="1mo", interval="1d")
+            df = df.dropna(subset=["Close"])
             if df.empty or len(df) < 14:
                 continue
             close = df["Close"]

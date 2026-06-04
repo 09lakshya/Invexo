@@ -23,6 +23,7 @@ _cache_lock = asyncio.Lock()
 def get_stock_data(symbol):
     stock = yf.Ticker(symbol, session=_yf_session)
     df = stock.history(period="2d")
+    df = df.dropna(subset=["Close"])
 
     if len(df) < 2:
         return {"price": 0, "change": 0, "percent": 0}
