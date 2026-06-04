@@ -416,7 +416,7 @@ export default function Home() {
   const activeMetadata = STOCK_METADATA[normalizedActiveSymbol] || {};
   const activeCompanyName = activeMetadata.name || activeStockSymbol;
   const activeCompanyDomain = activeMetadata.domain;
-  const activeLogoUrl = activeCompanyDomain && !modalLogoError ? `https://www.google.com/s2/favicons?domain=${activeCompanyDomain}&sz=128` : null;
+  const activeLogoUrl = null; // Removed external logo API — using styled initials badge
 
   return (
     <>

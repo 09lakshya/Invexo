@@ -94,7 +94,7 @@ export default function StockPage() {
   const metadata = STOCK_METADATA[normalizedSymbol] || {};
   const companyName = metadata.name || symbol;
   const companyDomain = metadata.domain;
-  const logoUrl = companyDomain && !logoError ? `https://www.google.com/s2/favicons?domain=${companyDomain}&sz=128` : null;
+  const logoUrl = null; // Removed external logo API — using styled initials badge
 
   const getPeriodFormat = (p) => PERIODS.find(x => x.key === p)?.yf || p;
 

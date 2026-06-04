@@ -62,8 +62,7 @@ export default function StockCard({ symbol, price, change, percent, color, small
   const metadata = STOCK_METADATA[cleanSymbol] || {};
   const companyName = metadata.name || symbol;
   const companyDomain = metadata.domain;
-  const [logoError, setLogoError] = useState(false);
-  const logoUrl = companyDomain && !logoError ? `https://www.google.com/s2/favicons?domain=${companyDomain}&sz=128` : null;
+  const logoUrl = null; // Removed external logo API — using styled initials badge
 
   useEffect(() => {
     if (hasData && prevPriceRef.current !== prc) {
