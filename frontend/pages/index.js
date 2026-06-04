@@ -5,6 +5,7 @@ import RealChart from "../components/RealChart";
 import Navbar from "../components/Navbar";
 import API from "../services/api";
 import Head from "next/head";
+import { STOCK_METADATA } from "../services/stocks";
 
 // ── Market hours helper (NSE: Mon–Fri 9:15–15:30 IST) ────────────────────
 function isMarketOpen() {
@@ -283,6 +284,8 @@ export default function Home() {
   const [modalPrediction, setModalPrediction] = useState(null);
   const [modalLoading, setModalLoading] = useState(false);
   const [modalPeriod, setModalPeriod] = useState("1m");
+  const [modalLogoError, setModalLogoError] = useState(false);
+  const [modalError, setModalError] = useState(null);
 
   const getPeriodFormat = (p) => {
     const PERIODS = [
@@ -304,12 +307,18 @@ export default function Home() {
     setModalLoading(true);
     setModalHistory([]);
     setModalPrediction(null);
+    setModalError(null);
+    setModalLogoError(false);
     const normalizedSymbol = symbol.replace(/\.NS$/i, "");
     try {
       const predRes = await API.get(`/predict/${normalizedSymbol}.NS`);
+      if (predRes.data && predRes.data.error) {
+        throw new Error(predRes.data.error);
+      }
       setModalPrediction(predRes.data);
     } catch (err) {
       console.error("ERROR Loading stock details:", err);
+      setModalError("Data unavailable — market may be closed");
     }
   };
 
@@ -323,6 +332,7 @@ export default function Home() {
         setModalHistory(Array.isArray(histRes.data) ? histRes.data : []);
       } catch (err) {
         console.error("ERROR loading history:", err);
+        setModalError("Data unavailable — market may be closed");
       } finally {
         setModalLoading(false);
       }
@@ -433,6 +443,12 @@ export default function Home() {
   const losersCount = losers.length;
 
   const isLoaded = stockEntries.length > 0;
+
+  const normalizedActiveSymbol = activeStockSymbol ? activeStockSymbol.replace(/\.NS$/i, "") : null;
+  const activeMetadata = STOCK_METADATA[normalizedActiveSymbol] || {};
+  const activeCompanyName = activeMetadata.name || activeStockSymbol;
+  const activeCompanyDomain = activeMetadata.domain;
+  const activeLogoUrl = activeCompanyDomain && !modalLogoError ? `https://logo.clearbit.com/${activeCompanyDomain}` : null;
 
   return (
     <>
@@ -580,43 +596,50 @@ export default function Home() {
                   zIndex: 200,
                 }}
               >
-                {results.map((sym) => (
-                  <div
-                    key={sym}
-                    onClick={() => goToStock(sym)}
-                    style={{
-                      padding: "14px 18px",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: "12px",
-                      borderBottom: "1px solid var(--border-subtle)",
-                      transition: "background 0.15s",
-                      fontSize: "0.95rem",
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = "var(--hover-overlay)"}
-                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                  >
+                {results.map((sym) => {
+                  const metadata = STOCK_METADATA[sym] || {};
+                  const companyName = metadata.name || sym;
+                  return (
                     <div
+                      key={sym}
+                      onClick={() => goToStock(sym)}
                       style={{
-                        width: "32px",
-                        height: "32px",
-                        borderRadius: "10px",
-                        background: "var(--accent-dim)",
+                        padding: "14px 18px",
+                        cursor: "pointer",
                         display: "flex",
                         alignItems: "center",
-                        justifyContent: "center",
-                        fontSize: "11px",
-                        fontWeight: 700,
-                        color: "var(--accent)",
-                        flexShrink: 0,
+                        gap: "12px",
+                        borderBottom: "1px solid var(--border-subtle)",
+                        transition: "background 0.15s",
+                        fontSize: "0.95rem",
                       }}
+                      onMouseEnter={e => e.currentTarget.style.background = "var(--hover-overlay)"}
+                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                     >
-                      {sym.slice(0, 2)}
+                      <div
+                        style={{
+                          width: "32px",
+                          height: "32px",
+                          borderRadius: "10px",
+                          background: "var(--accent-dim)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "11px",
+                          fontWeight: 700,
+                          color: "var(--accent)",
+                          flexShrink: 0,
+                        }}
+                      >
+                        {sym.slice(0, 2)}
+                      </div>
+                      <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>
+                        {companyName}
+                        {metadata.name ? ` — ${sym}` : ""}
+                      </span>
                     </div>
-                    <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>{sym}</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -911,19 +934,58 @@ export default function Home() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-              <div>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                  <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: "1.5rem", fontWeight: 800, color: "var(--text-primary)" }}>
-                    {activeStockSymbol}
-                  </h2>
-                  <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontWeight: 700, textTransform: "uppercase" }}>NSE</span>
-                </div>
-                {modalPrediction && (
-                  <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginTop: "2px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                {activeLogoUrl ? (
+                  <img
+                    src={activeLogoUrl}
+                    alt={`${activeCompanyName} logo`}
+                    onError={() => setModalLogoError(true)}
+                    style={{
+                      width: "40px",
+                      height: "40px",
+                      borderRadius: "10px",
+                      border: "1px solid var(--border-medium)",
+                      background: "#fff",
+                      objectFit: "contain",
+                      padding: "2px",
+                      flexShrink: 0,
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: "40px",
+                      height: "40px",
+                      borderRadius: "10px",
+                      background: "var(--accent-dim)",
+                      border: "1px solid var(--accent-glow)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "1.1rem",
+                      fontWeight: 800,
+                      color: "var(--accent)",
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {normalizedActiveSymbol ? normalizedActiveSymbol.substring(0, 2).toUpperCase() : "??"}
+                  </div>
+                )}
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: "1.25rem", fontWeight: 800, color: "var(--text-primary)", margin: 0, lineHeight: 1.2 }}>
+                      {activeCompanyName}
+                    </h2>
+                    <span style={{ fontSize: "0.68rem", color: "var(--accent)", fontWeight: 700, padding: "2px 6px", background: "var(--accent-dim)", borderRadius: "4px" }}>
+                      {normalizedActiveSymbol}
+                    </span>
+                  </div>
+                  <p style={{ fontSize: "0.78rem", color: "var(--text-muted)", margin: "2px 0 0 0" }}>
                     Quick View · AI Prediction Details
                   </p>
-                )}
+                </div>
               </div>
 
               <button
@@ -982,6 +1044,26 @@ export default function Home() {
                 </button>
               ))}
             </div>
+
+            {/* Error Message */}
+            {modalError && (
+              <div style={{
+                background: "var(--red-dim)",
+                border: "1px solid rgba(255, 23, 68, 0.2)",
+                borderRadius: "12px",
+                padding: "12px 16px",
+                color: "var(--red)",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: "8px",
+              }}>
+                <span>⚠️</span>
+                <span>{modalError}</span>
+              </div>
+            )}
 
             {/* Chart Block */}
             <div style={{ height: "300px", position: "relative", minHeight: "250px" }}>

@@ -4,6 +4,7 @@ import API from "../../services/api";
 import RealChart from "../../components/RealChart";
 import Navbar from "../../components/Navbar";
 import Head from "next/head";
+import { STOCK_METADATA } from "../../services/stocks";
 
 const PERIODS = [
   { key: "1d", label: "1D", yf: "1d" },
@@ -62,6 +63,13 @@ export default function StockPage() {
   const [news, setNews]             = useState([]);
   const [period, setPeriod]         = useState("1m");
   const [loading, setLoading]       = useState(true);
+  const [error, setError]           = useState(null);
+  const [logoError, setLogoError]   = useState(false);
+
+  const metadata = STOCK_METADATA[normalizedSymbol] || {};
+  const companyName = metadata.name || symbol;
+  const companyDomain = metadata.domain;
+  const logoUrl = companyDomain && !logoError ? `https://logo.clearbit.com/${companyDomain}` : null;
 
   const getPeriodFormat = (p) => PERIODS.find(x => x.key === p)?.yf || p;
 
@@ -70,15 +78,20 @@ export default function StockPage() {
     const load = async () => {
       try {
         setLoading(true);
+        setError(null);
         const [histRes, predRes] = await Promise.all([
           API.get(`/market/${normalizedSymbol}/history?period=${getPeriodFormat(period)}`),
           API.get(`/predict/${normalizedSymbol}.NS`),
         ]);
+        if (predRes.data && predRes.data.error) {
+          throw new Error(predRes.data.error);
+        }
         setHistory(Array.isArray(histRes.data) ? histRes.data : []);
         setPrediction(predRes.data);
       } catch (err) {
         console.error("ERROR:", err);
         setHistory([]);
+        setError("Data unavailable — market may be closed");
       } finally {
         setLoading(false);
       }
@@ -99,6 +112,53 @@ export default function StockPage() {
         <Navbar />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" }}>
           <div className="spinner" style={{ width: "40px", height: "40px" }} />
+        </div>
+      </div>
+    );
+  }
+
+  if (error && !loading) {
+    return (
+      <div style={{ minHeight: "100vh", background: "var(--bg-primary)" }}>
+        <Navbar />
+        <div style={{ maxWidth: "600px", margin: "80px auto 0", padding: "24px" }}>
+          <div
+            style={{
+              background: "var(--bg-card)",
+              border: "1px solid var(--red-dim)",
+              borderRadius: "20px",
+              padding: "40px 24px",
+              textAlign: "center",
+              boxShadow: "var(--shadow-card)",
+              backdropFilter: "blur(16px)",
+            }}
+          >
+            <p style={{ fontSize: "3rem", marginBottom: "16px" }}>⚠️</p>
+            <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: "1.4rem", fontWeight: 800, color: "var(--text-primary)", marginBottom: "10px" }}>
+              {error}
+            </h2>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginBottom: "24px" }}>
+              The requested stock data is currently unavailable. Please verify the symbol or try again later.
+            </p>
+            <button
+              onClick={() => router.back()}
+              style={{
+                padding: "10px 24px",
+                borderRadius: "10px",
+                border: "none",
+                cursor: "pointer",
+                fontFamily: "inherit",
+                fontWeight: 700,
+                fontSize: "0.9rem",
+                background: "linear-gradient(135deg, var(--accent) 0%, var(--purple) 100%)",
+                color: "var(--bg-primary)",
+                boxShadow: "0 4px 16px var(--accent-glow)",
+                transition: "all 0.2s",
+              }}
+            >
+              Go Back
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -151,21 +211,66 @@ export default function StockPage() {
                 <p style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--text-muted)", letterSpacing: "0.08em", textTransform: "uppercase" }}>NSE · India</p>
               </div>
 
-              <h1
-                style={{
-                  fontFamily: "'Space Grotesk', sans-serif",
-                  fontSize: "clamp(2rem, 5vmin, 3.5rem)",
-                  fontWeight: 900,
-                  letterSpacing: "-0.04em",
-                  background: "linear-gradient(90deg, var(--accent) 0%, var(--purple) 100%)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                  marginBottom: "4px",
-                }}
-              >
-                {symbol}
-              </h1>
+              <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "4px" }}>
+                {logoUrl ? (
+                  <img
+                    src={logoUrl}
+                    alt={`${companyName} logo`}
+                    onError={() => setLogoError(true)}
+                    style={{
+                      width: "56px",
+                      height: "56px",
+                      borderRadius: "14px",
+                      border: "1px solid var(--border-medium)",
+                      background: "#fff",
+                      objectFit: "contain",
+                      padding: "4px",
+                      flexShrink: 0,
+                    }}
+                  />
+                ) : (
+                  <div
+                    style={{
+                      width: "56px",
+                      height: "56px",
+                      borderRadius: "14px",
+                      background: "var(--accent-dim)",
+                      border: "1px solid var(--accent-glow)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: "1.5rem",
+                      fontWeight: 800,
+                      color: "var(--accent)",
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {normalizedSymbol ? normalizedSymbol.substring(0, 2).toUpperCase() : "??"}
+                  </div>
+                )}
+                <div>
+                  <h1
+                    style={{
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      fontSize: "clamp(2rem, 5vmin, 3.5rem)",
+                      fontWeight: 900,
+                      letterSpacing: "-0.04em",
+                      background: "linear-gradient(90deg, var(--accent) 0%, var(--purple) 100%)",
+                      WebkitBackgroundClip: "text",
+                      WebkitTextFillColor: "transparent",
+                      backgroundClip: "text",
+                      margin: 0,
+                      lineHeight: "1.1",
+                    }}
+                  >
+                    {companyName}
+                  </h1>
+                  <p style={{ color: "var(--accent)", fontWeight: 700, fontSize: "1.1rem", marginTop: "4px", margin: 0 }}>
+                    NSE: {normalizedSymbol}
+                  </p>
+                </div>
+              </div>
               <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
                 Real-time price · AI predictions · Market analysis
               </p>

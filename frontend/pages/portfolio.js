@@ -3,6 +3,7 @@ import Navbar from "../components/Navbar";
 import API from "../services/api";
 import Head from "next/head";
 import { useAuth } from "../context/AuthContext";
+import { STOCK_METADATA } from "../services/stocks";
 
 // ── Mini donut for allocation ─────────────────────────────────────────────
 function AllocationDonut({ holdings, size = 100 }) {
@@ -76,6 +77,12 @@ function HoldingRow({ h, onRemove }) {
   const pnlColor = profit ? "var(--green)" : "var(--red)";
   const [removing, setRemoving] = useState(false);
 
+  const cleanSymbol = h.symbol ? h.symbol.replace(/\.NS$/i, "").replace(/\.BO$/i, "") : "";
+  const metadata = STOCK_METADATA[cleanSymbol] || {};
+  const companyName = metadata.name || h.symbol;
+  const [logoError, setLogoError] = useState(false);
+  const logoUrl = metadata.domain && !logoError ? `https://logo.clearbit.com/${metadata.domain}` : null;
+
   const handleRemove = async () => {
     setRemoving(true);
     await onRemove(h.id);
@@ -95,8 +102,53 @@ function HoldingRow({ h, onRemove }) {
     >
       {/* Stock */}
       <td style={{ padding: "16px 18px" }}>
-        <p style={{ fontWeight: 800, color: "var(--accent)", fontSize: "0.9rem", fontFamily: "'Space Grotesk', sans-serif", marginBottom: "2px" }}>{h.symbol}</p>
-        <p style={{ fontSize: "0.7rem", color: "var(--text-muted)" }}>{h.added_on}</p>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", minWidth: 0 }}>
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt={`${companyName} logo`}
+              onError={() => setLogoError(true)}
+              style={{
+                width: "28px",
+                height: "28px",
+                borderRadius: "6px",
+                border: "1px solid var(--border-medium)",
+                background: "#fff",
+                objectFit: "contain",
+                padding: "2px",
+                flexShrink: 0,
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                width: "28px",
+                height: "28px",
+                borderRadius: "6px",
+                background: "var(--accent-dim)",
+                border: "1px solid var(--accent-glow)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "0.75rem",
+                fontWeight: 800,
+                color: "var(--accent)",
+                fontFamily: "'Space Grotesk', sans-serif",
+                flexShrink: 0,
+              }}
+            >
+              {cleanSymbol ? cleanSymbol.substring(0, 2).toUpperCase() : "??"}
+            </div>
+          )}
+          <div style={{ minWidth: 0 }}>
+            <p style={{ fontWeight: 800, color: "var(--text-primary)", fontSize: "0.9rem", fontFamily: "'Space Grotesk', sans-serif", marginBottom: "2px", margin: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }} title={companyName}>
+              {companyName}
+            </p>
+            <p style={{ fontSize: "0.7rem", color: "var(--text-muted)", margin: 0 }}>
+              NSE: {cleanSymbol} · {h.added_on}
+            </p>
+          </div>
+        </div>
       </td>
       {/* Qty */}
       <td style={{ padding: "16px 18px", textAlign: "right", fontWeight: 600, color: "var(--text-secondary)", fontSize: "0.875rem" }}>{h.quantity}</td>
@@ -352,17 +404,22 @@ export default function Portfolio() {
                   />
                   {searchResults.length > 0 && (
                     <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "var(--bg-primary)", border: "1px solid var(--border-subtle)", borderRadius: "12px", zIndex: 50, marginTop: "6px", overflow: "hidden", boxShadow: "0 16px 48px var(--shadow-card)" }}>
-                      {searchResults.map(sym => (
-                        <div
-                          key={sym}
-                          onClick={() => selectStock(sym)}
-                          style={{ padding: "11px 14px", cursor: "pointer", borderBottom: "1px solid var(--border-subtle)", fontSize: "0.875rem", transition: "background 0.15s", color: "var(--accent)", fontWeight: 600 }}
-                          onMouseEnter={e => e.currentTarget.style.background = "var(--accent-dim)"}
-                          onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                        >
-                          {sym}
-                        </div>
-                      ))}
+                      {searchResults.map(sym => {
+                        const metadata = STOCK_METADATA[sym] || {};
+                        const companyName = metadata.name || sym;
+                        return (
+                          <div
+                            key={sym}
+                            onClick={() => selectStock(sym)}
+                            style={{ padding: "11px 14px", cursor: "pointer", borderBottom: "1px solid var(--border-subtle)", fontSize: "0.875rem", transition: "background 0.15s", color: "var(--text-primary)", fontWeight: 600 }}
+                            onMouseEnter={e => e.currentTarget.style.background = "var(--accent-dim)"}
+                            onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                          >
+                            <span style={{ color: "var(--accent)" }}>{sym}</span>
+                            {metadata.name ? ` — ${companyName}` : ""}
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

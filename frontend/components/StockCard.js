@@ -1,5 +1,6 @@
 import { useRouter } from "next/router";
 import { useState, useEffect, useRef } from "react";
+import { STOCK_METADATA } from "../services/stocks";
 
 // Tiny sparkline SVG generator
 function Sparkline({ data, positive, width = 80, height = 32 }) {
@@ -57,6 +58,13 @@ export default function StockCard({ symbol, price, change, percent, color, small
   const prevPriceRef = useRef(prc);
   const [flash, setFlash] = useState(null); // "up" | "down" | null
 
+  const cleanSymbol = symbol ? symbol.replace(/\.NS$/i, "").replace(/\.BO$/i, "") : "";
+  const metadata = STOCK_METADATA[cleanSymbol] || {};
+  const companyName = metadata.name || symbol;
+  const companyDomain = metadata.domain;
+  const [logoError, setLogoError] = useState(false);
+  const logoUrl = companyDomain && !logoError ? `https://logo.clearbit.com/${companyDomain}` : null;
+
   useEffect(() => {
     if (hasData && prevPriceRef.current !== prc) {
       setFlash(prc > prevPriceRef.current ? "up" : "down");
@@ -113,23 +121,66 @@ export default function StockCard({ symbol, price, change, percent, color, small
 
       <div style={{ position: "relative", zIndex: 1 }}>
         {/* Header row */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px" }}>
-          <div>
-            <p
-              style={{
-                fontFamily: "'Space Grotesk', sans-serif",
-                fontWeight: 700,
-                fontSize: small ? "0.9rem" : "1rem",
-                color: "var(--accent)",
-                marginBottom: "2px",
-                letterSpacing: "-0.01em",
-              }}
-            >
-              {symbol}
-            </p>
-            <p style={{ fontSize: "0.7rem", color: "var(--text-muted)", fontWeight: 500 }}>
-              NSE
-            </p>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px", gap: "8px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+            {logoUrl ? (
+              <img
+                src={logoUrl}
+                alt={`${companyName} logo`}
+                onError={() => setLogoError(true)}
+                style={{
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "6px",
+                  border: "1px solid var(--border-medium)",
+                  background: "#fff",
+                  objectFit: "contain",
+                  padding: "2px",
+                  flexShrink: 0,
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "6px",
+                  background: "var(--accent-dim)",
+                  border: "1px solid var(--accent-glow)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "0.72rem",
+                  fontWeight: 800,
+                  color: "var(--accent)",
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  flexShrink: 0,
+                }}
+              >
+                {cleanSymbol ? cleanSymbol.substring(0, 2).toUpperCase() : "??"}
+              </div>
+            )}
+            <div style={{ minWidth: 0 }}>
+              <p
+                style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontWeight: 700,
+                  fontSize: small ? "0.82rem" : "0.9rem",
+                  color: "var(--text-primary)",
+                  margin: 0,
+                  letterSpacing: "-0.01em",
+                  whiteSpace: "nowrap",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                }}
+                title={companyName}
+              >
+                {companyName}
+              </p>
+              <p style={{ fontSize: "0.68rem", color: "var(--text-muted)", fontWeight: 500, margin: 0 }}>
+                NSE: {cleanSymbol}
+              </p>
+            </div>
           </div>
 
           {hasData ? (

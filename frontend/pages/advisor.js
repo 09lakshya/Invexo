@@ -3,6 +3,7 @@ import Navbar from "../components/Navbar";
 import API from "../services/api";
 import Head from "next/head";
 import { useRouter } from "next/router";
+import { STOCK_METADATA } from "../services/stocks";
 
 const GOALS = [
   { id: "wealth",    label: "Wealth Creation",  desc: "Grow money aggressively over time",  icon: "🚀" },
@@ -266,6 +267,11 @@ function RecoCard({ stock, rank, totalBudget }) {
     ? "mid cap"
     : "large cap";
 
+  const cleanSymbol = stock.symbol ? stock.symbol.replace(/\.NS$/i, "").replace(/\.BO$/i, "") : "";
+  const metadata = STOCK_METADATA[cleanSymbol] || {};
+  const [logoError, setLogoError] = useState(false);
+  const logoUrl = metadata.domain && !logoError ? `https://logo.clearbit.com/${metadata.domain}` : null;
+
   return (
     <div
       style={{
@@ -288,35 +294,74 @@ function RecoCard({ stock, rank, totalBudget }) {
     >
       {/* Top row */}
       <div 
-        style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px", flexWrap: "wrap", gap: "12px", cursor: "pointer" }}
+        style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "12px", cursor: "pointer" }}
         onClick={() => router.push(`/stock/${stock.symbol}`)}
       >
-        <div style={{ flex: 1 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "6px" }}>
-            <span style={{ padding: "2px 10px", borderRadius: "20px", background: "var(--accent-dim)", color: "var(--accent)", fontSize: "0.7rem", fontWeight: 800, border: "1px solid var(--accent-glow)" }}>
-              #{rank}
-            </span>
-            <span style={{
-              fontFamily: "'Space Grotesk', sans-serif",
-              fontWeight: 800,
-              fontSize: "1.1rem",
-              background: "linear-gradient(90deg, var(--accent), var(--purple))",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-              backgroundClip: "text",
-            }}>
-              {stock.name}
-            </span>
-            <span style={{ padding: "2px 8px", borderRadius: "20px", background: riskBg[stock.risk_level], color: riskColors[stock.risk_level], fontSize: "0.65rem", fontWeight: 700, border: `1px solid ${riskColors[stock.risk_level]}30` }}>
-              {stock.risk_level} risk
-            </span>
-            <span style={{ padding: "2px 8px", borderRadius: "20px", background: "var(--bg-primary)", color: "var(--text-secondary)", fontSize: "0.65rem", fontWeight: 700, border: "1px solid var(--border-subtle)" }}>
-              {capLabel}
-            </span>
+        <div style={{ flex: 1, display: "flex", alignItems: "center", gap: "12px", minWidth: 0 }}>
+          {logoUrl ? (
+            <img
+              src={logoUrl}
+              alt={`${stock.name} logo`}
+              onError={() => setLogoError(true)}
+              style={{
+                width: "40px",
+                height: "40px",
+                borderRadius: "10px",
+                border: "1px solid var(--border-medium)",
+                background: "#fff",
+                objectFit: "contain",
+                padding: "2px",
+                flexShrink: 0,
+              }}
+            />
+          ) : (
+            <div
+              style={{
+                width: "40px",
+                height: "40px",
+                borderRadius: "10px",
+                background: "var(--accent-dim)",
+                border: "1px solid var(--accent-glow)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "1.1rem",
+                fontWeight: 800,
+                color: "var(--accent)",
+                fontFamily: "'Space Grotesk', sans-serif",
+                flexShrink: 0,
+              }}
+            >
+              {cleanSymbol ? cleanSymbol.substring(0, 2).toUpperCase() : "??"}
+            </div>
+          )}
+          <div style={{ minWidth: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginBottom: "4px" }}>
+              <span style={{ padding: "2px 8px", borderRadius: "10px", background: "var(--accent-dim)", color: "var(--accent)", fontSize: "0.65rem", fontWeight: 800, border: "1px solid var(--accent-glow)" }}>
+                #{rank}
+              </span>
+              <span style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontWeight: 800,
+                fontSize: "1.1rem",
+                background: "linear-gradient(90deg, var(--accent), var(--purple))",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
+              }}>
+                {stock.name}
+              </span>
+              <span style={{ padding: "2px 8px", borderRadius: "20px", background: riskBg[stock.risk_level], color: riskColors[stock.risk_level], fontSize: "0.65rem", fontWeight: 700, border: `1px solid ${riskColors[stock.risk_level]}30` }}>
+                {stock.risk_level} risk
+              </span>
+              <span style={{ padding: "2px 8px", borderRadius: "20px", background: "var(--bg-primary)", color: "var(--text-secondary)", fontSize: "0.65rem", fontWeight: 700, border: "1px solid var(--border-subtle)" }}>
+                {capLabel}
+              </span>
+            </div>
+            <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 500, margin: 0 }}>
+              NSE: {cleanSymbol} · {stock.sector}
+            </p>
           </div>
-          <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 500 }}>
-            {stock.symbol} · {stock.sector}
-          </p>
         </div>
 
         <div style={{ textAlign: "right" }}>
