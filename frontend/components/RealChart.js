@@ -8,7 +8,7 @@ import {
   Filler,
 } from "chart.js";
 import { Line } from "react-chartjs-2";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 
 ChartJS.register(
   LineElement,
@@ -50,11 +50,15 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher, zoomRef, onZ
   const [yOffset, setYOffset] = useState(0);
   const [isPanning, setIsPanning] = useState(false);
 
+  // Only reset zoom and panning when the actual dataset contents change (e.g. changing symbol or period)
+  const dataKey = data.length > 0 ? `${data.length}-${data[0].Date}-${data[data.length - 1].Date}` : "";
+
   useEffect(() => {
+    console.log("Resetting zoomRange due to dataKey change:", dataKey);
     setZoomRange({ start: 0, end: data.length - 1 });
     setYOffset(0);
     setHoveredIndex(null);
-  }, [data]);
+  }, [dataKey]);
 
   useEffect(() => {
     setHoveredIndex(null);
@@ -680,29 +684,31 @@ export default function RealChart({
   const onZoomStateChange = externalOnZoomStateChange || setLocalIsZoomed;
 
   // 🔥 FORCE VALID DATA (Normalize keys and sanitize nulls/NaNs)
-  const cleaned = (data || []).map((d) => {
-    if (!d) return null;
-    const open = d.Open !== undefined && d.Open !== null ? Number(d.Open) : (d.open !== undefined && d.open !== null ? Number(d.open) : null);
-    const high = d.High !== undefined && d.High !== null ? Number(d.High) : (d.high !== undefined && d.high !== null ? Number(d.high) : null);
-    const low = d.Low !== undefined && d.Low !== null ? Number(d.Low) : (d.low !== undefined && d.low !== null ? Number(d.low) : null);
-    const close = d.Close !== undefined && d.Close !== null ? Number(d.Close) : (d.close !== undefined && d.close !== null ? Number(d.close) : null);
-    const date = d.Date || d.date;
+  const cleaned = useMemo(() => {
+    return (data || []).map((d) => {
+      if (!d) return null;
+      const open = d.Open !== undefined && d.Open !== null ? Number(d.Open) : (d.open !== undefined && d.open !== null ? Number(d.open) : null);
+      const high = d.High !== undefined && d.High !== null ? Number(d.High) : (d.high !== undefined && d.high !== null ? Number(d.high) : null);
+      const low = d.Low !== undefined && d.Low !== null ? Number(d.Low) : (d.low !== undefined && d.low !== null ? Number(d.low) : null);
+      const close = d.Close !== undefined && d.Close !== null ? Number(d.Close) : (d.close !== undefined && d.close !== null ? Number(d.close) : null);
+      const date = d.Date || d.date;
 
-    const finalClose = close !== null && !isNaN(close) ? close : null;
-    const finalOpen = open !== null && !isNaN(open) ? open : finalClose;
-    const finalHigh = high !== null && !isNaN(high) ? high : Math.max(finalOpen || 0, finalClose || 0);
-    const finalLow = low !== null && !isNaN(low) ? low : Math.min(finalOpen || 999999, finalClose || 999999);
+      const finalClose = close !== null && !isNaN(close) ? close : null;
+      const finalOpen = open !== null && !isNaN(open) ? open : finalClose;
+      const finalHigh = high !== null && !isNaN(high) ? high : Math.max(finalOpen || 0, finalClose || 0);
+      const finalLow = low !== null && !isNaN(low) ? low : Math.min(finalOpen || 999999, finalClose || 999999);
 
-    return {
-      Date: date,
-      Open: finalOpen,
-      High: finalHigh,
-      Low: finalLow,
-      Close: finalClose,
-    };
-  }).filter(
-    (d) => d && d.Date && d.Close !== null && d.Open !== null && d.High !== null && d.Low !== null
-  );
+      return {
+        Date: date,
+        Open: finalOpen,
+        High: finalHigh,
+        Low: finalLow,
+        Close: finalClose,
+      };
+    }).filter(
+      (d) => d && d.Date && d.Close !== null && d.Open !== null && d.High !== null && d.Low !== null
+    );
+  }, [data]);
 
   // Resolve CSS vars to real colors for Chart.js (re-resolve on theme change)
   const [colors, setColors] = useState({
