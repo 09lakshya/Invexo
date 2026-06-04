@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
+import Link from "next/link";
 import StockCard from "../components/StockCard";
 import RealChart from "../components/RealChart";
 import Navbar from "../components/Navbar";
@@ -893,7 +894,10 @@ export default function Home() {
           {/* ── Footer note ─────────────────────────────────── */}
           <div style={{ marginTop: "48px", textAlign: "center" }}>
             <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontWeight: 500 }}>
-              Data is for informational purposes only. Not financial advice. Prices may be delayed.
+              Data is for informational purposes only. Not financial advice. Prices may be delayed. ·{" "}
+              <Link href="/credits" style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}>
+                Credits & About
+              </Link>
             </p>
           </div>
         </div>
