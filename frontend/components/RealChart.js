@@ -198,112 +198,145 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher }) {
   const touchStartStart = useRef(0);
   const touchStartEnd = useRef(data.length - 1);
 
-  const handleTouchStart = (e) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    if (e.touches.length === 1) {
-      const x = e.touches[0].clientX - rect.left;
-      const y = e.touches[0].clientY - rect.top;
+  // Sync refs to avoid recreating touch event listeners
+  const zoomRangeRef = useRef(zoomRange);
+  const yOffsetRef = useRef(yOffset);
+  const priceRangeRef = useRef(priceRange);
 
-      if (x >= marginLeft && x <= (width - marginRight) && y >= marginTop && y <= (height - marginBottom)) {
-        isDragging.current = true;
-        setIsPanning(true);
-        dragStartX.current = e.touches[0].clientX;
-        dragStartY.current = e.touches[0].clientY;
-        dragStartRange.current = { ...zoomRange };
-        dragStartYOffset.current = yOffset;
-        setHoveredIndex(null);
+  useEffect(() => {
+    zoomRangeRef.current = zoomRange;
+  }, [zoomRange]);
+
+  useEffect(() => {
+    yOffsetRef.current = yOffset;
+  }, [yOffset]);
+
+  useEffect(() => {
+    priceRangeRef.current = priceRange;
+  }, [priceRange]);
+
+  // Active/Passive Touch event handling inside the graph margins to prevent whole-screen scrolling
+  useEffect(() => {
+    const svgEl = svgRef.current;
+    if (!svgEl) return;
+
+    const onTouchStart = (e) => {
+      const rect = svgEl.getBoundingClientRect();
+      if (e.touches.length === 1) {
+        const x = e.touches[0].clientX - rect.left;
+        const y = e.touches[0].clientY - rect.top;
+
+        if (x >= marginLeft && x <= (width - marginRight) && y >= marginTop && y <= (height - marginBottom)) {
+          isDragging.current = true;
+          setIsPanning(true);
+          dragStartX.current = e.touches[0].clientX;
+          dragStartY.current = e.touches[0].clientY;
+          dragStartRange.current = { ...zoomRangeRef.current };
+          dragStartYOffset.current = yOffsetRef.current;
+          setHoveredIndex(null);
+        }
+      } else if (e.touches.length === 2) {
+        isDragging.current = false;
+        setIsPanning(false);
+
+        const x0 = e.touches[0].clientX - rect.left;
+        const y0 = e.touches[0].clientY - rect.top;
+        const x1 = e.touches[1].clientX - rect.left;
+        const y1 = e.touches[1].clientY - rect.top;
+
+        const inside0 = x0 >= marginLeft && x0 <= (width - marginRight) && y0 >= marginTop && y0 <= (height - marginBottom);
+        const inside1 = x1 >= marginLeft && x1 <= (width - marginRight) && y1 >= marginTop && y1 <= (height - marginBottom);
+
+        if (inside0 && inside1) {
+          if (e.cancelable) e.preventDefault(); // Stop screen zoom gesture
+          const dist = Math.hypot(
+            e.touches[0].clientX - e.touches[1].clientX,
+            e.touches[0].clientY - e.touches[1].clientY
+          );
+          touchStartDistance.current = dist;
+          touchStartStart.current = zoomRangeRef.current.start;
+          touchStartEnd.current = zoomRangeRef.current.end;
+        }
       }
-    } else if (e.touches.length === 2) {
-      isDragging.current = false;
-      setIsPanning(false);
+    };
 
-      const x0 = e.touches[0].clientX - rect.left;
-      const y0 = e.touches[0].clientY - rect.top;
-      const x1 = e.touches[1].clientX - rect.left;
-      const y1 = e.touches[1].clientY - rect.top;
+    const onTouchMove = (e) => {
+      if (e.touches.length === 1 && isDragging.current) {
+        if (e.cancelable) e.preventDefault(); // BLOCK mobile scroll/bounce page drag!
+        const dx = e.touches[0].clientX - dragStartX.current;
+        const dy = e.touches[0].clientY - dragStartY.current;
 
-      const inside0 = x0 >= marginLeft && x0 <= (width - marginRight) && y0 >= marginTop && y0 <= (height - marginBottom);
-      const inside1 = x1 >= marginLeft && x1 <= (width - marginRight) && y1 >= marginTop && y1 <= (height - marginBottom);
+        // X-Panning
+        const indicesPerPixel = (dragStartRange.current.end - dragStartRange.current.start) / plotWidth;
+        const shiftX = Math.round(-dx * indicesPerPixel);
+        const span = dragStartRange.current.end - dragStartRange.current.start;
+        
+        let newStart = dragStartRange.current.start + shiftX;
+        let newEnd = dragStartRange.current.end + shiftX;
+        
+        if (newStart < 0) {
+          newStart = 0;
+          newEnd = span;
+        }
+        if (newEnd > data.length - 1) {
+          newEnd = data.length - 1;
+          newStart = newEnd - span;
+        }
 
-      if (inside0 && inside1) {
-        if (e.cancelable) e.preventDefault(); // Prevent browser screen zoom
+        // Y-Panning
+        const priceUnitsPerPixel = priceRangeRef.current / plotHeight;
+        const shiftY = dy * priceUnitsPerPixel;
+        const newYOffset = dragStartYOffset.current + shiftY;
+
+        setZoomRange({ start: newStart, end: newEnd });
+        setYOffset(newYOffset);
+      } else if (e.touches.length === 2 && touchStartDistance.current > 0) {
+        if (e.cancelable) e.preventDefault(); // Stop screen zoom gesture
         const dist = Math.hypot(
           e.touches[0].clientX - e.touches[1].clientX,
           e.touches[0].clientY - e.touches[1].clientY
         );
-        touchStartDistance.current = dist;
-        touchStartStart.current = zoomRange.start;
-        touchStartEnd.current = zoomRange.end;
+        const ratio = touchStartDistance.current / dist;
+        
+        const initialSpan = touchStartEnd.current - touchStartStart.current;
+        const targetSpan = Math.max(4, Math.min(data.length - 1, Math.round(initialSpan * ratio)));
+        
+        const diff = targetSpan - initialSpan;
+        const leftDiff = Math.floor(diff / 2);
+        const rightDiff = diff - leftDiff;
+        
+        let newStart = touchStartStart.current - leftDiff;
+        let newEnd = touchStartEnd.current + rightDiff;
+        
+        if (newStart < 0) {
+          newEnd = Math.min(data.length - 1, newEnd - newStart);
+          newStart = 0;
+        }
+        if (newEnd > data.length - 1) {
+          newStart = Math.max(0, newStart - (newEnd - (data.length - 1)));
+          newEnd = data.length - 1;
+        }
+
+        setZoomRange({ start: newStart, end: newEnd });
       }
-    }
-  };
+    };
 
-  const handleTouchMove = (e) => {
-    if (e.touches.length === 1 && isDragging.current) {
-      if (e.cancelable) e.preventDefault(); // Prevent page/screen scroll bounce
-      const dx = e.touches[0].clientX - dragStartX.current;
-      const dy = e.touches[0].clientY - dragStartY.current;
+    const onTouchEnd = () => {
+      isDragging.current = false;
+      setIsPanning(false);
+      touchStartDistance.current = 0;
+    };
 
-      // X-Panning
-      const indicesPerPixel = (dragStartRange.current.end - dragStartRange.current.start) / plotWidth;
-      const shiftX = Math.round(-dx * indicesPerPixel);
-      const span = dragStartRange.current.end - dragStartRange.current.start;
-      
-      let newStart = dragStartRange.current.start + shiftX;
-      let newEnd = dragStartRange.current.end + shiftX;
-      
-      if (newStart < 0) {
-        newStart = 0;
-        newEnd = span;
-      }
-      if (newEnd > data.length - 1) {
-        newEnd = data.length - 1;
-        newStart = newEnd - span;
-      }
+    svgEl.addEventListener("touchstart", onTouchStart, { passive: false });
+    svgEl.addEventListener("touchmove", onTouchMove, { passive: false });
+    svgEl.addEventListener("touchend", onTouchEnd, { passive: false });
 
-      // Y-Panning
-      const priceUnitsPerPixel = priceRange / plotHeight;
-      const shiftY = dy * priceUnitsPerPixel;
-      const newYOffset = dragStartYOffset.current + shiftY;
-
-      setZoomRange({ start: newStart, end: newEnd });
-      setYOffset(newYOffset);
-    } else if (e.touches.length === 2 && touchStartDistance.current > 0) {
-      if (e.cancelable) e.preventDefault(); // Prevent browser screen zoom
-      const dist = Math.hypot(
-        e.touches[0].clientX - e.touches[1].clientX,
-        e.touches[0].clientY - e.touches[1].clientY
-      );
-      const ratio = touchStartDistance.current / dist;
-      
-      const initialSpan = touchStartEnd.current - touchStartStart.current;
-      const targetSpan = Math.max(4, Math.min(data.length - 1, Math.round(initialSpan * ratio)));
-      
-      const diff = targetSpan - initialSpan;
-      const leftDiff = Math.floor(diff / 2);
-      const rightDiff = diff - leftDiff;
-      
-      let newStart = touchStartStart.current - leftDiff;
-      let newEnd = touchStartEnd.current + rightDiff;
-      
-      if (newStart < 0) {
-        newEnd = Math.min(data.length - 1, newEnd - newStart);
-        newStart = 0;
-      }
-      if (newEnd > data.length - 1) {
-        newStart = Math.max(0, newStart - (newEnd - (data.length - 1)));
-        newEnd = data.length - 1;
-      }
-
-      setZoomRange({ start: newStart, end: newEnd });
-    }
-  };
-
-  const handleTouchEnd = () => {
-    isDragging.current = false;
-    setIsPanning(false);
-    touchStartDistance.current = 0;
-  };
+    return () => {
+      svgEl.removeEventListener("touchstart", onTouchStart);
+      svgEl.removeEventListener("touchmove", onTouchMove);
+      svgEl.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [width, height, data.length, marginLeft, marginRight, marginTop, marginBottom]);
 
   const handleZoom = (direction) => {
     setZoomRange(prev => {
@@ -420,9 +453,6 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher }) {
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
         style={{ cursor: isPanning ? "grabbing" : "crosshair", display: "block", touchAction: "none" }}
       >
         <defs>
