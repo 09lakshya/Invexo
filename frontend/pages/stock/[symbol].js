@@ -62,6 +62,7 @@ export default function StockPage() {
   const [prediction, setPrediction] = useState(null);
   const [news, setNews]             = useState([]);
   const [period, setPeriod]         = useState("1m");
+  const [chartType, setChartType]   = useState("line");
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState(null);
   const [logoError, setLogoError]   = useState(false);
@@ -321,42 +322,95 @@ export default function StockPage() {
             )}
           </div>
 
-          {/* ── Period selector ─────────────────────────────────────── */}
+          {/* ── Chart Controls (Period + Chart Type Switcher) ───────── */}
           <div style={{
             display: "flex",
-            gap: "4px",
+            justifyContent: "space-between",
+            alignItems: "center",
             marginBottom: "16px",
-            background: "var(--filter-tab-bg)",
-            border: "1px solid var(--filter-tab-border)",
-            borderRadius: "12px",
-            padding: "4px",
-            width: "fit-content",
-            maxWidth: "100%",
-            overflowX: "auto",
-            WebkitOverflowScrolling: "touch",
+            flexWrap: "wrap",
+            gap: "12px",
             animation: "fadeInUp 0.5s 0.1s ease both",
           }}>
-            {PERIODS.map(({ key, label }) => (
+            {/* Period selector */}
+            <div style={{
+              display: "flex",
+              gap: "4px",
+              background: "var(--filter-tab-bg)",
+              border: "1px solid var(--filter-tab-border)",
+              borderRadius: "12px",
+              padding: "4px",
+              width: "fit-content",
+              maxWidth: "100%",
+              overflowX: "auto",
+              WebkitOverflowScrolling: "touch",
+            }}>
+              {PERIODS.map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setPeriod(key)}
+                  style={{
+                    padding: "7px 14px",
+                    borderRadius: "9px",
+                    border: "none",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    fontWeight: 700,
+                    fontSize: "0.8rem",
+                    transition: "all 0.2s",
+                    background: period === key ? "var(--accent-dim)" : "transparent",
+                    color: period === key ? "var(--accent)" : "var(--filter-tab-inactive)",
+                    boxShadow: period === key ? "0 2px 8px var(--shadow-card)" : "none",
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Chart Type Selector */}
+            <div style={{
+              display: "flex",
+              background: "var(--filter-tab-bg)",
+              border: "1px solid var(--filter-tab-border)",
+              borderRadius: "12px",
+              padding: "4px",
+            }}>
               <button
-                key={key}
-                onClick={() => setPeriod(key)}
+                onClick={() => setChartType("line")}
                 style={{
                   padding: "7px 14px",
                   borderRadius: "9px",
                   border: "none",
                   cursor: "pointer",
-                  fontFamily: "inherit",
-                  fontWeight: 700,
                   fontSize: "0.8rem",
+                  fontWeight: 700,
+                  background: chartType === "line" ? "var(--accent-dim)" : "transparent",
+                  color: chartType === "line" ? "var(--accent)" : "var(--filter-tab-inactive)",
                   transition: "all 0.2s",
-                  background: period === key ? "var(--accent-dim)" : "transparent",
-                  color: period === key ? "var(--accent)" : "var(--filter-tab-inactive)",
-                  boxShadow: period === key ? "0 2px 8px var(--shadow-card)" : "none",
+                  fontFamily: "inherit",
                 }}
               >
-                {label}
+                Line
               </button>
-            ))}
+              <button
+                onClick={() => setChartType("candle")}
+                style={{
+                  padding: "7px 14px",
+                  borderRadius: "9px",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: "0.8rem",
+                  fontWeight: 700,
+                  background: chartType === "candle" ? "var(--accent-dim)" : "transparent",
+                  color: chartType === "candle" ? "var(--accent)" : "var(--filter-tab-inactive)",
+                  transition: "all 0.2s",
+                  fontFamily: "inherit",
+                }}
+              >
+                Candle
+              </button>
+            </div>
           </div>
 
           {/* ── Chart ──────────────────────────────────────────────── */}
@@ -389,7 +443,7 @@ export default function StockPage() {
                   boxShadow: "var(--shadow-card)",
                 }}
               >
-                <RealChart data={history} />
+                <RealChart data={history} chartType={chartType} setChartType={setChartType} />
               </div>
             ) : (
               <div style={{

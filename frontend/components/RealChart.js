@@ -303,8 +303,11 @@ function getCSSVar(varName, fallback = "#888") {
   return val || fallback;
 }
 
-export default function RealChart({ data }) {
-  const [chartType, setChartType] = useState("line"); // "line" | "candle"
+export default function RealChart({ data, chartType: externalChartType, setChartType: externalSetChartType }) {
+  const [internalChartType, internalSetChartType] = useState("line");
+  const chartType = externalChartType !== undefined ? externalChartType : internalChartType;
+  const setChartType = externalSetChartType !== undefined ? externalSetChartType : internalSetChartType;
+  const showSwitcher = externalChartType === undefined;
 
   // 🔥 FORCE VALID DATA (Normalize keys and sanitize nulls/NaNs)
   const cleaned = (data || []).map((d) => {
@@ -502,54 +505,55 @@ export default function RealChart({ data }) {
 
   return (
     <div style={{ height: "100%", width: "100%", position: "relative" }}>
-      {/* Dynamic chart type switcher */}
-      <div style={{
-        position: "absolute",
-        top: "8px",
-        right: "12px",
-        display: "flex",
-        background: "var(--filter-tab-bg)",
-        border: "1px solid var(--filter-tab-border)",
-        borderRadius: "10px",
-        padding: "2px",
-        zIndex: 10,
-        backdropFilter: "blur(8px)",
-      }}>
-        <button
-          onClick={() => setChartType("line")}
-          style={{
-            padding: "4px 10px",
-            borderRadius: "7px",
-            border: "none",
-            cursor: "pointer",
-            fontSize: "0.7rem",
-            fontWeight: 700,
-            background: chartType === "line" ? "var(--accent-dim)" : "transparent",
-            color: chartType === "line" ? "var(--accent)" : "var(--filter-tab-inactive)",
-            transition: "all 0.2s",
-            fontFamily: "inherit",
-          }}
-        >
-          Line
-        </button>
-        <button
-          onClick={() => setChartType("candle")}
-          style={{
-            padding: "4px 10px",
-            borderRadius: "7px",
-            border: "none",
-            cursor: "pointer",
-            fontSize: "0.7rem",
-            fontWeight: 700,
-            background: chartType === "candle" ? "var(--accent-dim)" : "transparent",
-            color: chartType === "candle" ? "var(--accent)" : "var(--filter-tab-inactive)",
-            transition: "all 0.2s",
-            fontFamily: "inherit",
-          }}
-        >
-          Candle
-        </button>
-      </div>
+      {showSwitcher && (
+        <div style={{
+          position: "absolute",
+          top: "8px",
+          right: "12px",
+          display: "flex",
+          background: "var(--filter-tab-bg)",
+          border: "1px solid var(--filter-tab-border)",
+          borderRadius: "10px",
+          padding: "2px",
+          zIndex: 10,
+          backdropFilter: "blur(8px)",
+        }}>
+          <button
+            onClick={() => setChartType("line")}
+            style={{
+              padding: "4px 10px",
+              borderRadius: "7px",
+              border: "none",
+              cursor: "pointer",
+              fontSize: "0.7rem",
+              fontWeight: 700,
+              background: chartType === "line" ? "var(--accent-dim)" : "transparent",
+              color: chartType === "line" ? "var(--accent)" : "var(--filter-tab-inactive)",
+              transition: "all 0.2s",
+              fontFamily: "inherit",
+            }}
+          >
+            Line
+          </button>
+          <button
+            onClick={() => setChartType("candle")}
+            style={{
+              padding: "4px 10px",
+              borderRadius: "7px",
+              border: "none",
+              cursor: "pointer",
+              fontSize: "0.7rem",
+              fontWeight: 700,
+              background: chartType === "candle" ? "var(--accent-dim)" : "transparent",
+              color: chartType === "candle" ? "var(--accent)" : "var(--filter-tab-inactive)",
+              transition: "all 0.2s",
+              fontFamily: "inherit",
+            }}
+          >
+            Candle
+          </button>
+        </div>
+      )}
 
       {chartType === "line" ? (
         <div style={{ height: "100%", width: "100%" }}>
