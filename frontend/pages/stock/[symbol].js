@@ -469,7 +469,7 @@ export default function StockPage() {
                   sub={`${predDelta >= 0 ? "+" : ""}${predDelta.toFixed(2)} (${predDeltaPct}%)`}
                 />
                 <InfoChip
-                  label="Day Close"
+                  label="Day Close (Prediction)"
                   value={`₹${pred.day_close_prediction}`}
                   color={pred.day_close_prediction - pred.current_price >= 0 ? "var(--green)" : "var(--red)"}
                 />
