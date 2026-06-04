@@ -3,6 +3,9 @@ import numpy as np
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional
 import redis, json, hashlib, os
+from curl_cffi.requests import Session as curl_Session
+
+_yf_session = curl_Session(impersonate="chrome120")
 
 YF_SYMBOL_OVERRIDES = {
     "TATAMOTORS": "TATAMOTORS.BO",
@@ -46,12 +49,11 @@ def _ticker_candidates(symbol: str):
 def _working_ticker(symbol: str):
     for candidate in _ticker_candidates(symbol):
         try:
-            df = yf.Ticker(candidate).history(period="5d")
+            df = yf.Ticker(candidate, session=_yf_session).history(period="5d")
             if not df.empty:
                 return candidate
         except Exception:
             continue
-    return symbol
 
 # ── RSI helper (self-contained so this service has no circular imports) ──────
 def _rsi(prices, period=14):
@@ -241,7 +243,7 @@ def _investment_amounts(budget: float, investment_type: str, investment_months: 
 def _fetch_signals(symbol: str):
     for ticker_symbol in _ticker_candidates(symbol):
         try:
-            df = yf.Ticker(ticker_symbol).history(period="1mo", interval="1d")
+            df = yf.Ticker(ticker_symbol, session=_yf_session).history(period="1mo", interval="1d")
             if df.empty or len(df) < 14:
                 continue
             close = df["Close"]
@@ -386,24 +388,23 @@ def get_recommendations(goal: str, duration: str, risk: str, budget: float, inve
         
         # Fetch sentiment for this stock (0-100)
         try:
-            stock_obj = yf.Ticker(_working_ticker(sym))
-            news = getattr(stock_obj, 'news', [])
+            stock_obj = yf.Ticker(_working_ticker(sym), session=_yf_session)
+            news = getattr(stock_obj, 'news', []) or []
             sentiments = []
             for item in news[:5]:  # Top 5 news items
-                title = item.get("title", "")
-                summary = item.get("summary", "")
+                title = item.get("title", "") or ""
+                summary = item.get("summary", "") or ""
                 text = f"{title} {summary}"
                 sentiment = _analyze_sentiment(text)
                 sentiments.append(sentiment)
-            sentiment_score = np.mean(sentiments) if sentiments else 50
-        except:
-            sentiment_score = 50
+            sentiment_score = np.mean(sentiments) if sentiments else 50.0
+        except Exception:
+            sentiment_score = 50.0
         
         stock_risk = meta.get("risk", "medium")
         score = _score(signals, sentiment_score, stock_risk, duration)
         score = int(min(100, max(0, score + _opportunistic_bonus(meta, goal, duration, risk))))
         confidence = _calculate_confidence(score, sentiment_score, signals["rsi"], signals["trend"])
-        
         scored.append({
             "sym": sym,
             "meta": meta,

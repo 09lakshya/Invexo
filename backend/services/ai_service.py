@@ -9,6 +9,10 @@ import time
 import gc
 from functools import wraps
 
+from curl_cffi.requests import Session as curl_Session
+
+_yf_session = curl_Session(impersonate="chrome120")
+
 def ttl_cache(maxsize=100, ttl=60):
     def decorator(func):
         cache = {}
@@ -66,7 +70,7 @@ def _ticker_candidates(symbol: str):
 def _get_working_ticker(symbol: str):
     for candidate in _ticker_candidates(symbol):
         try:
-            df = yf.Ticker(candidate).history(period="5d")
+            df = yf.Ticker(candidate, session=_yf_session).history(period="5d")
             if not df.empty:
                 return candidate
         except Exception:
@@ -101,17 +105,125 @@ def calculate_bollinger_bands(prices, period=20, std_dev=2):
     return upper_band, sma, lower_band
 
 
-def analyze_sentiment(text):
-    """Analyze sentiment of text using TextBlob"""
+def calculate_adx(df, period=14):
+    """Calculate Average Directional Index (ADX)"""
+    high = df["High"]
+    low = df["Low"]
+    close = df["Close"]
+    
+    # Calculate True Range (TR)
+    h_l = high - low
+    h_pc = (high - close.shift(1)).abs()
+    # Handle NaN in first rows
+    h_pc = h_pc.fillna(0.0)
+    l_pc = (low - close.shift(1)).abs()
+    l_pc = l_pc.fillna(0.0)
+    
+    tr = pd.concat([h_l, h_pc, l_pc], axis=1).max(axis=1)
+    
+    up_move = high - high.shift(1)
+    down_move = low.shift(1) - low
+    
+    # +DM and -DM calculation
+    plus_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0.0)
+    minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0.0)
+    
+    plus_dm_series = pd.Series(plus_dm, index=df.index)
+    minus_dm_series = pd.Series(minus_dm, index=df.index)
+    
+    # Wilder's smoothing technique: 1/14 alpha
+    atr = tr.ewm(alpha=1/period, adjust=False).mean()
+    
+    # Handle case where ATR is 0 to avoid division by zero
+    atr_safe = np.where(atr != 0, atr, 1e-9)
+    
+    plus_di = 100 * plus_dm_series.ewm(alpha=1/period, adjust=False).mean() / atr_safe
+    minus_di = 100 * minus_dm_series.ewm(alpha=1/period, adjust=False).mean() / atr_safe
+    
+    # Avoid division by zero in DX calculation
+    di_sum = plus_di + minus_di
+    di_diff = (plus_di - minus_di).abs()
+    dx = 100 * np.where(di_sum != 0, di_diff / di_sum, 0.0)
+    
+    adx = pd.Series(dx, index=df.index).ewm(alpha=1/period, adjust=False).mean()
+    
+    return plus_di, minus_di, adx
+
+
+def calculate_stochastic(df, k_period=14, d_period=3):
+    """Calculate Stochastic Oscillator (%K and %D)"""
+    low_min = df["Low"].rolling(window=k_period).min()
+    high_max = df["High"].rolling(window=k_period).max()
+    
+    denom = high_max - low_min
+    k = 100 * np.where(denom != 0, (df["Close"] - low_min) / denom, 50.0)
+    k_series = pd.Series(k, index=df.index)
+    d = k_series.rolling(window=d_period).mean()
+    
+    # Fallback for initial NaN values
+    k_series = k_series.fillna(50.0)
+    d = d.fillna(50.0)
+    return k_series, d
+
+
+FINANCIAL_LEXICON = {
+    # Bullish keywords (positive influence)
+    "profit": 1.2, "revenue": 1.1, "earnings": 1.1, "growth": 1.2, "surges": 1.5,
+    "rises": 1.1, "leap": 1.4, "leaps": 1.4, "jump": 1.2, "jumps": 1.2,
+    "beat": 1.3, "beats": 1.3, "outperform": 1.4, "outperforms": 1.4,
+    "bullish": 1.5, "buy": 1.2, "strong": 1.2, "recovery": 1.3, "recover": 1.2,
+    "upward": 1.2, "gains": 1.2, "gain": 1.1, "positive": 1.1, "expansion": 1.2,
+    "expand": 1.1, "dividend": 1.3, "acquisition": 1.3, "partnership": 1.2,
+    "deal": 1.1, "hikes": 1.3, "hike": 1.2, "record-breaking": 1.5, "soars": 1.5,
+    
+    # Bearish keywords (negative influence)
+    "loss": -1.3, "losses": -1.4, "drop": -1.1, "drops": -1.1, "slump": -1.4,
+    "slumps": -1.4, "fall": -1.1, "falls": -1.1, "decline": -1.2, "declines": -1.2,
+    "bearish": -1.5, "sell": -1.2, "weak": -1.2, "plunge": -1.5, "plunges": -1.5,
+    "downward": -1.2, "debt": -1.1, "defaults": -1.5, "default": -1.4,
+    "investigation": -1.4, "probe": -1.4, "fine": -1.2, "fined": -1.3,
+    "regulatory": -1.1, "sanction": -1.3, "warning": -1.2, "warns": -1.2,
+    "miss": -1.2, "misses": -1.2, "scam": -1.6, "fraud": -1.6, "crash": -1.5,
+    "crashes": -1.5, "liabilities": -1.1, "bankrupt": -1.8, "bankruptcy": -1.8
+}
+
+
+def analyze_financial_sentiment(text):
+    """Analyze sentiment of text using TextBlob adjusted by a financial lexicon"""
     if not text:
-        return 0
+        return 50.0
     try:
         blob = TextBlob(str(text))
         polarity = blob.sentiment.polarity
-        # Convert -1 to 1 range to 0 to 100 range
-        return (polarity + 1) * 50
-    except:
-        return 50
+        base_score = (polarity + 1) * 50.0  # 0 to 100
+    except Exception:
+        base_score = 50.0
+        
+    # Apply financial lexicon weights
+    try:
+        text_lower = str(text).lower()
+        words = text_lower.split()
+        adjustment = 0.0
+        matched_words = 0
+        for word in words:
+            clean_word = word.strip(".,!?;:()\"'")
+            if clean_word in FINANCIAL_LEXICON:
+                adjustment += FINANCIAL_LEXICON[clean_word]
+                matched_words += 1
+                
+        if matched_words > 0:
+            # Scale adjustment to maximum +/- 25 points influence
+            avg_adj = (adjustment / matched_words) * 15.0
+            base_score += avg_adj
+    except Exception:
+        pass
+        
+    return max(0.0, min(100.0, base_score))
+
+
+def analyze_sentiment(text):
+    # Keep legacy function signature for safety, routing to upgraded lexicon logic
+    return analyze_financial_sentiment(text)
 
 
 def _safe_float(value, default=None):
@@ -142,7 +254,7 @@ def _news_text(item: dict) -> str:
 def _market_sentiment_proxy(symbol: str):
     """Fallback when news text is unavailable; keeps neutral from meaning unknown."""
     try:
-        stock = yf.Ticker(_get_working_ticker(symbol))
+        stock = yf.Ticker(_get_working_ticker(symbol), session=_yf_session)
         df = stock.history(period="3mo", interval="1d")
         if df.empty or len(df) < 15:
             return {"sentiment_score": 50, "news_count": 0, "impact": "neutral", "source": "none"}
@@ -166,11 +278,13 @@ def _market_sentiment_proxy(symbol: str):
         return {"sentiment_score": 50, "news_count": 0, "impact": "neutral", "source": "none"}
 
 
+
+
 @ttl_cache(maxsize=100, ttl=300)
 def fetch_news_sentiment(symbol: str):
     """Fetch and analyze news sentiment for a stock"""
     try:
-        stock = yf.Ticker(_get_working_ticker(symbol))
+        stock = yf.Ticker(_get_working_ticker(symbol), session=_yf_session)
         
         # Try to get news from yfinance
         try:
@@ -179,21 +293,23 @@ def fetch_news_sentiment(symbol: str):
                 return {"sentiment_score": 50, "news_count": 0, "impact": "neutral"}
             
             sentiments = []
-            for item in news[:10]:  # Last 10 news items
+            weights = []
+            for idx, item in enumerate(news[:10]):  # Last 10 news items
                 text = _news_text(item)
                 if text:
-                    sentiment = analyze_sentiment(text)
+                    sentiment = analyze_financial_sentiment(text)
                     sentiments.append(sentiment)
+                    weights.append(10 - idx)
 
             if not sentiments:
                 return _market_sentiment_proxy(symbol)
             
-            avg_sentiment = float(np.mean(sentiments)) if sentiments else 50
+            avg_sentiment = float(np.average(sentiments, weights=weights)) if sentiments else 50.0
             
             # Determine impact
-            if avg_sentiment > 60:
+            if avg_sentiment > 58:
                 impact = "bullish"
-            elif avg_sentiment < 40:
+            elif avg_sentiment < 42:
                 impact = "bearish"
             else:
                 impact = "neutral"
@@ -217,7 +333,7 @@ def fetch_news_sentiment(symbol: str):
 def get_fundamental_data(symbol: str):
     """Get fundamental data for a stock"""
     try:
-        stock = yf.Ticker(_get_working_ticker(symbol))
+        stock = yf.Ticker(_get_working_ticker(symbol), session=_yf_session)
         info = stock.get_info() or {}
         fast_info = getattr(stock, "fast_info", {}) or {}
         
@@ -342,7 +458,7 @@ def calculate_technical_quality_score(close, volume):
 def predict_stock(symbol: str):
     try:
         # Get more historical data for better accuracy
-        stock = yf.Ticker(_get_working_ticker(symbol))
+        stock = yf.Ticker(_get_working_ticker(symbol), session=_yf_session)
         df = stock.history(period="6mo")  # Reduced from 1y to 6mo to save memory
         
         if df.empty or len(df) < 50:
@@ -372,10 +488,27 @@ def predict_stock(symbol: str):
         current_middle = middle_bb.iloc[-1]
         current_lower = lower_bb.iloc[-1]
         
-        # Moving Averages
+        # Moving Averages (SMA)
         ma20 = close.rolling(20).mean().iloc[-1]
         ma50 = close.rolling(50).mean().iloc[-1]
         ma200 = close.rolling(200).mean().iloc[-1] if len(close) >= 200 else np.nan
+        
+        # Exponential Moving Averages (EMA 9 and 21)
+        ema9 = close.ewm(span=9, adjust=False).mean()
+        ema21 = close.ewm(span=21, adjust=False).mean()
+        current_ema9 = ema9.iloc[-1]
+        current_ema21 = ema21.iloc[-1]
+        
+        # ADX (Average Directional Index)
+        plus_di_series, minus_di_series, adx_series = calculate_adx(df)
+        current_adx = adx_series.iloc[-1]
+        current_plus_di = plus_di_series.iloc[-1]
+        current_minus_di = minus_di_series.iloc[-1]
+        
+        # Stochastic Oscillator
+        stoch_k_series, stoch_d_series = calculate_stochastic(df)
+        current_stoch_k = stoch_k_series.iloc[-1]
+        current_stoch_d = stoch_d_series.iloc[-1]
         
         # Volume Analysis
         avg_volume = volume.rolling(20).mean().iloc[-1]
@@ -393,116 +526,117 @@ def predict_stock(symbol: str):
             fundamental_score = calculate_technical_quality_score(close, volume)
             fundamental_source = "technical_proxy"
 
-        # ===== TREND DETECTION =====
-        trend_score = 0
-        confidence_factors = []
+        # ===== SIGNAL CONSENSUS & TREND DETECTION =====
+        signals_direction = {}
         
-        # MA trend analysis
-        if not np.isnan(ma200):
-            if ma20 > ma50 > ma200:
-                trend_score += 2
-                confidence_factors.append(25)
-            elif ma20 < ma50 < ma200:
-                trend_score -= 2
-                confidence_factors.append(25)
-            elif ma20 > ma50:
-                trend_score += 1
-                confidence_factors.append(15)
-            elif ma20 < ma50:
-                trend_score -= 1
-                confidence_factors.append(15)
+        # 1. EMA 9/21 Trend
+        signals_direction["ema_cross"] = "BULLISH" if current_ema9 > current_ema21 else "BEARISH"
+        
+        # 2. MACD Histogram
+        signals_direction["macd"] = "BULLISH" if current_histogram > 0 else "BEARISH"
+        
+        # 3. RSI
+        if rsi < 35:
+            signals_direction["rsi"] = "BULLISH"
+        elif rsi > 65:
+            signals_direction["rsi"] = "BEARISH"
         else:
-            if ma20 > ma50:
-                trend_score += 1
-                confidence_factors.append(15)
-            elif ma20 < ma50:
-                trend_score -= 1
-                confidence_factors.append(15)
+            signals_direction["rsi"] = "BULLISH" if rsi > 50 else "BEARISH"
+            
+        # 4. Stochastic Hook
+        if current_stoch_k > current_stoch_d:
+            signals_direction["stochastic"] = "BULLISH"
+        else:
+            signals_direction["stochastic"] = "BEARISH"
+            
+        # 5. Bollinger Bands (Relative position to middle band)
+        signals_direction["bollinger"] = "BULLISH" if current_price > current_middle else "BEARISH"
         
-        # RSI Analysis
-        if rsi > 70:  # Overbought
-            trend_score -= 1
-            confidence_factors.append(10)
-        elif rsi < 30:  # Oversold
-            trend_score += 1
-            confidence_factors.append(10)
-        elif rsi > 60:
-            trend_score += 1
-            confidence_factors.append(8)
-        elif rsi < 40:
-            trend_score -= 1
-            confidence_factors.append(8)
+        # 6. News Sentiment
+        signals_direction["sentiment"] = "BULLISH" if news_sentiment > 55 else "BEARISH" if news_sentiment < 45 else "NEUTRAL"
         
-        # MACD Analysis
-        if current_histogram > 0 and current_macd > current_signal:
-            trend_score += 1.5
-            confidence_factors.append(20)
-        elif current_histogram < 0 and current_macd < current_signal:
-            trend_score -= 1.5
-            confidence_factors.append(20)
+        # 7. Fundamentals
+        signals_direction["fundamentals"] = "BULLISH" if fundamental_score > 55 else "BEARISH" if fundamental_score < 45 else "NEUTRAL"
+
+        # Calculate final trend based on consensus score weight
+        trend_score = 0
         
-        # Bollinger Bands Analysis
-        if current_price > current_middle:
-            trend_score += 0.5
-            confidence_factors.append(10)
-        elif current_price < current_middle:
-            trend_score -= 0.5
-            confidence_factors.append(10)
+        if signals_direction["ema_cross"] == "BULLISH": trend_score += 1.5
+        else: trend_score -= 1.5
         
-        # ===== NEWS SENTIMENT INFLUENCE =====
-        if news_sentiment > 60:  # Bullish sentiment
-            trend_score += 0.8
-            confidence_factors.append(15)
-        elif news_sentiment < 40:  # Bearish sentiment
-            trend_score -= 0.8
-            confidence_factors.append(15)
+        if signals_direction["macd"] == "BULLISH": trend_score += 1.5
+        else: trend_score -= 1.5
         
-        # ===== FUNDAMENTAL ANALYSIS INFLUENCE =====
-        if fundamental_score > 65:  # Strong fundamentals
-            trend_score += 0.6
-            confidence_factors.append(12)
-        elif fundamental_score < 35:  # Weak fundamentals
-            trend_score -= 0.6
-            confidence_factors.append(12)
+        if signals_direction["rsi"] == "BULLISH": trend_score += 1.0
+        else: trend_score -= 1.0
         
-        # Volume Analysis
-        if volume_signal > 1.2:  # Higher than average volume
-            confidence_factors.append(5)
+        if signals_direction["stochastic"] == "BULLISH": trend_score += 1.0
+        else: trend_score -= 1.0
         
-        # Determine trend and confidence
-        if trend_score > 0:
+        if signals_direction["bollinger"] == "BULLISH": trend_score += 0.5
+        else: trend_score -= 0.5
+        
+        if signals_direction["sentiment"] == "BULLISH": trend_score += 0.8
+        elif signals_direction["sentiment"] == "BEARISH": trend_score -= 0.8
+        
+        if signals_direction["fundamentals"] == "BULLISH": trend_score += 0.7
+        elif signals_direction["fundamentals"] == "BEARISH": trend_score -= 0.7
+
+        # ADX trend confirmation boost
+        if current_adx > 25:
+            # Boost the prevailing trend strength if ADX indicates strong trend
+            if trend_score > 0 and current_plus_di > current_minus_di:
+                trend_score += 1.0
+            elif trend_score < 0 and current_minus_di > current_plus_di:
+                trend_score -= 1.0
+
+        if trend_score > 0.5:
             trend = "BULLISH"
-            base_confidence = min(50 + abs(trend_score) * 5, 95)
-        elif trend_score < 0:
+        elif trend_score < -0.5:
             trend = "BEARISH"
-            base_confidence = min(50 + abs(trend_score) * 5, 95)
         else:
             trend = "NEUTRAL"
-            base_confidence = 50
-        
-        # Dynamic confidence based on multiple factors (including sentiment & fundamentals)
-        factor_confidence = min(100, sum(confidence_factors) * 0.85)
-        confidence = int(min(100, round((base_confidence * 0.45) + (factor_confidence * 0.55))))
 
-        # ===== PRICE PREDICTION =====
-        # Calculate volatility
-        volatility = close.pct_change().rolling(20).std().iloc[-1]
+        # Calculate signal agreement consensus ratio
+        target_dir = "BULLISH" if trend == "BULLISH" else "BEARISH" if trend == "BEARISH" else None
         
-        # Sentiment and fundamental adjustment. Keep these small; they should nudge,
-        # not dominate, a short-term price forecast.
+        if target_dir:
+            matching_signals = sum(1 for k, v in signals_direction.items() if v == target_dir)
+            total_valid_signals = sum(1 for k, v in signals_direction.items() if v != "NEUTRAL")
+            consensus_ratio = (matching_signals / total_valid_signals) if total_valid_signals > 0 else 0.5
+        else:
+            # Neutral trend has 50% consensus baseline
+            consensus_ratio = 0.5
+
+        # ===== PRICE PREDICTION (ADX Regime Adaptive) =====
+        volatility = close.pct_change().rolling(20).std().iloc[-1]
+        if np.isnan(volatility) or volatility == 0:
+            volatility = 0.015  # Fallback standard deviation
+
         sentiment_factor = (news_sentiment - 50) / 100  # -0.5 to 0.5
         fundamental_factor = (fundamental_score - 50) / 100  # -0.5 to 0.5
         momentum_5d = close.iloc[-1] / close.iloc[-min(6, len(close))] - 1
         momentum_20d = close.iloc[-1] / close.iloc[-min(21, len(close))] - 1
         mean_reversion = (current_middle - current_price) / current_price if current_price else 0
 
+        # ADX regime scaling: trending vs range-bound
+        # Normalize ADX from 0 to 1 between 15 (choppy) and 45 (extremely trending)
+        trend_strength = min(1.0, max(0.0, (current_adx - 15) / 30))
+        
+        # In trending market (high trend_strength), prioritize momentum.
+        # In range-bound market (low trend_strength), prioritize mean reversion.
+        w_momentum = 0.20 + 0.40 * trend_strength      # ranges [0.20, 0.60]
+        w_reversion = 0.35 - 0.25 * trend_strength     # ranges [0.35, 0.10]
+        w_sentiment = 0.05
+        w_fundamental = 0.05
+
         expected_move = (
-            momentum_5d * 0.30
-            + momentum_20d * 0.20
-            + mean_reversion * 0.15
-            + sentiment_factor * 0.025
-            + fundamental_factor * 0.035
+            (momentum_5d * 0.6 + momentum_20d * 0.4) * w_momentum
+            + mean_reversion * w_reversion
+            + sentiment_factor * w_sentiment
+            + fundamental_factor * w_fundamental
         )
+        
         max_move = max(0.015, min(0.08, volatility * 2.2))
         expected_move = max(-max_move, min(max_move, expected_move))
         predicted_price = current_price * (1 + expected_move)
@@ -510,14 +644,41 @@ def predict_stock(symbol: str):
         # ===== DAY CLOSE PREDICTION =====
         x = np.arange(len(close))
         y = close.values
-        
         coefficients = np.polyfit(x[-20:], y[-20:], 1)
         slope = coefficients[0]
+        
         intraday_bias = expected_move * 0.35
         day_close_prediction = current_price * (1 + intraday_bias) + slope * 0.35
         
         day_close_prediction = max(day_close_prediction, lower_bb.iloc[-1])
         day_close_prediction = min(day_close_prediction, upper_bb.iloc[-1])
+
+        # ===== CONFIDENCE CALIBRATION =====
+        # Base confidence from consensus ratio (ranges from 50% to 90% typically)
+        base_confidence = 50 + (consensus_ratio - 0.5) * 80
+        
+        # ADX trend strength boost (up to +10 points for strong, clear trends)
+        adx_boost = 0.0
+        if current_adx > 25:
+            adx_boost = min(10.0, (current_adx - 25) * 0.5)
+            
+        # Volatility penalty (prices are less predictable during high volatility)
+        vol_penalty = min(10.0, volatility * 150)
+        
+        # Data richness adjustments
+        richness_bonus = 0.0
+        if news_data.get("source") == "news":
+            richness_bonus += 3.0
+        else:
+            richness_bonus -= 3.0
+            
+        if fundamental_source == "fundamentals":
+            richness_bonus += 3.0
+        else:
+            richness_bonus -= 3.0
+            
+        raw_confidence = base_confidence + adx_boost - vol_penalty + richness_bonus
+        confidence = int(max(35, min(95, round(raw_confidence))))
 
         result = {
             "current_price": round(current_price, 2),

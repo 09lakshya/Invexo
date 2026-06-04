@@ -45,7 +45,7 @@ function genSparkline(price, change, n = 20) {
   return pts;
 }
 
-export default function StockCard({ symbol, price, change, percent, color, small }) {
+export default function StockCard({ symbol, price, change, percent, color, small, onClick }) {
   const router = useRouter();
   const prc = typeof price === "number" && Number.isFinite(price) ? price : 0;
   const chg = typeof change === "number" && Number.isFinite(change) ? change : 0;
@@ -75,7 +75,7 @@ export default function StockCard({ symbol, price, change, percent, color, small
 
   return (
     <div
-      onClick={() => router.push(`/stock/${symbol}`)}
+      onClick={onClick || (() => router.push(`/stock/${symbol}`))}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
@@ -148,7 +148,7 @@ export default function StockCard({ symbol, price, change, percent, color, small
                 letterSpacing: "0.03em",
               }}
             >
-              {isPositive ? "?" : "?"}
+              {isPositive ? "\u25B2" : "\u25BC"}
             </span>
           ) : (
             <span

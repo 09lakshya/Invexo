@@ -1,6 +1,9 @@
 import asyncio
 import time
 import yfinance as yf
+from curl_cffi.requests import Session as curl_Session
+
+_yf_session = curl_Session(impersonate="chrome120")
 
 SYMBOLS = {
     "NIFTY50": "^NSEI",
@@ -18,7 +21,7 @@ _cache = {"at": 0, "data": None}
 _cache_lock = asyncio.Lock()
 
 def get_stock_data(symbol):
-    stock = yf.Ticker(symbol)
+    stock = yf.Ticker(symbol, session=_yf_session)
     df = stock.history(period="2d")
 
     if len(df) < 2:

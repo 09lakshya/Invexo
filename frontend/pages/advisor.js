@@ -324,7 +324,7 @@ function RecoCard({ stock, rank, totalBudget }) {
             ₹{stock.current_price}
           </p>
           <p style={{ fontSize: "0.8rem", fontWeight: 700, color: bull ? "var(--green)" : "var(--red)" }}>
-            {bull ? "▲ BULLISH" : "▼ BEARISH"}
+            {bull ? "\u25B2 BULLISH" : "\u25BC BEARISH"}
           </p>
         </div>
       </div>
@@ -374,7 +374,7 @@ function RecoCard({ stock, rank, totalBudget }) {
         onClick={() => setExpanded(!expanded)}
         style={{ background: "var(--accent-dim)", border: "1px solid var(--accent-glow)", borderRadius: "10px", padding: "8px 14px", cursor: "pointer", color: "var(--accent)", fontSize: "0.78rem", fontWeight: 600, fontFamily: "inherit", marginBottom: expanded ? "12px" : "16px", transition: "all 0.2s", width: "100%", textAlign: "left" }}
       >
-        {expanded ? "▲ Hide AI Analysis" : "▼ View AI Analysis"}
+        {expanded ? "\u25B2 Hide AI Analysis" : "\u25BC View AI Analysis"}
       </button>
 
       {expanded && (

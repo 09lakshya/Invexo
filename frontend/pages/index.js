@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/router";
 import StockCard from "../components/StockCard";
+import RealChart from "../components/RealChart";
 import Navbar from "../components/Navbar";
 import API from "../services/api";
 import Head from "next/head";
@@ -117,7 +118,7 @@ function TickerTape({ stocks }) {
               <span style={{ color: "var(--accent)", fontWeight: 700 }}>{sym}</span>
               <span>₹{(d?.price || 0).toFixed(2)}</span>
               <span style={{ color: pos ? "var(--green)" : "var(--red)", fontWeight: 700 }}>
-                {pos ? "▲" : "▼"} {Math.abs(d?.percent || 0).toFixed(2)}%
+                {pos ? "\u25B2" : "\u25BC"} {Math.abs(d?.percent || 0).toFixed(2)}%
               </span>
             </span>
           );
@@ -216,7 +217,7 @@ function IndexCard({ symbol, data, prevData }) {
             color: isUp ? "var(--green)" : "var(--red)",
           }}
         >
-          {isUp ? "▲ +" : "▼ "}{(data.change || 0).toFixed(2)}
+          {isUp ? "\u25B2 +" : "\u25BC "}{(data.change || 0).toFixed(2)}
         </span>
         <span
           style={{
@@ -274,6 +275,60 @@ export default function Home() {
   const [showRecents, setShowRecents] = useState(false);
   const [focused, setFocused] = useState(false);
   const searchRef = useRef(null);
+
+  // States for Quick View Chart Modal
+  const [activeStockSymbol, setActiveStockSymbol] = useState(null);
+  const [showChartModal, setShowChartModal] = useState(false);
+  const [modalHistory, setModalHistory] = useState([]);
+  const [modalPrediction, setModalPrediction] = useState(null);
+  const [modalLoading, setModalLoading] = useState(false);
+  const [modalPeriod, setModalPeriod] = useState("1m");
+
+  const getPeriodFormat = (p) => {
+    const PERIODS = [
+      { key: "1d", yf: "1d" },
+      { key: "1w", yf: "5d" },
+      { key: "1m", yf: "1mo" },
+      { key: "3m", yf: "3mo" },
+      { key: "6m", yf: "6mo" },
+      { key: "1y", yf: "1y" },
+      { key: "5y", yf: "5y" },
+    ];
+    return PERIODS.find(x => x.key === p)?.yf || p;
+  };
+
+  const openQuickView = async (symbol) => {
+    setActiveStockSymbol(symbol);
+    setShowChartModal(true);
+    setModalPeriod("1m");
+    setModalLoading(true);
+    setModalHistory([]);
+    setModalPrediction(null);
+    const normalizedSymbol = symbol.replace(/\.NS$/i, "");
+    try {
+      const predRes = await API.get(`/predict/${normalizedSymbol}.NS`);
+      setModalPrediction(predRes.data);
+    } catch (err) {
+      console.error("ERROR Loading stock details:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (!showChartModal || !activeStockSymbol) return;
+    const loadHistory = async () => {
+      setModalLoading(true);
+      const normalizedSymbol = activeStockSymbol.replace(/\.NS$/i, "");
+      try {
+        const histRes = await API.get(`/market/${normalizedSymbol}/history?period=${getPeriodFormat(modalPeriod)}`);
+        setModalHistory(Array.isArray(histRes.data) ? histRes.data : []);
+      } catch (err) {
+        console.error("ERROR loading history:", err);
+      } finally {
+        setModalLoading(false);
+      }
+    };
+    loadHistory();
+  }, [modalPeriod, activeStockSymbol, showChartModal]);
 
   // Load recent searches from localStorage
   useEffect(() => {
@@ -804,6 +859,7 @@ export default function Home() {
                       change={current?.change}
                       percent={current?.percent}
                       color={colorClass}
+                      onClick={() => openQuickView(sym)}
                     />
                   </div>
                 );
@@ -819,6 +875,231 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* Quick View Chart Modal */}
+      {showChartModal && activeStockSymbol && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 9999,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(8, 12, 26, 0.6)",
+            backdropFilter: "blur(8px)",
+            WebkitBackdropFilter: "blur(8px)",
+            padding: "20px",
+            animation: "fadeIn 0.25s ease-out forwards",
+          }}
+          onClick={() => setShowChartModal(false)}
+        >
+          <div
+            className="glass"
+            style={{
+              width: "100%",
+              maxWidth: "800px",
+              borderRadius: "20px",
+              padding: "clamp(16px, 3vmin, 28px)",
+              boxShadow: "0 24px 64px rgba(0,0,0,0.8), 0 0 0 1px var(--border-medium)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px",
+              animation: "scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards",
+              background: "var(--bg-card)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                  <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: "1.5rem", fontWeight: 800, color: "var(--text-primary)" }}>
+                    {activeStockSymbol}
+                  </h2>
+                  <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontWeight: 700, textTransform: "uppercase" }}>NSE</span>
+                </div>
+                {modalPrediction && (
+                  <p style={{ fontSize: "0.85rem", color: "var(--text-muted)", marginTop: "2px" }}>
+                    Quick View · AI Prediction Details
+                  </p>
+                )}
+              </div>
+
+              <button
+                onClick={() => setShowChartModal(false)}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "var(--text-muted)",
+                  fontSize: "1.5rem",
+                  cursor: "pointer",
+                  padding: "4px",
+                  lineHeight: 1,
+                  transition: "color 0.2s",
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.color = "var(--text-primary)"}
+                onMouseLeave={(e) => e.currentTarget.style.color = "var(--text-muted)"}
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Timeframe Selector */}
+            <div style={{
+              display: "flex",
+              gap: "4px",
+              background: "var(--filter-tab-bg)",
+              border: "1px solid var(--filter-tab-border)",
+              borderRadius: "10px",
+              padding: "3px",
+              width: "fit-content",
+            }}>
+              {[
+                { key: "1d", label: "1D" },
+                { key: "1w", label: "1W" },
+                { key: "1m", label: "1M" },
+                { key: "3m", label: "3M" },
+                { key: "1y", label: "1Y" },
+              ].map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setModalPeriod(key)}
+                  style={{
+                    padding: "5px 10px",
+                    borderRadius: "7px",
+                    border: "none",
+                    cursor: "pointer",
+                    fontFamily: "inherit",
+                    fontWeight: 700,
+                    fontSize: "0.75rem",
+                    background: modalPeriod === key ? "var(--accent-dim)" : "transparent",
+                    color: modalPeriod === key ? "var(--accent)" : "var(--filter-tab-inactive)",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {/* Chart Block */}
+            <div style={{ height: "300px", position: "relative", minHeight: "250px" }}>
+              {modalLoading ? (
+                <div style={{
+                  position: "absolute",
+                  inset: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "12px",
+                  background: "rgba(0,0,0,0.1)",
+                  borderRadius: "12px",
+                }}>
+                  <div className="spinner" style={{ width: "32px", height: "32px" }} />
+                  <p style={{ color: "var(--text-muted)", fontSize: "0.8rem" }}>Loading stock chart...</p>
+                </div>
+              ) : modalHistory && modalHistory.length > 0 ? (
+                <RealChart data={modalHistory} />
+              ) : (
+                <div style={{
+                  height: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  border: "1px dashed var(--border-subtle)",
+                  borderRadius: "12px",
+                }}>
+                  <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>No history data available for this period</p>
+                </div>
+              )}
+            </div>
+
+            {/* AI prediction details quick bar */}
+            {modalPrediction && (
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))",
+                gap: "10px",
+                background: "var(--input-bg)",
+                border: "1px solid var(--border-subtle)",
+                borderRadius: "12px",
+                padding: "12px",
+              }}>
+                <div>
+                  <p style={{ fontSize: "0.62rem", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.05em", marginBottom: "4px" }}>
+                    Current Price
+                  </p>
+                  <p style={{ fontSize: "1.1rem", fontWeight: 800, color: "var(--text-primary)", fontFamily: "'Space Grotesk', sans-serif" }}>
+                    ₹{modalPrediction.current_price}
+                  </p>
+                </div>
+                <div>
+                  <p style={{ fontSize: "0.62rem", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.05em", marginBottom: "4px" }}>
+                    Predicted Price
+                  </p>
+                  <p style={{
+                    fontSize: "1.1rem",
+                    fontWeight: 800,
+                    color: modalPrediction.predicted_price >= modalPrediction.current_price ? "var(--green)" : "var(--red)",
+                    fontFamily: "'Space Grotesk', sans-serif"
+                  }}>
+                    ₹{modalPrediction.predicted_price}
+                  </p>
+                </div>
+                <div>
+                  <p style={{ fontSize: "0.62rem", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.05em", marginBottom: "4px" }}>
+                    Trend
+                  </p>
+                  <p style={{
+                    fontSize: "1.1rem",
+                    fontWeight: 800,
+                    color: modalPrediction.trend === "BULLISH" ? "var(--green)" : modalPrediction.trend === "BEARISH" ? "var(--red)" : "var(--accent)",
+                    fontFamily: "'Space Grotesk', sans-serif"
+                  }}>
+                    {modalPrediction.trend}
+                  </p>
+                </div>
+                <div>
+                  <p style={{ fontSize: "0.62rem", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.05em", marginBottom: "4px" }}>
+                    Confidence
+                  </p>
+                  <p style={{
+                    fontSize: "1.1rem",
+                    fontWeight: 800,
+                    color: modalPrediction.confidence >= 70 ? "var(--green)" : modalPrediction.confidence >= 55 ? "var(--gold)" : "var(--red)",
+                    fontFamily: "'Space Grotesk', sans-serif"
+                  }}>
+                    {modalPrediction.confidence}%
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "4px" }}>
+              <button
+                onClick={() => setShowChartModal(false)}
+                className="btn-ghost"
+                style={{ padding: "8px 16px", fontSize: "0.8rem" }}
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setShowChartModal(false);
+                  router.push(`/stock/${activeStockSymbol}`);
+                }}
+                className="btn-primary"
+                style={{ padding: "8px 16px", fontSize: "0.8rem", color: "var(--bg-primary)" }}
+              >
+                View Full Analysis &rarr;
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

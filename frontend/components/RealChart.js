@@ -8,7 +8,7 @@ import {
   Filler,
 } from "chart.js";
 import { Line } from "react-chartjs-2";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 ChartJS.register(
   LineElement,
@@ -18,6 +18,281 @@ ChartJS.register(
   Tooltip,
   Filler,
 );
+
+// ── CUSTOM RESPONSIVE RESIZE OBSERVER HOOK ──────────────────────────────────
+function useElementSize() {
+  const [size, setSize] = useState({ width: 600, height: 300 });
+  const [ref, setRef] = useState(null);
+
+  useEffect(() => {
+    if (!ref) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setSize({
+          width: Math.floor(entry.contentRect.width),
+          height: Math.floor(entry.contentRect.height),
+        });
+      }
+    });
+    observer.observe(ref);
+    return () => observer.disconnect();
+  }, [ref]);
+
+  return [setRef, size];
+}
+
+// ── CUSTOM HIGH-FIDELITY CANDLESTICK CHART COMPONENT ────────────────────────
+function CandlestickChart({ data, colors, isIntraday }) {
+  const [setRef, size] = useElementSize();
+  const { width, height } = size;
+  const [hoveredIndex, setHoveredIndex] = useState(null);
+
+  const marginTop = 36; // Extra spacing for HUD
+  const marginBottom = 28;
+  const marginLeft = 15;
+  const marginRight = 60; // Space for Y-Axis labels
+
+  const plotWidth = Math.max(50, width - marginLeft - marginRight);
+  const plotHeight = Math.max(50, height - marginTop - marginBottom);
+
+  const lows = data.map((d) => Number(d.Low));
+  const highs = data.map((d) => Number(d.High));
+  const minPrice = Math.min(...lows);
+  const maxPrice = Math.max(...highs);
+  const priceRange = (maxPrice - minPrice) || 1.0;
+
+  const getX = (index) => marginLeft + (index / (data.length - 1)) * plotWidth;
+  const getY = (price) => height - marginBottom - ((price - minPrice) / priceRange) * plotHeight;
+
+  const formatXLabel = (dateString) => {
+    try {
+      const date = new Date(dateString);
+      const day = String(date.getDate()).padStart(2, "0");
+      const month = String(date.getMonth() + 1).padStart(2, "0");
+      if (isIntraday) {
+        return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+      }
+      return `${day}/${month}`;
+    } catch {
+      return dateString;
+    }
+  };
+
+  // Generate grid values
+  const yTicksCount = 4;
+  const yTicks = Array.from({ length: yTicksCount + 1 }).map((_, i) => {
+    const val = minPrice + (i / yTicksCount) * priceRange;
+    return { val, y: getY(val) };
+  });
+
+  const xTicksCount = 4;
+  const xTicks = Array.from({ length: xTicksCount + 1 }).map((_, i) => {
+    const index = Math.floor((i / xTicksCount) * (data.length - 1));
+    return { label: formatXLabel(data[index].Date), x: getX(index) };
+  });
+
+  const handleMouseMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const relativeX = x - marginLeft;
+    const pct = relativeX / plotWidth;
+    const index = Math.max(0, Math.min(data.length - 1, Math.round(pct * (data.length - 1))));
+    setHoveredIndex(index);
+  };
+
+  const handleMouseLeave = () => {
+    setHoveredIndex(null);
+  };
+
+  const activeItem = hoveredIndex !== null ? data[hoveredIndex] : null;
+  const activeChangePct = activeItem ? ((activeItem.Close - activeItem.Open) / activeItem.Open) * 100 : 0;
+
+  return (
+    <div ref={setRef} style={{ width: "100%", height: "100%", position: "relative" }}>
+      {/* Absolute OHLC Header HUD */}
+      <div style={{
+        position: "absolute",
+        top: "8px",
+        left: "12px",
+        fontSize: "0.68rem",
+        color: colors.textSecondary,
+        fontFamily: "'Space Grotesk', sans-serif",
+        display: "flex",
+        gap: "10px",
+        flexWrap: "wrap",
+        pointerEvents: "none",
+        zIndex: 5,
+        background: colors.bgPrimary === "#080c1a" ? "rgba(8, 12, 26, 0.5)" : "rgba(255, 255, 255, 0.6)",
+        padding: "4px 8px",
+        borderRadius: "6px",
+        backdropFilter: "blur(6px)",
+        border: `1px solid ${colors.borderSubtle}`,
+        animation: "fadeIn 0.2s ease",
+      }}>
+        {activeItem ? (
+          <>
+            <span style={{ fontWeight: 700, color: colors.textPrimary }}>
+              {new Date(activeItem.Date).toLocaleDateString("en-IN", {
+                day: "numeric",
+                month: "short",
+                hour: isIntraday ? "2-digit" : undefined,
+                minute: isIntraday ? "2-digit" : undefined,
+              })}
+            </span>
+            <span>O:<span style={{ color: activeItem.Close >= activeItem.Open ? colors.green : colors.red, marginLeft: "2px", fontWeight: 700 }}>₹{activeItem.Open.toFixed(2)}</span></span>
+            <span>H:<span style={{ color: activeItem.Close >= activeItem.Open ? colors.green : colors.red, marginLeft: "2px", fontWeight: 700 }}>₹{activeItem.High.toFixed(2)}</span></span>
+            <span>L:<span style={{ color: activeItem.Close >= activeItem.Open ? colors.green : colors.red, marginLeft: "2px", fontWeight: 700 }}>₹{activeItem.Low.toFixed(2)}</span></span>
+            <span>C:<span style={{ color: activeItem.Close >= activeItem.Open ? colors.green : colors.red, marginLeft: "2px", fontWeight: 700 }}>₹{activeItem.Close.toFixed(2)}</span></span>
+            <span style={{ color: activeChangePct >= 0 ? colors.green : colors.red, fontWeight: 700, marginLeft: "4px" }}>
+              {activeChangePct >= 0 ? "\u25B2 +" : "\u25BC "}{activeChangePct.toFixed(2)}%
+            </span>
+          </>
+        ) : (
+          <span style={{ fontWeight: 600, opacity: 0.85 }}>Move cursor over chart for OHLC details</span>
+        )}
+      </div>
+
+      <svg
+        width={width}
+        height={height}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        style={{ cursor: "crosshair", display: "block" }}
+      >
+        {/* Horizontal Gridlines & Y-Axis Ticks */}
+        {yTicks.map((tick, i) => (
+          <g key={`y-grid-${i}`}>
+            <line
+              x1={marginLeft}
+              y1={tick.y}
+              x2={width - marginRight}
+              y2={tick.y}
+              stroke={colors.borderSubtle}
+              strokeWidth="1"
+              strokeDasharray="3 3"
+            />
+            <text
+              x={width - marginRight + 8}
+              y={tick.y + 3}
+              fill={colors.textSecondary}
+              fontSize="9"
+              fontFamily="monospace"
+            >
+              ₹{tick.val.toFixed(1)}
+            </text>
+          </g>
+        ))}
+
+        {/* Vertical Gridlines & X-Axis Ticks */}
+        {xTicks.map((tick, i) => (
+          <g key={`x-grid-${i}`}>
+            <line
+              x1={tick.x}
+              y1={marginTop}
+              x2={tick.x}
+              y2={height - marginBottom}
+              stroke={colors.borderSubtle}
+              strokeWidth="1"
+              strokeDasharray="3 3"
+            />
+            <text
+              x={tick.x}
+              y={height - marginBottom + 14}
+              textAnchor="middle"
+              fill={colors.textSecondary}
+              fontSize="9"
+              fontFamily="sans-serif"
+            >
+              {tick.label}
+            </text>
+          </g>
+        ))}
+
+        {/* Candlestick bars */}
+        {data.map((d, i) => {
+          const x = getX(i);
+          const yOpen = getY(d.Open);
+          const yClose = getY(d.Close);
+          const yHigh = getY(d.High);
+          const yLow = getY(d.Low);
+
+          const isBullish = d.Close >= d.Open;
+          const color = isBullish ? colors.green : colors.red;
+
+          // Compute custom bar width
+          const candleW = Math.max(3, (plotWidth / data.length) * 0.65);
+          const halfW = candleW / 2;
+
+          const yTop = Math.min(yOpen, yClose);
+          const yBottom = Math.max(yOpen, yClose);
+          const bodyH = Math.max(1.5, yBottom - yTop);
+
+          return (
+            <g key={`candle-${i}`} opacity={hoveredIndex !== null && hoveredIndex !== i ? 0.6 : 1}>
+              {/* Wick shadow */}
+              <line
+                x1={x}
+                y1={yHigh}
+                x2={x}
+                y2={yLow}
+                stroke={color}
+                strokeWidth="1.2"
+              />
+              {/* Candle Body */}
+              <rect
+                x={x - halfW}
+                y={yTop}
+                width={candleW}
+                height={bodyH}
+                fill={color}
+                stroke={color}
+                strokeWidth="0.8"
+                rx="0.5"
+              />
+            </g>
+          );
+        })}
+
+        {/* Crosshair overlays */}
+        {hoveredIndex !== null && (
+          <g pointerEvents="none">
+            {/* Vertical cross line */}
+            <line
+              x1={getX(hoveredIndex)}
+              y1={marginTop}
+              x2={getX(hoveredIndex)}
+              y2={height - marginBottom}
+              stroke={colors.green}
+              strokeWidth="0.75"
+              strokeDasharray="4 4"
+              opacity="0.6"
+            />
+            {/* Horizontal cross line */}
+            <line
+              x1={marginLeft}
+              y1={getY(data[hoveredIndex].Close)}
+              x2={width - marginRight}
+              y2={getY(data[hoveredIndex].Close)}
+              stroke={colors.green}
+              strokeWidth="0.75"
+              strokeDasharray="4 4"
+              opacity="0.6"
+            />
+            {/* Focus Point */}
+            <circle
+              cx={getX(hoveredIndex)}
+              cy={getY(data[hoveredIndex].Close)}
+              r="3.5"
+              fill={data[hoveredIndex].Close >= data[hoveredIndex].Open ? colors.green : colors.red}
+              stroke="#fff"
+              strokeWidth="1"
+            />
+          </g>
+        )}
+      </svg>
+    </div>
+  );
+}
 
 // Resolve a CSS variable to its computed value (Chart.js can't use var() directly)
 function getCSSVar(varName, fallback = "#888") {
@@ -29,6 +304,8 @@ function getCSSVar(varName, fallback = "#888") {
 }
 
 export default function RealChart({ data }) {
+  const [chartType, setChartType] = useState("line"); // "line" | "candle"
+
   // 🔥 FORCE VALID DATA
   const cleaned = (data || []).filter(
     (d) => d && d.Date && d.Close !== null && d.Close !== undefined,
@@ -79,7 +356,7 @@ export default function RealChart({ data }) {
   }, []);
 
   if (cleaned.length === 0) {
-    return <div className="text-gray-400">No chart data</div>;
+    return <div style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>No chart data available</div>;
   }
 
   // Determine if bullish or bearish
@@ -128,7 +405,6 @@ export default function RealChart({ data }) {
       mode: "index",
       intersect: false,
     },
-
     plugins: {
       tooltip: {
         enabled: true,
@@ -194,7 +470,7 @@ export default function RealChart({ data }) {
         borderColor: lineColor,
         backgroundColor: bgColor,
         fill: true,
-        tension: 0,
+        tension: 0.05,
         pointRadius: 0,
         pointHoverRadius: 8,
         pointBackgroundColor: lineColor,
@@ -204,15 +480,64 @@ export default function RealChart({ data }) {
     ],
   };
 
-  const ChartContent = () => (
-    <div className="relative w-full h-full">
-      <Line data={chartData} options={chartOptions} />
-    </div>
-  );
-
   return (
-    <div style={{ height: "100%", width: "100%" }}>
-      <ChartContent />
+    <div style={{ height: "100%", width: "100%", position: "relative" }}>
+      {/* Dynamic chart type switcher */}
+      <div style={{
+        position: "absolute",
+        top: "8px",
+        right: "12px",
+        display: "flex",
+        background: "var(--filter-tab-bg)",
+        border: "1px solid var(--filter-tab-border)",
+        borderRadius: "10px",
+        padding: "2px",
+        zIndex: 10,
+        backdropFilter: "blur(8px)",
+      }}>
+        <button
+          onClick={() => setChartType("line")}
+          style={{
+            padding: "4px 10px",
+            borderRadius: "7px",
+            border: "none",
+            cursor: "pointer",
+            fontSize: "0.7rem",
+            fontWeight: 700,
+            background: chartType === "line" ? "var(--accent-dim)" : "transparent",
+            color: chartType === "line" ? "var(--accent)" : "var(--filter-tab-inactive)",
+            transition: "all 0.2s",
+            fontFamily: "inherit",
+          }}
+        >
+          Line
+        </button>
+        <button
+          onClick={() => setChartType("candle")}
+          style={{
+            padding: "4px 10px",
+            borderRadius: "7px",
+            border: "none",
+            cursor: "pointer",
+            fontSize: "0.7rem",
+            fontWeight: 700,
+            background: chartType === "candle" ? "var(--accent-dim)" : "transparent",
+            color: chartType === "candle" ? "var(--accent)" : "var(--filter-tab-inactive)",
+            transition: "all 0.2s",
+            fontFamily: "inherit",
+          }}
+        >
+          Candle
+        </button>
+      </div>
+
+      {chartType === "line" ? (
+        <div style={{ height: "100%", width: "100%" }}>
+          <Line data={chartData} options={chartOptions} />
+        </div>
+      ) : (
+        <CandlestickChart data={cleaned} colors={colors} isIntraday={isIntraday} />
+      )}
     </div>
   );
 }

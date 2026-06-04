@@ -188,7 +188,7 @@ export default function StockPage() {
                 </p>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "flex-end" }}>
                   <span style={{ fontSize: "0.9rem", fontWeight: 700, color: isPredUp ? "var(--green)" : "var(--red)" }}>
-                    {isPredUp ? "▲ +" : "▼ "}{pred.change} ({pred.percent_change}%)
+                    {isPredUp ? "\u25B2 +" : "\u25BC "}{pred.change} ({pred.percent_change}%)
                   </span>
                   <span style={{
                     padding: "2px 8px",
@@ -336,7 +336,7 @@ export default function StockPage() {
                 <InfoChip label="Current Price" value={`₹${pred.current_price}`} />
                 <InfoChip
                   label="24h Change"
-                  value={`${isPredUp ? "▲ +" : "▼ "}${pred.change}`}
+                  value={`${isPredUp ? "\u25B2 +" : "\u25BC "}${pred.change}`}
                   color={isPredUp ? "var(--green)" : "var(--red)"}
                   sub={`${pred.percent_change}%`}
                 />

@@ -1,9 +1,12 @@
 import yfinance as yf
 from datetime import datetime
+from curl_cffi.requests import Session as curl_Session
+
+_yf_session = curl_Session(impersonate="chrome120")
 
 def get_stock_news(symbol: str):
     try:
-        stock = yf.Ticker(symbol)
+        stock = yf.Ticker(symbol, session=_yf_session)
         try:
             news_data = stock.news
         except Exception:

@@ -1,4 +1,7 @@
 import yfinance as yf
+from curl_cffi.requests import Session as curl_Session
+
+_yf_session = curl_Session(impersonate="chrome120")
 
 YF_SYMBOL_OVERRIDES = {
     "TATAMOTORS": "TATAMOTORS.BO",
@@ -33,7 +36,7 @@ def _ticker_candidates(symbol: str):
 def get_stock_price(symbol: str):
     for ticker_symbol in _ticker_candidates(symbol):
         try:
-            stock = yf.Ticker(ticker_symbol)
+            stock = yf.Ticker(ticker_symbol, session=_yf_session)
             df = stock.history(period="2d")
 
             if df.empty:
@@ -51,7 +54,7 @@ def get_stock_price(symbol: str):
 def get_history(symbol: str, period: str = "1mo"):
     for ticker_symbol in _ticker_candidates(symbol):
         try:
-            stock = yf.Ticker(ticker_symbol)
+            stock = yf.Ticker(ticker_symbol, session=_yf_session)
 
             if period == "1d":
                 # Intraday 5-minute data for the whole day
@@ -73,10 +76,14 @@ def get_history(symbol: str, period: str = "1mo"):
             # yfinance returns 'Datetime' for intraday and 'Date' for daily
             date_col = "Datetime" if "Datetime" in df.columns else "Date"
 
-            df = df[[date_col, "Close"]]
+            df = df[[date_col, "Open", "High", "Low", "Close"]]
             df = df.rename(columns={date_col: "Date"})
 
             df["Date"] = df["Date"].astype(str)
+            df["Open"] = df["Open"].astype(float)
+            df["High"] = df["High"].astype(float)
+            df["Low"] = df["Low"].astype(float)
+            df["Close"] = df["Close"].astype(float)
 
             return df.to_dict(orient="records")
         except Exception:
