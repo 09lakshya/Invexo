@@ -47,9 +47,12 @@ function CandlestickChart({ data, colors, isIntraday }) {
   const { width, height } = size;
   const [hoveredIndex, setHoveredIndex] = useState(null);
   const [zoomRange, setZoomRange] = useState({ start: 0, end: data.length - 1 });
+  const [yOffset, setYOffset] = useState(0);
+  const [isPanning, setIsPanning] = useState(false);
 
   useEffect(() => {
     setZoomRange({ start: 0, end: data.length - 1 });
+    setYOffset(0);
     setHoveredIndex(null);
   }, [data]);
 
@@ -73,8 +76,11 @@ function CandlestickChart({ data, colors, isIntraday }) {
   const maxPrice = Math.max(...highs);
   const priceRange = (maxPrice - minPrice) || 1.0;
 
+  const minPriceAdjusted = minPrice + yOffset;
+  const maxPriceAdjusted = maxPrice + yOffset;
+
   const getX = (index) => marginLeft + (index / (visibleData.length - 1)) * plotWidth;
-  const getY = (price) => height - marginBottom - ((price - minPrice) / priceRange) * plotHeight;
+  const getY = (price) => height - marginBottom - ((price - minPriceAdjusted) / priceRange) * plotHeight;
 
   const formatXLabel = (dateString) => {
     try {
@@ -93,7 +99,7 @@ function CandlestickChart({ data, colors, isIntraday }) {
   // Generate grid values
   const yTicksCount = 4;
   const yTicks = Array.from({ length: yTicksCount + 1 }).map((_, i) => {
-    const val = minPrice + (i / yTicksCount) * priceRange;
+    const val = minPriceAdjusted + (i / yTicksCount) * priceRange;
     return { val, y: getY(val) };
   });
 
@@ -103,12 +109,66 @@ function CandlestickChart({ data, colors, isIntraday }) {
     return { label: formatXLabel(visibleData[index].Date), x: getX(index) };
   });
 
+  // Refs for drag tracking
+  const isDragging = useRef(false);
+  const dragStartX = useRef(0);
+  const dragStartY = useRef(0);
+  const dragStartRange = useRef({ start: 0, end: data.length - 1 });
+  const dragStartYOffset = useRef(0);
+
+  const handleMouseDown = (e) => {
+    if (e.button !== 0) return; // Only left click
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    if (x >= marginLeft && x <= (width - marginRight) && y >= marginTop && y <= (height - marginBottom)) {
+      isDragging.current = true;
+      setIsPanning(true);
+      dragStartX.current = e.clientX;
+      dragStartY.current = e.clientY;
+      dragStartRange.current = { ...zoomRange };
+      dragStartYOffset.current = yOffset;
+      setHoveredIndex(null);
+    }
+  };
+
   const handleMouseMove = (e) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
 
-    // The zoomable and hoverable area should be inside the margins of the graph
+    if (isDragging.current) {
+      const dx = e.clientX - dragStartX.current;
+      const dy = e.clientY - dragStartY.current;
+
+      // X-Panning
+      const indicesPerPixel = (dragStartRange.current.end - dragStartRange.current.start) / plotWidth;
+      const shiftX = Math.round(-dx * indicesPerPixel);
+      const span = dragStartRange.current.end - dragStartRange.current.start;
+      
+      let newStart = dragStartRange.current.start + shiftX;
+      let newEnd = dragStartRange.current.end + shiftX;
+      
+      if (newStart < 0) {
+        newStart = 0;
+        newEnd = span;
+      }
+      if (newEnd > data.length - 1) {
+        newEnd = data.length - 1;
+        newStart = newEnd - span;
+      }
+
+      // Y-Panning
+      const priceUnitsPerPixel = priceRange / plotHeight;
+      const shiftY = dy * priceUnitsPerPixel;
+      const newYOffset = dragStartYOffset.current + shiftY;
+
+      setZoomRange({ start: newStart, end: newEnd });
+      setYOffset(newYOffset);
+      return;
+    }
+
     if (x < marginLeft || x > width - marginRight || y < marginTop || y > height - marginBottom) {
       setHoveredIndex(null);
       return;
@@ -120,7 +180,14 @@ function CandlestickChart({ data, colors, isIntraday }) {
     setHoveredIndex(index);
   };
 
+  const handleMouseUp = () => {
+    isDragging.current = false;
+    setIsPanning(false);
+  };
+
   const handleMouseLeave = () => {
+    isDragging.current = false;
+    setIsPanning(false);
     setHoveredIndex(null);
   };
 
@@ -132,14 +199,29 @@ function CandlestickChart({ data, colors, isIntraday }) {
   const touchStartEnd = useRef(data.length - 1);
 
   const handleTouchStart = (e) => {
-    if (e.touches.length === 2) {
-      const rect = e.currentTarget.getBoundingClientRect();
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (e.touches.length === 1) {
+      const x = e.touches[0].clientX - rect.left;
+      const y = e.touches[0].clientY - rect.top;
+
+      if (x >= marginLeft && x <= (width - marginRight) && y >= marginTop && y <= (height - marginBottom)) {
+        isDragging.current = true;
+        setIsPanning(true);
+        dragStartX.current = e.touches[0].clientX;
+        dragStartY.current = e.touches[0].clientY;
+        dragStartRange.current = { ...zoomRange };
+        dragStartYOffset.current = yOffset;
+        setHoveredIndex(null);
+      }
+    } else if (e.touches.length === 2) {
+      isDragging.current = false;
+      setIsPanning(false);
+
       const x0 = e.touches[0].clientX - rect.left;
       const y0 = e.touches[0].clientY - rect.top;
       const x1 = e.touches[1].clientX - rect.left;
       const y1 = e.touches[1].clientY - rect.top;
 
-      // Both touches must start inside the margins of the graph
       const inside0 = x0 >= marginLeft && x0 <= (width - marginRight) && y0 >= marginTop && y0 <= (height - marginBottom);
       const inside1 = x1 >= marginLeft && x1 <= (width - marginRight) && y1 >= marginTop && y1 <= (height - marginBottom);
 
@@ -156,7 +238,35 @@ function CandlestickChart({ data, colors, isIntraday }) {
   };
 
   const handleTouchMove = (e) => {
-    if (e.touches.length === 2 && touchStartDistance.current > 0) {
+    if (e.touches.length === 1 && isDragging.current) {
+      const dx = e.touches[0].clientX - dragStartX.current;
+      const dy = e.touches[0].clientY - dragStartY.current;
+
+      // X-Panning
+      const indicesPerPixel = (dragStartRange.current.end - dragStartRange.current.start) / plotWidth;
+      const shiftX = Math.round(-dx * indicesPerPixel);
+      const span = dragStartRange.current.end - dragStartRange.current.start;
+      
+      let newStart = dragStartRange.current.start + shiftX;
+      let newEnd = dragStartRange.current.end + shiftX;
+      
+      if (newStart < 0) {
+        newStart = 0;
+        newEnd = span;
+      }
+      if (newEnd > data.length - 1) {
+        newEnd = data.length - 1;
+        newStart = newEnd - span;
+      }
+
+      // Y-Panning
+      const priceUnitsPerPixel = priceRange / plotHeight;
+      const shiftY = dy * priceUnitsPerPixel;
+      const newYOffset = dragStartYOffset.current + shiftY;
+
+      setZoomRange({ start: newStart, end: newEnd });
+      setYOffset(newYOffset);
+    } else if (e.touches.length === 2 && touchStartDistance.current > 0) {
       const dist = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY
@@ -187,6 +297,8 @@ function CandlestickChart({ data, colors, isIntraday }) {
   };
 
   const handleTouchEnd = () => {
+    isDragging.current = false;
+    setIsPanning(false);
     touchStartDistance.current = 0;
   };
 
@@ -206,6 +318,11 @@ function CandlestickChart({ data, colors, isIntraday }) {
       }
       return prev;
     });
+  };
+
+  const handleReset = () => {
+    setZoomRange({ start: 0, end: data.length - 1 });
+    setYOffset(0);
   };
 
   // Passive wheel event handling inside the graph margins
@@ -288,7 +405,7 @@ function CandlestickChart({ data, colors, isIntraday }) {
             </span>
           </>
         ) : (
-          <span style={{ fontWeight: 600, opacity: 0.85 }}>Move cursor over chart for OHLC details</span>
+          <span style={{ fontWeight: 600, opacity: 0.85 }}>Drag to Pan | Scroll/Pinch to Zoom | Move cursor for details</span>
         )}
       </div>
 
@@ -296,13 +413,26 @@ function CandlestickChart({ data, colors, isIntraday }) {
         ref={svgRef}
         width={width}
         height={height}
+        onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseLeave}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        style={{ cursor: "crosshair", display: "block" }}
+        style={{ cursor: isPanning ? "grabbing" : "crosshair", display: "block" }}
       >
+        <defs>
+          <clipPath id="chart-plot-area">
+            <rect
+              x={marginLeft}
+              y={marginTop}
+              width={plotWidth}
+              height={plotHeight}
+            />
+          </clipPath>
+        </defs>
+
         {/* Horizontal Gridlines & Y-Axis Ticks */}
         {yTicks.map((tick, i) => (
           <g key={`y-grid-${i}`}>
@@ -314,6 +444,7 @@ function CandlestickChart({ data, colors, isIntraday }) {
               stroke={colors.borderSubtle}
               strokeWidth="1"
               strokeDasharray="3 3"
+              clipPath="url(#chart-plot-area)"
             />
             <text
               x={width - marginRight + 8}
@@ -338,6 +469,7 @@ function CandlestickChart({ data, colors, isIntraday }) {
               stroke={colors.borderSubtle}
               strokeWidth="1"
               strokeDasharray="3 3"
+              clipPath="url(#chart-plot-area)"
             />
             <text
               x={tick.x}
@@ -352,87 +484,90 @@ function CandlestickChart({ data, colors, isIntraday }) {
           </g>
         ))}
 
-        {/* Candlestick bars */}
-        {visibleData.map((d, i) => {
-          const x = getX(i);
-          const yOpen = getY(d.Open);
-          const yClose = getY(d.Close);
-          const yHigh = getY(d.High);
-          const yLow = getY(d.Low);
+        {/* Clipped Plot Content */}
+        <g clipPath="url(#chart-plot-area)">
+          {/* Candlestick bars */}
+          {visibleData.map((d, i) => {
+            const x = getX(i);
+            const yOpen = getY(d.Open);
+            const yClose = getY(d.Close);
+            const yHigh = getY(d.High);
+            const yLow = getY(d.Low);
 
-          const isBullish = d.Close >= d.Open;
-          const color = isBullish ? colors.green : colors.red;
+            const isBullish = d.Close >= d.Open;
+            const color = isBullish ? colors.green : colors.red;
 
-          // Compute custom bar width
-          const candleW = Math.max(3, (plotWidth / visibleData.length) * 0.65);
-          const halfW = candleW / 2;
+            // Compute custom bar width
+            const candleW = Math.max(3, (plotWidth / visibleData.length) * 0.65);
+            const halfW = candleW / 2;
 
-          const yTop = Math.min(yOpen, yClose);
-          const yBottom = Math.max(yOpen, yClose);
-          const bodyH = Math.max(1.5, yBottom - yTop);
+            const yTop = Math.min(yOpen, yClose);
+            const yBottom = Math.max(yOpen, yClose);
+            const bodyH = Math.max(1.5, yBottom - yTop);
 
-          return (
-            <g key={`candle-${i}`} opacity={hoveredIndex !== null && hoveredIndex !== i ? 0.6 : 1}>
-              {/* Wick shadow */}
+            return (
+              <g key={`candle-${i}`} opacity={hoveredIndex !== null && hoveredIndex !== i ? 0.6 : 1}>
+                {/* Wick shadow */}
+                <line
+                  x1={x}
+                  y1={yHigh}
+                  x2={x}
+                  y2={yLow}
+                  stroke={color}
+                  strokeWidth="1.2"
+                />
+                {/* Candle Body */}
+                <rect
+                  x={x - halfW}
+                  y={yTop}
+                  width={candleW}
+                  height={bodyH}
+                  fill={color}
+                  stroke={color}
+                  strokeWidth="0.8"
+                  rx="0.5"
+                />
+              </g>
+            );
+          })}
+
+          {/* Crosshair overlays */}
+          {hoveredIndex !== null && visibleData[hoveredIndex] && (
+            <g pointerEvents="none">
+              {/* Vertical cross line */}
               <line
-                x1={x}
-                y1={yHigh}
-                x2={x}
-                y2={yLow}
-                stroke={color}
-                strokeWidth="1.2"
+                x1={getX(hoveredIndex)}
+                y1={marginTop}
+                x2={getX(hoveredIndex)}
+                y2={height - marginBottom}
+                stroke={colors.green}
+                strokeWidth="0.75"
+                strokeDasharray="4 4"
+                opacity="0.6"
               />
-              {/* Candle Body */}
-              <rect
-                x={x - halfW}
-                y={yTop}
-                width={candleW}
-                height={bodyH}
-                fill={color}
-                stroke={color}
-                strokeWidth="0.8"
-                rx="0.5"
+              {/* Horizontal cross line */}
+              <line
+                x1={marginLeft}
+                y1={getY(visibleData[hoveredIndex].Close)}
+                x2={width - marginRight}
+                y2={getY(visibleData[hoveredIndex].Close)}
+                stroke={colors.green}
+                strokeWidth="0.75"
+                strokeDasharray="4 4"
+                opacity="0.6"
+              />
+              {/* Focus Point */}
+              <circle
+                cx={getX(hoveredIndex)}
+                cy={getY(visibleData[hoveredIndex].Close)}
+                r="3.5"
+                fill={visibleData[hoveredIndex].Close >= visibleData[hoveredIndex].Open ? colors.green : colors.red}
+                stroke="#fff"
+                strokeWidth="1"
               />
             </g>
-          );
-        })}
-
-        {/* Crosshair overlays */}
-        {hoveredIndex !== null && visibleData[hoveredIndex] && (
-          <g pointerEvents="none">
-            {/* Vertical cross line */}
-            <line
-              x1={getX(hoveredIndex)}
-              y1={marginTop}
-              x2={getX(hoveredIndex)}
-              y2={height - marginBottom}
-              stroke={colors.green}
-              strokeWidth="0.75"
-              strokeDasharray="4 4"
-              opacity="0.6"
-            />
-            {/* Horizontal cross line */}
-            <line
-              x1={marginLeft}
-              y1={getY(visibleData[hoveredIndex].Close)}
-              x2={width - marginRight}
-              y2={getY(visibleData[hoveredIndex].Close)}
-              stroke={colors.green}
-              strokeWidth="0.75"
-              strokeDasharray="4 4"
-              opacity="0.6"
-            />
-            {/* Focus Point */}
-            <circle
-              cx={getX(hoveredIndex)}
-              cy={getY(visibleData[hoveredIndex].Close)}
-              r="3.5"
-              fill={visibleData[hoveredIndex].Close >= visibleData[hoveredIndex].Open ? colors.green : colors.red}
-              stroke="#fff"
-              strokeWidth="1"
-            />
-          </g>
-        )}
+          )}
+        </g>
       </svg>
 
       {/* Floating Zoom Controls inside chart margins */}
@@ -507,10 +642,10 @@ function CandlestickChart({ data, colors, isIntraday }) {
         >
           −
         </button>
-        {(zoomRange.start > 0 || zoomRange.end < data.length - 1) && (
+        {(zoomRange.start > 0 || zoomRange.end < data.length - 1 || yOffset !== 0) && (
           <button
-            onClick={() => setZoomRange({ start: 0, end: data.length - 1 })}
-            title="Reset Zoom"
+            onClick={handleReset}
+            title="Reset View"
             style={{
               width: "28px",
               height: "28px",
