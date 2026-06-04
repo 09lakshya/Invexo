@@ -526,6 +526,7 @@ export default function StockPage() {
                   label="Day Close (Prediction)"
                   value={`₹${pred.day_close_prediction}`}
                   color={pred.day_close_prediction - pred.current_price >= 0 ? "var(--green)" : "var(--red)"}
+                  sub={`Confidence: ${pred.day_close_confidence || pred.confidence}%`}
                 />
                 <InfoChip
                   label="Trend"

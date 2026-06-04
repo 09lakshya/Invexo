@@ -685,6 +685,13 @@ def predict_stock(symbol: str):
         raw_confidence = base_confidence + adx_boost - vol_penalty + richness_bonus
         confidence = int(max(35, min(95, round(raw_confidence))))
 
+        # Shorter term (1-day) has slightly higher certainty baseline but is more sensitive to recent trend/slope alignment
+        slope_direction = 1 if slope > 0 else -1
+        move_direction = 1 if expected_move > 0 else -1
+        agreement_boost = 4.0 if slope_direction == move_direction else -4.0
+        raw_day_close_conf = base_confidence + (adx_boost * 0.6) - (vol_penalty * 1.2) + agreement_boost
+        day_close_confidence = int(max(40, min(97, round(raw_day_close_conf))))
+
         result = {
             "current_price": round(current_price, 2),
             "change": round(change, 2),
@@ -692,6 +699,7 @@ def predict_stock(symbol: str):
             "predicted_price": round(predicted_price, 2),
             "day_close_prediction": round(day_close_prediction, 2),
             "confidence": confidence,
+            "day_close_confidence": day_close_confidence,
             "trend": trend,
             "rsi": round(float(rsi), 2),
             "macd": round(current_histogram, 4),
