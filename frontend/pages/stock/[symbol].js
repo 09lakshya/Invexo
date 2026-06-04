@@ -67,7 +67,29 @@ export default function StockPage() {
   const [error, setError]           = useState(null);
   const [logoError, setLogoError]   = useState(false);
   const [isZoomed, setIsZoomed]     = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const zoomRef                     = useRef(null);
+
+  // Escape key to exit fullscreen
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape" && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isFullscreen]);
+
+  // Lock body scroll when fullscreen
+  useEffect(() => {
+    if (isFullscreen) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [isFullscreen]);
 
   const metadata = STOCK_METADATA[normalizedSymbol] || {};
   const companyName = metadata.name || symbol;
@@ -519,10 +541,155 @@ export default function StockPage() {
                   )}
                 </div>
               )}
+
+              {/* Fullscreen toggle */}
+              <button
+                onClick={() => setIsFullscreen(prev => !prev)}
+                title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
+                style={{
+                  padding: "7px 12px",
+                  borderRadius: "9px",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: "0.85rem",
+                  fontWeight: 700,
+                  background: isFullscreen ? "var(--accent-dim)" : "var(--filter-tab-bg)",
+                  color: isFullscreen ? "var(--accent)" : "var(--filter-tab-inactive)",
+                  border: `1px solid ${isFullscreen ? "var(--accent-glow)" : "var(--filter-tab-border)"}`,
+                  borderRadius: "12px",
+                  transition: "all 0.2s",
+                  fontFamily: "inherit",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = "var(--accent-dim)";
+                  e.currentTarget.style.color = "var(--accent)";
+                }}
+                onMouseLeave={e => {
+                  if (!isFullscreen) {
+                    e.currentTarget.style.background = "var(--filter-tab-bg)";
+                    e.currentTarget.style.color = "var(--filter-tab-inactive)";
+                  }
+                }}
+              >
+                {isFullscreen ? "✕" : "⛶"}
+              </button>
             </div>
           </div>
 
           {/* ── Chart ──────────────────────────────────────────────── */}
+          {isFullscreen && (
+            <div
+              style={{
+                position: "fixed",
+                top: 0,
+                left: 0,
+                width: "100vw",
+                height: "100vh",
+                zIndex: 9999,
+                background: "var(--bg-primary)",
+                display: "flex",
+                flexDirection: "column",
+                animation: "fadeIn 0.2s ease",
+              }}
+            >
+              {/* Fullscreen header */}
+              <div style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "12px 20px",
+                borderBottom: "1px solid var(--border-subtle)",
+                background: "var(--bg-card)",
+                backdropFilter: "blur(16px)",
+                flexShrink: 0,
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                  <span style={{ color: "var(--text-primary)", fontWeight: 800, fontSize: "1rem", fontFamily: "'Space Grotesk', sans-serif" }}>
+                    {companyName} · {normalizedSymbol}
+                  </span>
+                  <div style={{
+                    display: "flex",
+                    gap: "4px",
+                    background: "var(--filter-tab-bg)",
+                    border: "1px solid var(--filter-tab-border)",
+                    borderRadius: "10px",
+                    padding: "2px",
+                  }}>
+                    {PERIODS.map(({ key, label }) => (
+                      <button
+                        key={key}
+                        onClick={() => setPeriod(key)}
+                        style={{
+                          padding: "5px 10px",
+                          borderRadius: "7px",
+                          border: "none",
+                          cursor: "pointer",
+                          fontFamily: "inherit",
+                          fontWeight: 700,
+                          fontSize: "0.7rem",
+                          transition: "all 0.2s",
+                          background: period === key ? "var(--accent-dim)" : "transparent",
+                          color: period === key ? "var(--accent)" : "var(--filter-tab-inactive)",
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  {chartType === "candle" && (
+                    <div style={{
+                      display: "flex",
+                      gap: "2px",
+                      background: "var(--filter-tab-bg)",
+                      border: "1px solid var(--filter-tab-border)",
+                      borderRadius: "10px",
+                      padding: "2px",
+                    }}>
+                      <button onClick={() => zoomRef.current?.zoomIn()} title="Zoom In" style={{ padding: "5px 10px", borderRadius: "7px", border: "none", cursor: "pointer", fontSize: "0.75rem", fontWeight: 700, background: "transparent", color: "var(--filter-tab-inactive)", transition: "all 0.2s", fontFamily: "inherit" }}>+</button>
+                      <button onClick={() => zoomRef.current?.zoomOut()} title="Zoom Out" style={{ padding: "5px 10px", borderRadius: "7px", border: "none", cursor: "pointer", fontSize: "0.75rem", fontWeight: 700, background: "transparent", color: "var(--filter-tab-inactive)", transition: "all 0.2s", fontFamily: "inherit" }}>−</button>
+                      {isZoomed && (
+                        <button onClick={() => zoomRef.current?.reset()} title="Reset View" style={{ padding: "5px 10px", borderRadius: "7px", border: "none", cursor: "pointer", fontSize: "0.65rem", fontWeight: 700, background: "transparent", color: "var(--filter-tab-inactive)", transition: "all 0.2s", fontFamily: "inherit" }}>↺</button>
+                      )}
+                    </div>
+                  )}
+                  <button
+                    onClick={() => setIsFullscreen(false)}
+                    title="Exit Fullscreen (Esc)"
+                    style={{
+                      padding: "5px 14px",
+                      borderRadius: "10px",
+                      border: "1px solid var(--red-dim)",
+                      cursor: "pointer",
+                      fontSize: "0.8rem",
+                      fontWeight: 700,
+                      background: "var(--red-dim)",
+                      color: "var(--red)",
+                      transition: "all 0.2s",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    ✕ Exit
+                  </button>
+                </div>
+              </div>
+              {/* Fullscreen chart body */}
+              <div style={{ flex: 1, padding: "12px", minHeight: 0 }}>
+                <RealChart
+                  data={history}
+                  chartType={chartType}
+                  setChartType={setChartType}
+                  zoomRef={zoomRef}
+                  onZoomStateChange={setIsZoomed}
+                />
+              </div>
+            </div>
+          )}
+
           <div style={{ marginBottom: "24px", animation: "fadeInUp 0.5s 0.15s ease both" }}>
             {loading ? (
               <div style={{
