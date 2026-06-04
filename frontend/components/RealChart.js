@@ -403,7 +403,7 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher, zoomRef, onZ
     setYOffset(0);
   };
 
-  // Passive wheel event handling inside the graph margins
+  // Wheel event handling: Ctrl+scroll = zoom, regular two-finger trackpad scroll = pan
   useEffect(() => {
     const svgEl = svgRef.current;
     if (!svgEl) return;
@@ -415,29 +415,89 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher, zoomRef, onZ
       
       if (x >= marginLeft && x <= (width - marginRight) && y >= marginTop && y <= (height - marginBottom)) {
         e.preventDefault();
-        const direction = e.deltaY < 0 ? 1 : -1;
-        
-        setZoomRange(prev => {
-          const span = prev.end - prev.start;
-          const delta = Math.max(1, Math.round(span * 0.08));
-          if (direction > 0) {
-            if (span > 4) {
-              return { start: prev.start + delta, end: prev.end - delta };
+
+        if (e.ctrlKey || e.metaKey) {
+          // Ctrl+scroll (or trackpad pinch gesture) → ZOOM
+          const direction = e.deltaY < 0 ? 1 : -1;
+          
+          setZoomRange(prev => {
+            const span = prev.end - prev.start;
+            const delta = Math.max(1, Math.round(span * 0.08));
+            if (direction > 0) {
+              if (span > 4) {
+                return { start: prev.start + delta, end: prev.end - delta };
+              }
+            } else {
+              return {
+                start: Math.max(0, prev.start - delta),
+                end: Math.min(data.length - 1, prev.end + delta)
+              };
+            }
+            return prev;
+          });
+        } else {
+          // Regular two-finger trackpad scroll → PAN
+          const currentRange = zoomRangeRef.current;
+          const span = currentRange.end - currentRange.start;
+          const isZoomed = span < data.length - 1 || yOffsetRef.current !== 0;
+
+          if (isZoomed) {
+            // Horizontal panning via deltaX (and deltaY for left/right when no deltaX)
+            const dx = e.deltaX !== 0 ? e.deltaX : 0;
+            const dy = e.deltaY;
+
+            // X-axis panning: shift visible date window
+            if (Math.abs(dx) > 0) {
+              const indicesPerPixel = span / plotWidth;
+              const shiftX = Math.round(dx * indicesPerPixel * 0.5);
+              
+              if (shiftX !== 0) {
+                setZoomRange(prev => {
+                  const s = prev.end - prev.start;
+                  let newStart = prev.start + shiftX;
+                  let newEnd = prev.end + shiftX;
+                  
+                  if (newStart < 0) { newStart = 0; newEnd = s; }
+                  if (newEnd > data.length - 1) { newEnd = data.length - 1; newStart = newEnd - s; }
+                  
+                  return { start: newStart, end: newEnd };
+                });
+              }
+            }
+
+            // Y-axis panning: shift price offset
+            if (Math.abs(dy) > 0) {
+              const priceUnitsPerPixel = priceRangeRef.current / plotHeight;
+              const shiftY = dy * priceUnitsPerPixel * 0.5;
+              setYOffset(prev => prev + shiftY);
             }
           } else {
-            return {
-              start: Math.max(0, prev.start - delta),
-              end: Math.min(data.length - 1, prev.end + delta)
-            };
+            // Not zoomed in — use vertical scroll as zoom (legacy behaviour)
+            const direction = e.deltaY < 0 ? 1 : -1;
+            
+            setZoomRange(prev => {
+              const s = prev.end - prev.start;
+              const delta = Math.max(1, Math.round(s * 0.08));
+              if (direction > 0) {
+                if (s > 4) {
+                  return { start: prev.start + delta, end: prev.end - delta };
+                }
+              } else {
+                return {
+                  start: Math.max(0, prev.start - delta),
+                  end: Math.min(data.length - 1, prev.end + delta)
+                };
+              }
+              return prev;
+            });
           }
-          return prev;
-        });
+        }
       }
     };
 
     svgEl.addEventListener("wheel", onWheel, { passive: false });
     return () => svgEl.removeEventListener("wheel", onWheel);
-  }, [width, height, data.length, marginLeft, marginRight, marginTop, marginBottom]);
+  }, [width, height, data.length, marginLeft, marginRight, marginTop, marginBottom, plotWidth, plotHeight]);
 
   const activeItem = (hoveredIndex !== null && visibleData[hoveredIndex]) ? visibleData[hoveredIndex] : null;
   const activeChangePct = (activeItem && activeItem.Open) ? ((activeItem.Close - activeItem.Open) / activeItem.Open) * 100 : 0;
