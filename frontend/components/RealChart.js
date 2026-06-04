@@ -193,6 +193,11 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher }) {
 
   const svgRef = useRef(null);
 
+  // References for touch zoom tracking
+  const touchStartDistance = useRef(0);
+  const touchStartStart = useRef(0);
+  const touchStartEnd = useRef(data.length - 1);
+
   const handleTouchStart = (e) => {
     const rect = e.currentTarget.getBoundingClientRect();
     if (e.touches.length === 1) {
@@ -208,11 +213,34 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher }) {
         dragStartYOffset.current = yOffset;
         setHoveredIndex(null);
       }
+    } else if (e.touches.length === 2) {
+      isDragging.current = false;
+      setIsPanning(false);
+
+      const x0 = e.touches[0].clientX - rect.left;
+      const y0 = e.touches[0].clientY - rect.top;
+      const x1 = e.touches[1].clientX - rect.left;
+      const y1 = e.touches[1].clientY - rect.top;
+
+      const inside0 = x0 >= marginLeft && x0 <= (width - marginRight) && y0 >= marginTop && y0 <= (height - marginBottom);
+      const inside1 = x1 >= marginLeft && x1 <= (width - marginRight) && y1 >= marginTop && y1 <= (height - marginBottom);
+
+      if (inside0 && inside1) {
+        if (e.cancelable) e.preventDefault(); // Prevent browser screen zoom
+        const dist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        touchStartDistance.current = dist;
+        touchStartStart.current = zoomRange.start;
+        touchStartEnd.current = zoomRange.end;
+      }
     }
   };
 
   const handleTouchMove = (e) => {
     if (e.touches.length === 1 && isDragging.current) {
+      if (e.cancelable) e.preventDefault(); // Prevent page/screen scroll bounce
       const dx = e.touches[0].clientX - dragStartX.current;
       const dy = e.touches[0].clientY - dragStartY.current;
 
@@ -240,12 +268,41 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher }) {
 
       setZoomRange({ start: newStart, end: newEnd });
       setYOffset(newYOffset);
+    } else if (e.touches.length === 2 && touchStartDistance.current > 0) {
+      if (e.cancelable) e.preventDefault(); // Prevent browser screen zoom
+      const dist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      const ratio = touchStartDistance.current / dist;
+      
+      const initialSpan = touchStartEnd.current - touchStartStart.current;
+      const targetSpan = Math.max(4, Math.min(data.length - 1, Math.round(initialSpan * ratio)));
+      
+      const diff = targetSpan - initialSpan;
+      const leftDiff = Math.floor(diff / 2);
+      const rightDiff = diff - leftDiff;
+      
+      let newStart = touchStartStart.current - leftDiff;
+      let newEnd = touchStartEnd.current + rightDiff;
+      
+      if (newStart < 0) {
+        newEnd = Math.min(data.length - 1, newEnd - newStart);
+        newStart = 0;
+      }
+      if (newEnd > data.length - 1) {
+        newStart = Math.max(0, newStart - (newEnd - (data.length - 1)));
+        newEnd = data.length - 1;
+      }
+
+      setZoomRange({ start: newStart, end: newEnd });
     }
   };
 
   const handleTouchEnd = () => {
     isDragging.current = false;
     setIsPanning(false);
+    touchStartDistance.current = 0;
   };
 
   const handleZoom = (direction) => {
@@ -366,7 +423,7 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher }) {
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        style={{ cursor: isPanning ? "grabbing" : "crosshair", display: "block" }}
+        style={{ cursor: isPanning ? "grabbing" : "crosshair", display: "block", touchAction: "none" }}
       >
         <defs>
           <clipPath id="chart-plot-area">
