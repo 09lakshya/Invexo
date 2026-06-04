@@ -1087,7 +1087,7 @@ export default function Home() {
                 </div>
                 <div>
                   <p style={{ fontSize: "0.62rem", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.05em", marginBottom: "4px" }}>
-                    Predicted Price
+                    Predicted Price (5-7 Day Target)
                   </p>
                   <p style={{
                     fontSize: "1.1rem",

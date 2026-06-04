@@ -517,7 +517,7 @@ export default function StockPage() {
                   sub={`${pred.percent_change}%`}
                 />
                 <InfoChip
-                  label="Predicted Price"
+                  label="Predicted Price (5-7 Day Target)"
                   value={`₹${pred.predicted_price}`}
                   color={predDelta >= 0 ? "var(--green)" : "var(--red)"}
                   sub={`${predDelta >= 0 ? "+" : ""}${predDelta.toFixed(2)} (${predDeltaPct}%)`}
