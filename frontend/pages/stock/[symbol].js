@@ -426,7 +426,11 @@ export default function StockPage() {
                   animation: "fadeIn 0.2s ease-in-out",
                 }}>
                   <button
-                    onClick={() => zoomRef.current?.zoomIn()}
+                    onClick={() => {
+                      console.log("StockPage + button clicked. zoomRef:", zoomRef);
+                      console.log("StockPage + button zoomRef.current:", zoomRef.current);
+                      zoomRef.current?.zoomIn();
+                    }}
                     title="Zoom In"
                     style={{
                       padding: "7px 12px",
@@ -452,7 +456,11 @@ export default function StockPage() {
                     +
                   </button>
                   <button
-                    onClick={() => zoomRef.current?.zoomOut()}
+                    onClick={() => {
+                      console.log("StockPage - button clicked. zoomRef:", zoomRef);
+                      console.log("StockPage - button zoomRef.current:", zoomRef.current);
+                      zoomRef.current?.zoomOut();
+                    }}
                     title="Zoom Out"
                     style={{
                       padding: "7px 12px",
@@ -479,7 +487,11 @@ export default function StockPage() {
                   </button>
                   {isZoomed && (
                     <button
-                      onClick={() => zoomRef.current?.reset()}
+                      onClick={() => {
+                        console.log("StockPage reset button clicked. zoomRef:", zoomRef);
+                        console.log("StockPage reset button zoomRef.current:", zoomRef.current);
+                        zoomRef.current?.reset();
+                      }}
                       title="Reset View"
                       style={{
                         padding: "7px 12px",

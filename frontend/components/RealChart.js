@@ -218,15 +218,25 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher, zoomRef, onZ
 
   // Expose zoom controls via ref to parent components
   useEffect(() => {
+    console.log("RealChart setting zoomRef.current", { zoomRef, current: zoomRef?.current });
     if (zoomRef) {
       zoomRef.current = {
-        zoomIn: () => handleZoom(1),
-        zoomOut: () => handleZoom(-1),
-        reset: handleReset
+        zoomIn: () => {
+          console.log("zoomRef.zoomIn triggered");
+          handleZoom(1);
+        },
+        zoomOut: () => {
+          console.log("zoomRef.zoomOut triggered");
+          handleZoom(-1);
+        },
+        reset: () => {
+          console.log("zoomRef.reset triggered");
+          handleReset();
+        }
       };
     }
     return () => {
-      if (zoomRef) zoomRef.current = null;
+      console.log("RealChart zoomRef cleanup (retaining ref contents)");
     };
   }, [zoomRef, zoomRange, yOffset, data.length]);
 
@@ -363,24 +373,28 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher, zoomRef, onZ
   }, [width, height, data.length, marginLeft, marginRight, marginTop, marginBottom]);
 
   const handleZoom = (direction) => {
+    console.log("handleZoom called with direction:", direction);
     setZoomRange(prev => {
       const span = prev.end - prev.start;
       const delta = Math.max(1, Math.round(span * 0.1));
+      let nextRange = { ...prev };
       if (direction > 0) {
         if (span > 4) {
-          return { start: prev.start + delta, end: prev.end - delta };
+          nextRange = { start: prev.start + delta, end: prev.end - delta };
         }
       } else {
-        return {
+        nextRange = {
           start: Math.max(0, prev.start - delta),
           end: Math.min(data.length - 1, prev.end + delta)
         };
       }
-      return prev;
+      console.log("New zoom range set to:", nextRange);
+      return nextRange;
     });
   };
 
   const handleReset = () => {
+    console.log("handleReset called");
     setZoomRange({ start: 0, end: data.length - 1 });
     setYOffset(0);
   };
@@ -928,7 +942,10 @@ export default function RealChart({
               animation: "fadeIn 0.2s ease-in-out",
             }}>
               <button
-                onClick={() => zoomRef.current?.zoomIn()}
+                onClick={() => {
+                  console.log("RealChart internal + clicked, zoomRef:", zoomRef.current);
+                  zoomRef.current?.zoomIn();
+                }}
                 title="Zoom In"
                 style={{
                   padding: "4px 8px",
@@ -954,7 +971,10 @@ export default function RealChart({
                 +
               </button>
               <button
-                onClick={() => zoomRef.current?.zoomOut()}
+                onClick={() => {
+                  console.log("RealChart internal - clicked, zoomRef:", zoomRef.current);
+                  zoomRef.current?.zoomOut();
+                }}
                 title="Zoom Out"
                 style={{
                   padding: "4px 8px",
@@ -981,7 +1001,10 @@ export default function RealChart({
               </button>
               {localIsZoomed && (
                 <button
-                  onClick={() => zoomRef.current?.reset()}
+                  onClick={() => {
+                    console.log("RealChart internal reset clicked, zoomRef:", zoomRef.current);
+                    zoomRef.current?.reset();
+                  }}
                   title="Reset View"
                   style={{
                     padding: "4px 8px",
