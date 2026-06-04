@@ -7,6 +7,7 @@ import Navbar from "../components/Navbar";
 import API from "../services/api";
 import Head from "next/head";
 import { STOCK_METADATA } from "../services/stocks";
+import { useWebSocket } from "../context/WebSocketContext";
 
 // ── Market hours helper (NSE: Mon–Fri 9:15–15:30 IST) ────────────────────
 function isMarketOpen() {
@@ -266,9 +267,7 @@ function SkeletonCard() {
 // ── Main Dashboard ────────────────────────────────────────────────────────
 export default function Home() {
   const router = useRouter();
-  const [stocks, setStocks] = useState({});
-  const [prevStocks, setPrevStocks] = useState({});
-  const [connected, setConnected] = useState(false);
+  const { stocks, prevStocks, connected } = useWebSocket();
   const [filterCategory, setFilterCategory] = useState("All");
   const [viewAll, setViewAll] = useState(false);
   const [query, setQuery] = useState("");
@@ -386,38 +385,6 @@ export default function Home() {
   };
 
   const indexSymbols = ["NIFTY50", "SENSEX"];
-
-  useEffect(() => {
-    let ws;
-    let retryTimer;
-    let active = true;
-    const connect = () => {
-      if (!active) return;
-      const defaultWsUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000")
-        .replace(/^http/, "ws") + "/market/ws";
-      ws = new WebSocket(process.env.NEXT_PUBLIC_WS_URL || defaultWsUrl);
-      ws.onopen = () => { if (active) setConnected(true); };
-      ws.onmessage = (e) => {
-        if (!active) return;
-        try {
-          const data = JSON.parse(e.data);
-          setStocks((prev) => { setPrevStocks(prev); return data; });
-        } catch {}
-      };
-      ws.onclose = () => {
-        if (!active) return;
-        setConnected(false);
-        retryTimer = setTimeout(connect, 5000);
-      };
-      ws.onerror = () => ws.close();
-    };
-    connect();
-    return () => {
-      active = false;
-      clearTimeout(retryTimer);
-      if (ws) ws.close();
-    };
-  }, []);
 
   const entries = Object.entries(stocks || {});
   const indexEntries = entries.filter(([s]) => indexSymbols.includes(s));

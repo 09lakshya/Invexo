@@ -145,7 +145,9 @@ async def websocket_endpoint(websocket: WebSocket):
         while True:
             # Keep the connection open and wait for client messages (if any)
             await websocket.receive_text()
-    except WebSocketDisconnect:
+    except (WebSocketDisconnect, Exception):
+        pass
+    finally:
         _active_connections.discard(websocket)
 
 # =========================

@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import '../styles/globals.css';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
+import { WebSocketProvider } from '../context/WebSocketContext';
 
 // Pages that don't require authentication
 const PUBLIC_PAGES = ['/login'];
@@ -58,41 +59,43 @@ export default function App({ Component, pageProps }) {
       </Head>
       <ThemeProvider>
         <AuthProvider>
-          <AuthGuard>
-            <div style={{ paddingBottom: '48px' }}>
-              <Component {...pageProps} />
-            </div>
-            <div
-              style={{
-                position: 'fixed',
-                bottom: 0,
-                left: 0,
-                right: 0,
-                background: 'rgba(13, 18, 36, 0.95)',
-                backdropFilter: 'blur(16px)',
-                WebkitBackdropFilter: 'blur(16px)',
-                borderTop: '1px solid rgba(255, 23, 68, 0.25)',
-                color: 'var(--text-primary)',
-                padding: '12px 24px',
-                textAlign: 'center',
-                fontSize: '0.72rem',
-                fontWeight: '500',
-                zIndex: 999999,
-                boxShadow: '0 -4px 30px rgba(0, 0, 0, 0.5)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '8px',
-                fontFamily: "'Inter', sans-serif",
-                lineHeight: '1.4',
-              }}
-            >
-              <span style={{ color: 'var(--red)', fontWeight: 'bold', fontSize: '0.85rem' }}>⚠️</span>
-              <span style={{ color: 'var(--text-secondary)' }}>
-                <strong style={{ color: 'var(--text-primary)', fontWeight: '700' }}>Legal Disclaimer:</strong> Invexo is not SEBI registered. All content is for educational purposes only and does not constitute investment advice.
-              </span>
-            </div>
-          </AuthGuard>
+          <WebSocketProvider>
+            <AuthGuard>
+              <div style={{ paddingBottom: '48px' }}>
+                <Component {...pageProps} />
+              </div>
+              <div
+                style={{
+                  position: 'fixed',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  background: 'rgba(13, 18, 36, 0.95)',
+                  backdropFilter: 'blur(16px)',
+                  WebkitBackdropFilter: 'blur(16px)',
+                  borderTop: '1px solid rgba(255, 23, 68, 0.25)',
+                  color: 'var(--text-primary)',
+                  padding: '12px 24px',
+                  textAlign: 'center',
+                  fontSize: '0.72rem',
+                  fontWeight: '500',
+                  zIndex: 999999,
+                  boxShadow: '0 -4px 30px rgba(0, 0, 0, 0.5)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  fontFamily: "'Inter', sans-serif",
+                  lineHeight: '1.4',
+                }}
+              >
+                <span style={{ color: 'var(--red)', fontWeight: 'bold', fontSize: '0.85rem' }}>⚠️</span>
+                <span style={{ color: 'var(--text-secondary)' }}>
+                  <strong style={{ color: 'var(--text-primary)', fontWeight: '700' }}>Legal Disclaimer:</strong> Invexo is not SEBI registered. All content is for educational purposes only and does not constitute investment advice.
+                </span>
+              </div>
+            </AuthGuard>
+          </WebSocketProvider>
         </AuthProvider>
       </ThemeProvider>
     </>
