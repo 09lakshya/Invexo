@@ -200,7 +200,7 @@ def _news_text(item: dict) -> str:
 def _market_sentiment_proxy(symbol: str):
     """Fallback when news text is unavailable; keeps neutral from meaning unknown."""
     try:
-        stock = yf.Ticker(_get_working_ticker(symbol), session=_yf_session)
+        stock = yf.Ticker(_get_working_ticker(symbol))
         df = stock.history(period="3mo", interval="1d")
         df = df.dropna(subset=["Close"])
         if df.empty or len(df) < 15:
@@ -405,7 +405,7 @@ def calculate_technical_quality_score(close, volume):
 def predict_stock(symbol: str):
     try:
         # Get more historical data for better accuracy
-        stock = yf.Ticker(_get_working_ticker(symbol), session=_yf_session)
+        stock = yf.Ticker(_get_working_ticker(symbol))
         df = stock.history(period="6mo")  # Reduced from 1y to 6mo to save memory
         df = df.dropna(subset=["Close"])
         

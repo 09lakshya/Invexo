@@ -53,7 +53,7 @@ UNIVERSE = {
     "WIPRO.NS":      {"name": "Wipro",                 "sector": "IT",              "risk": "medium", "desc": "A global IT services company with a growing focus on AI and cloud."},
     "HCLTECH.NS":    {"name": "HCL Technologies",      "sector": "IT",              "risk": "medium", "desc": "Fast-growing IT company known for engineering and product services."},
     "BAJFINANCE.NS": {"name": "Bajaj Finance",         "sector": "Finance",         "risk": "medium", "desc": "India's largest consumer-finance company — strong growth, wide reach."},
-    "TATAMOTORS.NS": {"name": "Tata Motors",           "sector": "Auto",            "risk": "medium", "desc": "Maker of Tata EVs and owner of Jaguar Land Rover globally."},
+    "TMPV.NS":       {"name": "Tata Motors Passenger", "sector": "Auto",            "risk": "medium", "desc": "Maker of Tata EVs and passenger vehicles post-demerger."},
     "ADANIENT.NS":   {"name": "Adani Enterprises",     "sector": "Infrastructure",  "risk": "high",   "desc": "India's largest infrastructure conglomerate — high growth potential, higher risk."},
     "SUZLON.NS":     {"name": "Suzlon Energy",         "sector": "Renewable Energy","risk": "high",   "cap": "small", "desc": "Leading wind energy company riding India's green-energy push."},
     "IDFCFIRSTB.NS": {"name": "IDFC First Bank",       "sector": "Banking",         "risk": "medium", "cap": "mid",   "desc": "A challenger private bank with retail-led growth and improving operating metrics."},
@@ -63,7 +63,7 @@ UNIVERSE = {
     "YESBANK.NS":    {"name": "Yes Bank",              "sector": "Banking",         "risk": "high",   "cap": "penny", "desc": "A recovering private bank; suitable only for investors who can tolerate high uncertainty."},
     "JPPOWER.NS":    {"name": "Jaiprakash Power",      "sector": "Power",           "risk": "high",   "cap": "penny", "desc": "Power-sector penny stock with turnaround potential and meaningful balance-sheet risk."},
     "RPOWER.NS":     {"name": "Reliance Power",        "sector": "Power",           "risk": "high",   "cap": "penny", "desc": "Speculative power-sector name where price action can be sharp and unpredictable."},
-    "GMRINFRA.NS":   {"name": "GMR Airports Infra",    "sector": "Infrastructure",  "risk": "high",   "cap": "small", "desc": "Airport infrastructure operator with traffic-growth upside and elevated execution risk."},
+    "GMRAIRPORT.NS": {"name": "GMR Airports Infra",    "sector": "Infrastructure",  "risk": "high",   "cap": "small", "desc": "Airport infrastructure operator with traffic-growth upside and elevated execution risk."},
     "SOUTHBANK.NS":  {"name": "South Indian Bank",     "sector": "Banking",         "risk": "high",   "cap": "penny", "desc": "Regional bank turnaround idea with lower valuation and higher asset-quality sensitivity."},
     "UJJIVANSFB.NS": {"name": "Ujjivan Small Finance", "sector": "Banking",         "risk": "high",   "cap": "small", "desc": "Small finance bank exposed to inclusion-led growth, but with cyclical credit risk."},
     "IFCI.NS":       {"name": "IFCI",                  "sector": "Finance",         "risk": "high",   "cap": "penny", "desc": "Speculative financial-services name where momentum can dominate fundamentals."},
@@ -73,8 +73,8 @@ UNIVERSE = {
 
 GOAL_CANDIDATES = {
     "wealth":     ["RELIANCE.NS", "HCLTECH.NS", "BHARTIARTL.NS", "BAJFINANCE.NS",
-                   "TATAMOTORS.NS", "ADANIENT.NS", "WIPRO.NS", "SUZLON.NS",
-                   "GMRINFRA.NS", "PATELENG.NS", "IDEA.NS", "JPPOWER.NS"],
+                   "TMPV.NS", "ADANIENT.NS", "WIPRO.NS", "SUZLON.NS",
+                   "GMRAIRPORT.NS", "PATELENG.NS", "IDEA.NS", "JPPOWER.NS"],
     "income":     ["ITC.NS", "HINDUNILVR.NS", "NESTLEIND.NS",
                    "HDFCBANK.NS", "TCS.NS", "INFY.NS", "NHPC.NS", "IRFC.NS"],
     "retirement": ["HDFCBANK.NS", "TCS.NS", "HINDUNILVR.NS",
@@ -214,7 +214,7 @@ def _investment_amounts(budget: float, investment_type: str, investment_months: 
 def _fetch_signals(symbol: str):
     for ticker_symbol in _ticker_candidates(symbol):
         try:
-            df = yf.Ticker(ticker_symbol, session=_yf_session).history(period="1mo", interval="1d")
+            df = yf.Ticker(ticker_symbol).history(period="1mo", interval="1d")
             df = df.dropna(subset=["Close"])
             if df.empty or len(df) < 14:
                 continue

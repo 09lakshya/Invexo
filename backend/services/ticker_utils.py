@@ -24,10 +24,7 @@ def ttl_cache(maxsize=100, ttl=300):
         return wrapper
     return decorator
 
-YF_SYMBOL_OVERRIDES = {
-    "TATAMOTORS": "TATAMOTORS.BO",
-    "TATAMOTORS.NS": "TATAMOTORS.BO",
-}
+YF_SYMBOL_OVERRIDES = {}
 
 def _ticker_candidates(symbol: str):
     symbol = str(symbol).strip().upper()
@@ -54,7 +51,7 @@ def _ticker_candidates(symbol: str):
 def _working_ticker(symbol: str):
     for candidate in _ticker_candidates(symbol):
         try:
-            df = yf.Ticker(candidate, session=_yf_session).history(period="5d")
+            df = yf.Ticker(candidate).history(period="5d")
             df = df.dropna(subset=["Close"])
             if not df.empty:
                 return candidate

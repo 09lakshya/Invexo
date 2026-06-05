@@ -1,4 +1,7 @@
 import yfinance as yf
+import requests
+from datetime import datetime
+import pytz
 from services.ticker_utils import _yf_session, ttl_cache, _ticker_candidates
 
 # =========================
@@ -8,7 +11,7 @@ from services.ticker_utils import _yf_session, ttl_cache, _ticker_candidates
 def get_stock_price(symbol: str):
     for ticker_symbol in _ticker_candidates(symbol):
         try:
-            stock = yf.Ticker(ticker_symbol, session=_yf_session)
+            stock = yf.Ticker(ticker_symbol)
             df = stock.history(period="2d")
 
             if df.empty:
@@ -29,44 +32,74 @@ def get_stock_price(symbol: str):
 # =========================
 @ttl_cache(maxsize=100, ttl=300)
 def get_history(symbol: str, period: str = "1mo"):
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+
+    if period == "1d":
+        range_val = "1d"
+        interval_val = "5m"
+    elif period == "5d":
+        range_val = "5d"
+        interval_val = "15m"
+    else:
+        range_val = period
+        interval_val = "1d"
+
     for ticker_symbol in _ticker_candidates(symbol):
         try:
-            stock = yf.Ticker(ticker_symbol, session=_yf_session)
-
-            if period == "1d":
-                # Intraday 5-minute data for the whole day
-                df = stock.history(period="1d", interval="5m")
-                if df.empty:
-                    continue
-            elif period == "5d":
-                # Intraday 15-minute data for 5 days
-                df = stock.history(period="5d", interval="15m")
-                if df.empty:
-                    continue
-            else:
-                # Daily data for 1mo and beyond
-                df = stock.history(period=period, interval="1d")
-                if df.empty:
-                    continue
-
-            df = df.dropna(subset=["Close"])
-            if df.empty:
+            url = f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker_symbol}?range={range_val}&interval={interval_val}"
+            res = requests.get(url, headers=headers, timeout=5)
+            if res.status_code != 200:
                 continue
 
-            df = df.reset_index()
-            # yfinance returns 'Datetime' for intraday and 'Date' for daily
-            date_col = "Datetime" if "Datetime" in df.columns else "Date"
+            data = res.json()
+            result = data.get("chart", {}).get("result", [])
+            if not result:
+                continue
 
-            df = df[[date_col, "Open", "High", "Low", "Close"]]
-            df = df.rename(columns={date_col: "Date"})
+            result_data = result[0]
+            timestamps = result_data.get("timestamp", [])
+            indicators = result_data.get("indicators", {}).get("quote", [{}])[0]
 
-            df["Date"] = df["Date"].astype(str)
-            df["Open"] = df["Open"].astype(float)
-            df["High"] = df["High"].astype(float)
-            df["Low"] = df["Low"].astype(float)
-            df["Close"] = df["Close"].astype(float)
+            opens = indicators.get("open", [])
+            highs = indicators.get("high", [])
+            lows = indicators.get("low", [])
+            closes = indicators.get("close", [])
 
-            return df.to_dict(orient="records")
+            tz_name = result_data.get("meta", {}).get("exchangeTimezoneName", "UTC")
+            try:
+                tz = pytz.timezone(tz_name)
+            except Exception:
+                tz = pytz.UTC
+
+            records = []
+            for i in range(len(timestamps)):
+                ts = timestamps[i]
+                dt = datetime.fromtimestamp(ts, tz)
+
+                if interval_val in ["5m", "15m"]:
+                    date_str = dt.replace(microsecond=0).isoformat(sep=" ")
+                else:
+                    date_str = dt.strftime("%Y-%m-%d")
+
+                open_val = opens[i]
+                high_val = highs[i]
+                low_val = lows[i]
+                close_val = closes[i]
+
+                if close_val is None:
+                    continue
+
+                records.append({
+                    "Date": date_str,
+                    "Open": float(open_val) if open_val is not None else float(close_val),
+                    "High": float(high_val) if high_val is not None else float(close_val),
+                    "Low": float(low_val) if low_val is not None else float(close_val),
+                    "Close": float(close_val)
+                })
+
+            return records
         except Exception:
             continue
 
