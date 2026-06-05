@@ -3,14 +3,7 @@ import numpy as np
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional
 import redis, json, hashlib, os
-from curl_cffi.requests import Session as curl_Session
-
-_yf_session = curl_Session(impersonate="chrome120")
-
-YF_SYMBOL_OVERRIDES = {
-    "TATAMOTORS": "TATAMOTORS.BO",
-    "TATAMOTORS.NS": "TATAMOTORS.BO",
-}
+from services.ticker_utils import _yf_session, _working_ticker, _ticker_candidates, ttl_cache
 
 try:
     cache = redis.Redis(
@@ -23,38 +16,6 @@ try:
 except:
     CACHE_AVAILABLE = False
     cache = None
-
-def _ticker_candidates(symbol: str):
-    symbol = str(symbol).strip().upper()
-    if symbol in YF_SYMBOL_OVERRIDES:
-        override = YF_SYMBOL_OVERRIDES[symbol]
-        if override.endswith(".BO"):
-            base = override[:-3]
-            return [override, f"{base}.NS"]
-        if override.endswith(".NS"):
-            base = override[:-3]
-            return [override, f"{base}.BO"]
-        return [override]
-    if symbol.startswith("^"):
-        return [symbol]
-    if symbol.endswith(".NS"):
-        base = symbol[:-3]
-        return [symbol, f"{base}.BO"]
-    if symbol.endswith(".BO"):
-        base = symbol[:-3]
-        return [symbol, f"{base}.NS"]
-    return [f"{symbol}.NS", f"{symbol}.BO"]
-
-
-def _working_ticker(symbol: str):
-    for candidate in _ticker_candidates(symbol):
-        try:
-            df = yf.Ticker(candidate, session=_yf_session).history(period="5d")
-            df = df.dropna(subset=["Close"])
-            if not df.empty:
-                return candidate
-        except Exception:
-            continue
 
 # ── RSI helper (self-contained so this service has no circular imports) ──────
 def _rsi(prices, period=14):
@@ -249,6 +210,7 @@ def _investment_amounts(budget: float, investment_type: str, investment_months: 
 
 
 # ── Fetch signals for one ticker ──────────────────────────────────────────────
+@ttl_cache(maxsize=100, ttl=900)
 def _fetch_signals(symbol: str):
     for ticker_symbol in _ticker_candidates(symbol):
         try:
@@ -368,6 +330,33 @@ def _reason(meta: dict, signals: dict, goal: str, duration: str, sentiment_score
     return f"{goal_sentence} It is currently {trend_phrase}. {rsi_note}{sentiment_phrase}"
 
 
+# ── Fetch signals and news sentiment for one ticker ───────────────────────────
+@ttl_cache(maxsize=100, ttl=1800)
+def _fetch_signals_and_sentiment(symbol: str):
+    signals = _fetch_signals(symbol)
+    if not signals:
+        return None
+        
+    try:
+        working_ticker = _working_ticker(symbol)
+        stock_obj = yf.Ticker(working_ticker, session=_yf_session)
+        news = getattr(stock_obj, 'news', []) or []
+        sentiments = []
+        for item in news[:5]:
+            title = item.get("title", "") or ""
+            summary = item.get("summary", "") or ""
+            text = f"{title} {summary}"
+            sentiments.append(_analyze_sentiment(text))
+        sentiment_score = np.mean(sentiments) if sentiments else 50.0
+    except Exception:
+        sentiment_score = 50.0
+        
+    return {
+        "signals": signals,
+        "sentiment_score": sentiment_score
+    }
+
+
 # ── Main entry point ──────────────────────────────────────────────────────────
 def get_recommendations(goal: str, duration: str, risk: str, budget: float, investment_type: str = "one-time", investment_months: Optional[int] = None):
     is_sip, months, total_budget = _investment_amounts(budget, investment_type, investment_months, duration)
@@ -382,38 +371,25 @@ def get_recommendations(goal: str, duration: str, risk: str, budget: float, inve
 
     candidates = _advisor_candidates(goal, risk)
 
-    # Parallel fetch
-    signals_map = {}
+    # Parallel fetch of both technical indicators and news sentiment
+    results_map = {}
     with ThreadPoolExecutor(max_workers=6) as executor:
-        futures = {executor.submit(_fetch_signals, sym): sym for sym in candidates}
+        futures = {executor.submit(_fetch_signals_and_sentiment, sym): sym for sym in candidates}
         for future in as_completed(futures):
             sym = futures[future]
             try:
                 result = future.result()
                 if result:
-                    signals_map[sym] = result
+                    results_map[sym] = result
             except Exception:
                 pass
 
-    # Score and rank with sentiment
+    # Score and rank using pre-fetched results
     scored = []
-    for sym, signals in signals_map.items():
+    for sym, data in results_map.items():
         meta = UNIVERSE.get(sym, {})
-        
-        # Fetch sentiment for this stock (0-100)
-        try:
-            stock_obj = yf.Ticker(_working_ticker(sym), session=_yf_session)
-            news = getattr(stock_obj, 'news', []) or []
-            sentiments = []
-            for item in news[:5]:  # Top 5 news items
-                title = item.get("title", "") or ""
-                summary = item.get("summary", "") or ""
-                text = f"{title} {summary}"
-                sentiment = _analyze_sentiment(text)
-                sentiments.append(sentiment)
-            sentiment_score = np.mean(sentiments) if sentiments else 50.0
-        except Exception:
-            sentiment_score = 50.0
+        signals = data["signals"]
+        sentiment_score = data["sentiment_score"]
         
         stock_risk = meta.get("risk", "medium")
         is_goal_match = sym in GOAL_CANDIDATES.get(goal, [])

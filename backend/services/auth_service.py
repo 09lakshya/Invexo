@@ -1,11 +1,11 @@
-import sqlite3
 import os
 import bcrypt
 import jwt
 import warnings
 import random
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from email.mime.text import MIMEText
+from services.db import DB_PATH, get_db_connection, get_cursor, execute_query
 
 # Global in-memory OTP store. Format: { email: { "otp": str, "expires": datetime, "payload": dict } }
 otp_store = {}
@@ -121,42 +121,22 @@ def verify_signup_otp(email_addr: str, otp: str) -> dict | None:
     del otp_store[key]
     return payload
 
-DB_DIR = "/var/data"
-if os.path.exists(DB_DIR):
-    DB_PATH = os.path.join(DB_DIR, "portfolio.db")
-else:
-    DB_PATH = os.path.join(os.path.dirname(__file__), "portfolio.db")
-
-DATABASE_URL = os.environ.get("DATABASE_URL", "")
-
-def get_db_connection():
-    if DATABASE_URL:
-        import psycopg2
-        conn = psycopg2.connect(DATABASE_URL)
-        return conn, True
-    else:
-        conn = sqlite3.connect(DB_PATH)
-        return conn, False
-
-def get_cursor(conn, is_postgres):
-    if is_postgres:
-        import psycopg2.extras
-        return conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-    else:
-        conn.row_factory = sqlite3.Row
-        return conn.cursor()
-
-def execute_query(c, sql, params=(), is_postgres=False):
-    if is_postgres:
-        sql = sql.replace("?", "%s")
-    c.execute(sql, params)
-    return c
+def user_exists(email: str) -> bool:
+    """Check if email already exists in users table."""
+    conn, is_postgres = get_db_connection()
+    c = get_cursor(conn, is_postgres)
+    execute_query(c, "SELECT id FROM users WHERE email = ?", (email.lower(),), is_postgres)
+    row = c.fetchone()
+    conn.close()
+    return row is not None
 
 JWT_SECRET = os.environ.get("JWT_SECRET", "")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRY_DAYS = 30  # Long-lived tokens for "keep me signed in"
 
 if not JWT_SECRET:
+    if os.environ.get("ENV") == "production" or os.environ.get("RENDER") == "true":
+        raise ValueError("JWT_SECRET environment variable is required in production!")
     JWT_SECRET = "dev_only_change_me"
     warnings.warn(
         "JWT_SECRET is not set. Using insecure development default. "
@@ -348,8 +328,8 @@ def create_token(user_id: int) -> str:
     """Create a JWT token for the given user ID."""
     payload = {
         "sub": str(user_id),
-        "iat": datetime.utcnow(),
-        "exp": datetime.utcnow() + timedelta(days=JWT_EXPIRY_DAYS),
+        "iat": datetime.now(timezone.utc),
+        "exp": datetime.now(timezone.utc) + timedelta(days=JWT_EXPIRY_DAYS),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 

@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from services.portfolio_service import get_portfolio, add_holding, remove_holding
 from services.data_service import get_stock_price
 from services.auth_service import verify_token
+from routers.market import GLOBAL_CACHE
 
 router = APIRouter(prefix="/portfolio")
 
@@ -31,8 +32,14 @@ def _enrich_holdings(user_id: str):
     holdings = get_portfolio(user_id)
     enriched = []
     for h in holdings:
-        ticker        = h["symbol"] + ".NS"
-        current_price = get_stock_price(ticker)
+        symbol = h["symbol"].upper()
+        # Look up price in the live websocket cache first
+        if symbol in GLOBAL_CACHE and GLOBAL_CACHE[symbol]["price"] > 0:
+            current_price = GLOBAL_CACHE[symbol]["price"]
+        else:
+            ticker = symbol + ".NS"
+            current_price = get_stock_price(ticker)
+            
         invested      = h["quantity"] * h["buy_price"]
         current_value = h["quantity"] * current_price
         pnl           = current_value - invested

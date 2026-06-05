@@ -5,6 +5,7 @@ import time
 from bs4 import BeautifulSoup
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from services.ticker_utils import ttl_cache
 
 CACHE_FILE = os.path.join(os.path.dirname(__file__), "general_news_cache.json")
 SEARCH_CACHE_FILE = os.path.join(os.path.dirname(__file__), "general_news_search_cache.json")
@@ -32,26 +33,7 @@ def _parse_xml(content: bytes) -> BeautifulSoup:
         return BeautifulSoup(content, "html.parser")
 
 def _scrape_article_text(link: str) -> str:
-    try:
-        res = requests.get(link, headers=headers, timeout=8)
-        if res.status_code != 200:
-            return ""
-        soup = BeautifulSoup(res.content, "html.parser")
-        paragraphs = soup.find_all("p")
-        text_blocks = []
-        for p in paragraphs:
-            txt = p.get_text().strip()
-            # Clean and filter out advertisements or boilerplate
-            if len(txt.split()) > 10 and not any(k in txt for k in ["Subscribe", "Newsletter", "Sign in", "Apps", "Follow us"]):
-                txt = txt.replace('\xa0', ' ').replace('\u2019', "'").replace('\u201c', '"').replace('\u201d', '"')
-                text_blocks.append(txt)
-        combined = " ".join(text_blocks)
-        words = combined.split()
-        if len(words) >= 60:
-            # Take first 85 words (comfortably in 60-100 range)
-            return " ".join(words[:85]) + "..."
-    except Exception as e:
-        print(f"Error scraping {link}: {e}")
+    # Disable real-time external website scraping to optimize news retrieval speed
     return ""
 
 def get_general_news():
@@ -268,6 +250,7 @@ def search_general_news(query: str):
         
     return news_list
 
+@ttl_cache(maxsize=100, ttl=1800)
 def suggest_general_news(query: str):
     query = query.strip()
     if not query:

@@ -1,9 +1,11 @@
 import yfinance as yf
 from datetime import datetime
 from curl_cffi.requests import Session as curl_Session
+from services.ticker_utils import ttl_cache
 
 _yf_session = curl_Session(impersonate="chrome120")
 
+@ttl_cache(maxsize=100, ttl=1800)
 def get_stock_news(symbol: str):
     try:
         stock = yf.Ticker(symbol, session=_yf_session)

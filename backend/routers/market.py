@@ -1,6 +1,8 @@
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 import asyncio
 import io
+import os
+import json
 from contextlib import redirect_stdout, redirect_stderr
 import yfinance as yf
 import gc
@@ -48,6 +50,17 @@ GLOBAL_CACHE = {
     "NIFTY50": {"price": 0, "change": 0, "percent": 0},
     "SENSEX": {"price": 0, "change": 0, "percent": 0}
 }
+
+CACHE_FILE_PATH = os.path.join(os.path.dirname(__file__), "..", "services", "market_cache.json")
+try:
+    if os.path.exists(CACHE_FILE_PATH):
+        with open(CACHE_FILE_PATH, "r", encoding="utf-8") as f:
+            cached_data = json.load(f)
+            if isinstance(cached_data, dict) and len(cached_data) > 0:
+                GLOBAL_CACHE.update(cached_data)
+except Exception as e:
+    print(f"Error loading market cache from file: {e}")
+
 _background_task = None
 _active_connections = set()
 
@@ -105,6 +118,11 @@ async def update_market_cache():
 
             if new_data:
                 GLOBAL_CACHE.update(new_data)
+                try:
+                    with open(CACHE_FILE_PATH, "w", encoding="utf-8") as f:
+                        json.dump(GLOBAL_CACHE, f, indent=2, ensure_ascii=False)
+                except Exception as ex:
+                    print(f"Error saving market cache to file: {ex}")
                 
             # Broadcast to all connected clients
             for connection in list(_active_connections):

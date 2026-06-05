@@ -127,14 +127,8 @@ def handle_signup_initiate(payload: SignupInput):
         raise HTTPException(status_code=400, detail="Please enter a valid age")
 
     # Check if user already exists
-    from services.auth_service import DB_PATH
-    import sqlite3
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT id FROM users WHERE email = ?", (payload.email.lower(),))
-    exists = c.fetchone()
-    conn.close()
-    if exists:
+    from services.auth_service import user_exists
+    if user_exists(payload.email):
         raise HTTPException(status_code=409, detail="An account with this email already exists")
 
     try:
@@ -173,17 +167,6 @@ def handle_login(payload: LoginInput):
         raise HTTPException(status_code=400, detail="Email and password are required")
     if not _is_valid_email(payload.email):
         raise HTTPException(status_code=400, detail="Please enter a valid email address")
-
-    # Check if user exists
-    from services.auth_service import get_db_connection, get_cursor, execute_query
-    conn, is_postgres = get_db_connection()
-    c = get_cursor(conn, is_postgres)
-    execute_query(c, "SELECT id FROM users WHERE email = ?", (payload.email.lower(),), is_postgres)
-    exists = c.fetchone()
-    conn.close()
-
-    if not exists:
-        raise HTTPException(status_code=404, detail="Details not found")
 
     user = login(payload.email, payload.password)
     if user is None:

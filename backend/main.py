@@ -33,25 +33,25 @@ async def add_security_headers(request, call_next):
         
     return response
 
-default_origins = "*"
-raw_origins = os.getenv("CORS_ORIGINS", default_origins)
-allowed_origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+default_origins = "https://invexo-one.vercel.app,http://localhost:3000,http://localhost:3001"
+raw_origins = os.getenv("CORS_ORIGINS", "")
+if raw_origins:
+    allowed_origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+else:
+    allowed_origins = [origin.strip() for origin in default_origins.split(",") if origin.strip()]
 
-if "*" not in allowed_origins:
-    for o in ["https://invexo-one.vercel.app", "http://localhost:3000", "http://localhost:3001"]:
-        if o not in allowed_origins:
-            allowed_origins.append(o)
+if "*" in allowed_origins:
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=allowed_origins,
-        allow_origin_regex=r"https://invexo-one(?:-[a-zA-Z0-9-]+)?\.vercel\.app",
+        allow_origins=["*"],
         allow_methods=["*"],
         allow_headers=["*"],
     )
 else:
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=allowed_origins,
+        allow_origin_regex=r"https://invexo-one(?:-[a-zA-Z0-9-]+)?\.vercel\.app",
         allow_methods=["*"],
         allow_headers=["*"],
     )
