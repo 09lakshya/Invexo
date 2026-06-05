@@ -67,7 +67,7 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher, zoomRef, onZ
   const visibleData = data.slice(zoomRange.start, zoomRange.end + 1);
   const zoomPercent = data.length > 0 ? Math.round((1 - (visibleData.length / data.length)) * 100) : 0;
 
-  const marginTop = 36; // Extra spacing for HUD
+  const marginTop = showSwitcher ? 52 : 36; // Extra spacing for HUD
   const marginBottom = 28;
   const marginLeft = 15;
   const marginRight = 60; // Space for Y-Axis labels
@@ -92,8 +92,32 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher, zoomRef, onZ
       const date = new Date(dateString);
       const day = String(date.getDate()).padStart(2, "0");
       const month = String(date.getMonth() + 1).padStart(2, "0");
+      
       if (isIntraday) {
-        return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+        let isSpanningMultipleDays = false;
+        if (visibleData.length >= 2) {
+          const firstDate = new Date(visibleData[0].Date).toDateString();
+          const lastDate = new Date(visibleData[visibleData.length - 1].Date).toDateString();
+          isSpanningMultipleDays = firstDate !== lastDate;
+        }
+        
+        const timeStr = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+        if (isSpanningMultipleDays) {
+          return `${day}/${month} ${timeStr}`;
+        }
+        return timeStr;
+      }
+      
+      let spanDays = 0;
+      if (visibleData.length >= 2) {
+        const t1 = new Date(visibleData[0].Date).getTime();
+        const t2 = new Date(visibleData[visibleData.length - 1].Date).getTime();
+        spanDays = (t2 - t1) / (24 * 60 * 60 * 1000);
+      }
+      
+      if (spanDays > 90) {
+        const year = date.getFullYear();
+        return `${day}/${month}/${year}`;
       }
       return `${day}/${month}`;
     } catch {
@@ -423,8 +447,8 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher, zoomRef, onZ
           
           setZoomRange(prev => {
             const span = prev.end - prev.start;
-            // Reduce trackpad sensitivity by scaling multiplier with e.deltaY magnitude
-            const multiplier = Math.min(0.05, Math.max(0.008, Math.abs(e.deltaY) * 0.0005));
+            // Balance trackpad sensitivity by scaling multiplier with e.deltaY magnitude
+            const multiplier = Math.min(0.08, Math.max(0.015, Math.abs(e.deltaY) * 0.001));
             const delta = Math.max(1, Math.round(span * multiplier));
             if (direction > 0) {
               if (span > 4) {
@@ -468,11 +492,11 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher, zoomRef, onZ
               }
             }
 
-            // Y-axis panning: shift price offset
+            // Y-axis panning: shift price offset (inverted to match standard wheel scrolling)
             if (Math.abs(dy) > 0) {
               const priceUnitsPerPixel = priceRangeRef.current / plotHeight;
               const shiftY = dy * priceUnitsPerPixel * 0.5;
-              setYOffset(prev => prev + shiftY);
+              setYOffset(prev => prev - shiftY);
             }
           } else {
             // Not zoomed in — use vertical scroll as zoom (legacy behaviour)
@@ -480,8 +504,8 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher, zoomRef, onZ
             
             setZoomRange(prev => {
               const s = prev.end - prev.start;
-              // Reduce trackpad sensitivity by scaling multiplier with e.deltaY magnitude
-              const multiplier = Math.min(0.05, Math.max(0.008, Math.abs(e.deltaY) * 0.0005));
+              // Balance trackpad sensitivity by scaling multiplier with e.deltaY magnitude
+              const multiplier = Math.min(0.08, Math.max(0.015, Math.abs(e.deltaY) * 0.001));
               const delta = Math.max(1, Math.round(s * multiplier));
               if (direction > 0) {
                 if (s > 4) {
@@ -539,10 +563,10 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher, zoomRef, onZ
                 minute: isIntraday ? "2-digit" : undefined,
               })}
             </span>
-            <span>O:<span style={{ color: (activeItem.Close || 0) >= (activeItem.Open || 0) ? colors.green : colors.red, marginLeft: "2px", fontWeight: 700 }}>₹{Number(activeItem.Open || 0).toFixed(2)}</span></span>
-            <span>H:<span style={{ color: (activeItem.Close || 0) >= (activeItem.Open || 0) ? colors.green : colors.red, marginLeft: "2px", fontWeight: 700 }}>₹{Number(activeItem.High || 0).toFixed(2)}</span></span>
-            <span>L:<span style={{ color: (activeItem.Close || 0) >= (activeItem.Open || 0) ? colors.green : colors.red, marginLeft: "2px", fontWeight: 700 }}>₹{Number(activeItem.Low || 0).toFixed(2)}</span></span>
-            <span>C:<span style={{ color: (activeItem.Close || 0) >= (activeItem.Open || 0) ? colors.green : colors.red, marginLeft: "2px", fontWeight: 700 }}>₹{Number(activeItem.Close || 0).toFixed(2)}</span></span>
+            <span>O:<span style={{ color: (activeItem.Close || 0) >= (activeItem.Open || 0) ? colors.green : colors.red, marginLeft: "2px", fontWeight: 700 }}><span style={{ fontFamily: "Inter, sans-serif" }}>₹</span>{Number(activeItem.Open || 0).toFixed(2)}</span></span>
+            <span>H:<span style={{ color: (activeItem.Close || 0) >= (activeItem.Open || 0) ? colors.green : colors.red, marginLeft: "2px", fontWeight: 700 }}><span style={{ fontFamily: "Inter, sans-serif" }}>₹</span>{Number(activeItem.High || 0).toFixed(2)}</span></span>
+            <span>L:<span style={{ color: (activeItem.Close || 0) >= (activeItem.Open || 0) ? colors.green : colors.red, marginLeft: "2px", fontWeight: 700 }}><span style={{ fontFamily: "Inter, sans-serif" }}>₹</span>{Number(activeItem.Low || 0).toFixed(2)}</span></span>
+            <span>C:<span style={{ color: (activeItem.Close || 0) >= (activeItem.Open || 0) ? colors.green : colors.red, marginLeft: "2px", fontWeight: 700 }}><span style={{ fontFamily: "Inter, sans-serif" }}>₹</span>{Number(activeItem.Close || 0).toFixed(2)}</span></span>
             <span style={{ color: (activeChangePct || 0) >= 0 ? colors.green : colors.red, fontWeight: 700, marginLeft: "4px" }}>
               {(activeChangePct || 0) >= 0 ? "\u25B2 +" : "\u25BC "}{Number(activeChangePct || 0).toFixed(2)}%
             </span>
@@ -603,7 +627,7 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher, zoomRef, onZ
               fontWeight="600"
               fontFamily="'Space Grotesk', sans-serif"
             >
-              ₹{tick.val.toFixed(1)}
+              <tspan fontFamily="Inter, sans-serif">₹</tspan>{tick.val.toFixed(1)}
             </text>
           </g>
         ))}
@@ -885,6 +909,11 @@ export default function RealChart({
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
+    layout: {
+      padding: {
+        top: showSwitcher ? 24 : 0,
+      },
+    },
     interaction: {
       mode: "index",
       intersect: false,
