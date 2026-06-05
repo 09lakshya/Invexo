@@ -267,3 +267,33 @@ def search_general_news(query: str):
         print(f"Search cache write error: {e}")
         
     return news_list
+
+def suggest_general_news(query: str):
+    query = query.strip()
+    if not query:
+        return []
+
+    import urllib.parse
+    encoded_query = urllib.parse.quote(query)
+    url = f"https://news.google.com/rss/search?q={encoded_query}&hl=en-IN&gl=IN&ceid=IN:en"
+
+    try:
+        res = requests.get(url, headers=headers, timeout=4)
+        if res.status_code == 200:
+            soup = _parse_xml(res.content)
+            items = soup.find_all("item")
+            suggestions = []
+            for item in items[:5]:
+                title = item.find("title").text if item.find("title") is not None else ""
+                if title:
+                    # Clean title by removing source suffix (e.g. " - Livemint")
+                    clean_title = title
+                    if " - " in title:
+                        clean_title = " - ".join(title.split(" - ")[:-1])
+                    suggestions.append({
+                        "title": clean_title.strip()
+                    })
+            return suggestions
+    except Exception as e:
+        print(f"Error fetching suggestions for '{query}': {e}")
+    return []

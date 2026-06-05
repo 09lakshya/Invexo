@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Head from "next/head";
 import Navbar from "../components/Navbar";
 import API from "../services/api";
@@ -14,6 +14,14 @@ export default function GeneralNewsPage() {
   const [searching, setSearching] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
 
+  // Suggestions states
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [suggestionIndex, setSuggestionIndex] = useState(-1);
+
+  const searchContainerRef = useRef(null);
+
+  // Initial fetch
   useEffect(() => {
     const fetchNews = async () => {
       try {
@@ -33,14 +41,43 @@ export default function GeneralNewsPage() {
     fetchNews();
   }, []);
 
-  const handleSearch = async (e) => {
-    if (e) e.preventDefault();
+  // Debounced suggestions fetch
+  useEffect(() => {
     const query = searchQuery.trim();
-    if (!query) {
-      handleClearSearch();
+    if (query.length < 3) {
+      setSuggestions([]);
+      setShowSuggestions(false);
       return;
     }
 
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        const res = await API.get(`/news/general/suggest?q=${encodeURIComponent(query)}`);
+        setSuggestions(Array.isArray(res.data) ? res.data : []);
+        setShowSuggestions(true);
+        setSuggestionIndex(-1);
+      } catch (err) {
+        console.error("Error fetching suggestions:", err);
+      }
+    }, 250);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery]);
+
+  // Click outside listener
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+  const executeSearch = async (query) => {
     try {
       setSearching(true);
       setError(null);
@@ -55,11 +92,50 @@ export default function GeneralNewsPage() {
     }
   };
 
+  const handleSearch = (e) => {
+    if (e) e.preventDefault();
+    const query = searchQuery.trim();
+    if (!query) {
+      handleClearSearch();
+      return;
+    }
+    setShowSuggestions(false);
+    executeSearch(query);
+  };
+
   const handleClearSearch = () => {
     setSearchQuery("");
     setActiveQuery("");
     setNews(dailyNews);
+    setSuggestions([]);
+    setShowSuggestions(false);
     setError(null);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setSuggestionIndex((prevIndex) =>
+        prevIndex < suggestions.length - 1 ? prevIndex + 1 : 0
+      );
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setSuggestionIndex((prevIndex) =>
+        prevIndex > 0 ? prevIndex - 1 : suggestions.length - 1
+      );
+    } else if (e.key === "Enter") {
+      if (suggestionIndex >= 0 && suggestionIndex < suggestions.length) {
+        e.preventDefault();
+        const selected = suggestions[suggestionIndex].title;
+        setSearchQuery(selected);
+        setShowSuggestions(false);
+        executeSearch(selected);
+      } else {
+        handleSearch(e);
+      }
+    } else if (e.key === "Escape") {
+      setShowSuggestions(false);
+    }
   };
 
   return (
@@ -132,88 +208,168 @@ export default function GeneralNewsPage() {
             </p>
           </div>
 
-          {/* Search Bar */}
-          <form
-            onSubmit={handleSearch}
-            style={{
-              display: "flex",
-              gap: "12px",
-              marginBottom: "32px",
-              animation: "fadeInUp 0.5s ease both",
-              background: "var(--bg-card)",
-              border: searchFocused ? "1px solid var(--accent-glow)" : "1px solid var(--border-subtle)",
-              borderRadius: "16px",
-              padding: "6px 6px 6px 16px",
-              boxShadow: searchFocused ? "0 8px 30px var(--shadow-card), 0 0 1px var(--accent-glow)" : "var(--shadow-card)",
-              backdropFilter: "blur(16px)",
-              alignItems: "center",
-              transition: "all 0.25s ease"
-            }}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: "4px" }}>
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>
-            <input
-              type="text"
-              placeholder="Search news by topic, company, or keyword..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onFocus={() => setSearchFocused(true)}
-              onBlur={() => setSearchFocused(false)}
+          {/* Search Bar Container */}
+          <div ref={searchContainerRef} style={{ position: "relative", marginBottom: "32px", zIndex: 50 }}>
+            <form
+              onSubmit={handleSearch}
               style={{
-                flex: 1,
-                background: "transparent",
-                border: "none",
-                color: "var(--text-primary)",
-                fontSize: "0.95rem",
-                outline: "none",
-                padding: "8px 0"
+                display: "flex",
+                gap: "12px",
+                background: "var(--bg-card)",
+                border: searchFocused ? "1px solid var(--accent-glow)" : "1px solid var(--border-subtle)",
+                borderRadius: "16px",
+                padding: "6px 6px 6px 16px",
+                boxShadow: searchFocused ? "0 8px 30px var(--shadow-card), 0 0 1px var(--accent-glow)" : "var(--shadow-card)",
+                backdropFilter: "blur(16px)",
+                alignItems: "center",
+                transition: "all 0.25s ease"
               }}
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={handleClearSearch}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: "4px" }}>
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input
+                type="text"
+                placeholder="Search news by topic, company, or keyword..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onFocus={() => {
+                  setSearchFocused(true);
+                  if (suggestions.length > 0) setShowSuggestions(true);
+                }}
+                onBlur={() => setSearchFocused(false)}
+                onKeyDown={handleKeyDown}
                 style={{
+                  flex: 1,
                   background: "transparent",
                   border: "none",
-                  color: "var(--text-muted)",
-                  cursor: "pointer",
-                  padding: "4px 8px",
-                  fontSize: "0.85rem",
-                  fontWeight: 600,
-                  transition: "color 0.2s"
+                  color: "var(--text-primary)",
+                  fontSize: "0.95rem",
+                  outline: "none",
+                  padding: "8px 0"
                 }}
-                onMouseEnter={e => e.currentTarget.style.color = "var(--text-primary)"}
-                onMouseLeave={e => e.currentTarget.style.color = "var(--text-muted)"}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={handleClearSearch}
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    color: "var(--text-muted)",
+                    cursor: "pointer",
+                    padding: "4px 8px",
+                    fontSize: "0.85rem",
+                    fontWeight: 600,
+                    transition: "color 0.2s"
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.color = "var(--text-primary)"}
+                  onMouseLeave={e => e.currentTarget.style.color = "var(--text-muted)"}
+                >
+                  Clear
+                </button>
+              )}
+              <button
+                type="submit"
+                disabled={searching}
+                style={{
+                  background: "linear-gradient(90deg, var(--accent) 0%, var(--purple) 100%)",
+                  border: "none",
+                  color: "#ffffff",
+                  padding: "10px 20px",
+                  borderRadius: "12px",
+                  fontWeight: 600,
+                  fontSize: "0.9rem",
+                  cursor: "pointer",
+                  transition: "opacity 0.2s",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px"
+                }}
+                onMouseEnter={e => e.currentTarget.style.opacity = 0.9}
+                onMouseLeave={e => e.currentTarget.style.opacity = 1}
               >
-                Clear
+                {searching ? "Searching..." : "Search"}
               </button>
+            </form>
+
+            {/* Suggestions Dropdown */}
+            {showSuggestions && suggestions.length > 0 && (
+              <div
+                style={{
+                  position: "absolute",
+                  top: "100%",
+                  left: 0,
+                  right: 0,
+                  zIndex: 100,
+                  marginTop: "8px",
+                  background: "var(--bg-card)",
+                  border: "1px solid var(--border-subtle)",
+                  borderRadius: "16px",
+                  boxShadow: "0 12px 40px rgba(0, 0, 0, 0.4), 0 0 1px var(--border-subtle)",
+                  backdropFilter: "blur(20px)",
+                  overflow: "hidden",
+                  padding: "8px 0",
+                  animation: "fadeInUp 0.15s ease both"
+                }}
+              >
+                {suggestions.map((item, idx) => {
+                  const isSelected = idx === suggestionIndex;
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => {
+                        setSearchQuery(item.title);
+                        setShowSuggestions(false);
+                        executeSearch(item.title);
+                      }}
+                      onMouseEnter={() => setSuggestionIndex(idx)}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "12px",
+                        padding: "12px 18px",
+                        cursor: "pointer",
+                        background: isSelected ? "var(--accent-dim)" : "transparent",
+                        transition: "all 0.15s ease",
+                        borderLeft: isSelected ? "3px solid var(--accent)" : "3px solid transparent",
+                        textAlign: "left"
+                      }}
+                    >
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke={isSelected ? "var(--accent)" : "var(--text-muted)"}
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        style={{ flexShrink: 0, transition: "stroke 0.15s ease" }}
+                      >
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                      </svg>
+                      <span
+                        style={{
+                          fontSize: "0.9rem",
+                          fontWeight: isSelected ? 600 : 400,
+                          color: isSelected ? "var(--accent)" : "var(--text-primary)",
+                          whiteSpace: "nowrap",
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          transition: "color 0.15s ease"
+                        }}
+                      >
+                        {item.title}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             )}
-            <button
-              type="submit"
-              disabled={searching}
-              style={{
-                background: "linear-gradient(90deg, var(--accent) 0%, var(--purple) 100%)",
-                border: "none",
-                color: "#ffffff",
-                padding: "10px 20px",
-                borderRadius: "12px",
-                fontWeight: 600,
-                fontSize: "0.9rem",
-                cursor: "pointer",
-                transition: "opacity 0.2s",
-                display: "flex",
-                alignItems: "center",
-                gap: "6px"
-              }}
-              onMouseEnter={e => e.currentTarget.style.opacity = 0.9}
-              onMouseLeave={e => e.currentTarget.style.opacity = 1}
-            >
-              {searching ? "Searching..." : "Search"}
-            </button>
-          </form>
+          </div>
 
           {/* News list */}
           {loading || searching ? (
