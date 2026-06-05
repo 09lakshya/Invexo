@@ -727,10 +727,32 @@ export default function Advisor() {
               <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
                 <span style={{ fontSize: "1.5rem", color: "var(--accent)", fontWeight: 700 }}>₹</span>
                 <input
-                  type="number"
-                  value={budget}
-                  onChange={e => setBudget(e.target.value)}
-                  placeholder={investmentType === "one-time" ? "e.g. 500000" : "e.g. 10000"}
+                  type="text"
+                  value={budget ? Number(budget).toLocaleString("en-IN") : ""}
+                  onChange={e => {
+                    const input = e.target;
+                    const rawValue = input.value;
+                    const selectionStart = input.selectionStart;
+                    
+                    const cleanValue = rawValue.replace(/[^0-9]/g, '');
+                    setBudget(cleanValue);
+                    
+                    const digitsBefore = rawValue.substring(0, selectionStart).replace(/[^0-9]/g, '').length;
+                    
+                    setTimeout(() => {
+                      const currentFormatted = cleanValue ? Number(cleanValue).toLocaleString("en-IN") : "";
+                      let newPos = 0;
+                      let digitCount = 0;
+                      while (newPos < currentFormatted.length && digitCount < digitsBefore) {
+                        if (currentFormatted[newPos] !== ',') {
+                          digitCount++;
+                        }
+                        newPos++;
+                      }
+                      input.setSelectionRange(newPos, newPos);
+                    }, 0);
+                  }}
+                  placeholder={investmentType === "one-time" ? "e.g. 5,00,000" : "e.g. 10,000"}
                   style={{
                     background: "transparent",
                     border: "none",
@@ -753,14 +775,14 @@ export default function Advisor() {
             {budget && !isNaN(budget) && parseFloat(budget) > 0 && (
               <div style={{ 
                 fontSize: "0.78rem", 
-                color: "var(--accent)", 
-                fontWeight: 700, 
+                color: "var(--text-muted)", 
+                fontWeight: 500, 
                 marginTop: "-6px",
                 marginBottom: "14px",
                 paddingLeft: "4px",
                 fontFamily: "'Space Grotesk', sans-serif"
               }}>
-                ₹{Number(budget).toLocaleString("en-IN")} <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>({numToIndianWords(budget)})</span>
+                {numToIndianWords(budget)}
               </div>
             )}
 

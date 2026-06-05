@@ -197,7 +197,7 @@ export default function Calculator() {
   };
 
   const principalLabel = calcType === "lumpsum" ? "Investment Amount (₹)" : "Monthly Investment (₹)";
-  const principalPlaceholder = calcType === "lumpsum" ? "500000" : "10000";
+  const principalPlaceholder = calcType === "lumpsum" ? "5,00,000" : "10,000";
   const principalHelper = calcType === "lumpsum" ? "How much will you invest at once?" : "How much will you invest every month?";
 
   const inputStyle = {
@@ -289,9 +289,31 @@ export default function Calculator() {
                   {principalLabel}
                 </label>
                 <input
-                  type="number"
-                  value={calcPrincipal}
-                  onChange={e => setCalcPrincipal(e.target.value)}
+                  type="text"
+                  value={calcPrincipal ? Number(calcPrincipal).toLocaleString("en-IN") : ""}
+                  onChange={e => {
+                    const input = e.target;
+                    const rawValue = input.value;
+                    const selectionStart = input.selectionStart;
+                    
+                    const cleanValue = rawValue.replace(/[^0-9]/g, '');
+                    setCalcPrincipal(cleanValue);
+                    
+                    const digitsBefore = rawValue.substring(0, selectionStart).replace(/[^0-9]/g, '').length;
+                    
+                    setTimeout(() => {
+                      const currentFormatted = cleanValue ? Number(cleanValue).toLocaleString("en-IN") : "";
+                      let newPos = 0;
+                      let digitCount = 0;
+                      while (newPos < currentFormatted.length && digitCount < digitsBefore) {
+                        if (currentFormatted[newPos] !== ',') {
+                          digitCount++;
+                        }
+                        newPos++;
+                      }
+                      input.setSelectionRange(newPos, newPos);
+                    }, 0);
+                  }}
                   placeholder={principalPlaceholder}
                   style={inputStyle}
                   onFocus={e => { e.target.style.borderColor = "var(--accent)"; e.target.style.background = "var(--bg-primary)"; }}
@@ -300,12 +322,12 @@ export default function Calculator() {
                 {calcPrincipal && !isNaN(calcPrincipal) && parseFloat(calcPrincipal) > 0 && (
                   <div style={{ 
                     fontSize: "0.78rem", 
-                    color: "var(--accent)", 
-                    fontWeight: 700, 
+                    color: "var(--text-muted)", 
+                    fontWeight: 500, 
                     marginTop: "6px",
                     fontFamily: "'Space Grotesk', sans-serif"
                   }}>
-                    ₹{Number(calcPrincipal).toLocaleString("en-IN")} <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>({numToIndianWords(calcPrincipal)})</span>
+                    {numToIndianWords(calcPrincipal)}
                   </div>
                 )}
                 <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", marginTop: "6px" }}>{principalHelper}</p>
