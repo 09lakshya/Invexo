@@ -19,7 +19,22 @@ export default function GeneralNewsPage() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionIndex, setSuggestionIndex] = useState(-1);
 
+  const [placeholder, setPlaceholder] = useState("Search topics, companies, or keywords...");
+
   const searchContainerRef = useRef(null);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 600) {
+        setPlaceholder("Search news...");
+      } else {
+        setPlaceholder("Search topics, companies, or keywords...");
+      }
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // Initial fetch
   useEffect(() => {
@@ -208,6 +223,18 @@ export default function GeneralNewsPage() {
             </p>
           </div>
 
+          <style>{`
+            @media (max-width: 600px) {
+              .search-submit-button {
+                padding: 10px !important;
+                border-radius: 12px !important;
+              }
+              .search-btn-text {
+                display: none !important;
+              }
+            }
+          `}</style>
+
           {/* Search Bar Container */}
           <div ref={searchContainerRef} style={{ position: "relative", marginBottom: "32px", zIndex: 50 }}>
             <form
@@ -225,13 +252,13 @@ export default function GeneralNewsPage() {
                 transition: "all 0.25s ease"
               }}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: "4px" }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginLeft: "4px", flexShrink: 0 }}>
                 <circle cx="11" cy="11" r="8"></circle>
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
               </svg>
               <input
                 type="text"
-                placeholder="Search news by topic, company, or keyword..."
+                placeholder={placeholder}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onFocus={() => {
@@ -242,6 +269,7 @@ export default function GeneralNewsPage() {
                 onKeyDown={handleKeyDown}
                 style={{
                   flex: 1,
+                  minWidth: 0,
                   background: "transparent",
                   border: "none",
                   color: "var(--text-primary)",
@@ -255,6 +283,7 @@ export default function GeneralNewsPage() {
                   type="button"
                   onClick={handleClearSearch}
                   style={{
+                    flexShrink: 0,
                     background: "transparent",
                     border: "none",
                     color: "var(--text-muted)",
@@ -273,7 +302,9 @@ export default function GeneralNewsPage() {
               <button
                 type="submit"
                 disabled={searching}
+                className="search-submit-button"
                 style={{
+                  flexShrink: 0,
                   background: "linear-gradient(90deg, var(--accent) 0%, var(--purple) 100%)",
                   border: "none",
                   color: "#ffffff",
@@ -290,7 +321,13 @@ export default function GeneralNewsPage() {
                 onMouseEnter={e => e.currentTarget.style.opacity = 0.9}
                 onMouseLeave={e => e.currentTarget.style.opacity = 1}
               >
-                {searching ? "Searching..." : "Search"}
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <span className="search-btn-text">
+                  {searching ? "Searching..." : "Search"}
+                </span>
               </button>
             </form>
 
