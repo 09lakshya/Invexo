@@ -160,12 +160,20 @@ DURATION_MULTIPLIERS = {
 
 def _advisor_candidates(goal: str, risk: str):
     goal_matches = GOAL_CANDIDATES.get(goal, GOAL_CANDIDATES["wealth"])
-    allowed_risks = RISK_COMPATIBILITY.get(risk, RISK_COMPATIBILITY["medium"])
-    risk_matches = [
+    allowed_risks = RISK_COMPATIBILITY.get(risk, {"low", "medium"})
+    
+    # Filter the entire universe based on allowed risks
+    compatible_universe = [
         sym for sym, meta in UNIVERSE.items()
         if meta.get("risk", "medium") in allowed_risks
     ]
-    return list(dict.fromkeys(goal_matches + risk_matches + list(UNIVERSE.keys())))
+    
+    # Prioritize goal matches that are risk-compatible
+    prioritized = [sym for sym in goal_matches if sym in compatible_universe]
+    
+    # Fill remaining spots with other compatible stocks
+    candidates = prioritized + [sym for sym in compatible_universe if sym not in prioritized]
+    return candidates
 
 
 def _is_opportunistic(meta: dict) -> bool:
@@ -266,37 +274,41 @@ def _fetch_signals(symbol: str):
 
 
 # ── Scoring with news sentiment ───────────────────────────────────────────────
-def _score(signals: dict, sentiment_score: float = 50, risk_level: str = "medium", duration: str = "medium") -> int:
+def _score(signals: dict, sentiment_score: float = 50, risk_level: str = "medium", duration: str = "medium", is_goal_match: bool = False) -> int:
     """
-    Score a stock based on technical signals, sentiment, and duration
+    Score a stock based on technical signals, sentiment, duration, and goal alignment
     
     Args:
         signals: Technical signals (trend, RSI)
         sentiment_score: News sentiment 0-100
         risk_level: Stock risk level (low/medium/high)
         duration: Investment duration (short/medium/long)
+        is_goal_match: True if the stock matches the selected investment goal
     
     Returns:
         Composite score 0-100
     """
     score = 0
     
-    # Technical score (40% weight)
-    technical = 30 if signals["trend"] == "BULLISH" else 0
+    # 1. Goal Alignment (40 points max)
+    if is_goal_match:
+        score += 40
+        
+    # 2. Technical Trend & Momentum (25 points max)
+    technical = 15 if signals["trend"] == "BULLISH" else 0
     rsi = signals["rsi"]
-    if   35 <= rsi <= 55: technical += 25
-    elif 20 <= rsi <  35: technical += 20
-    elif 55 <  rsi <= 65: technical += 15
-    elif 65 <  rsi <= 72: technical += 5
-    score += technical * 0.4
+    if   35 <= rsi <= 55: technical += 10
+    elif 20 <= rsi <  35: technical += 8
+    elif 55 <  rsi <= 65: technical += 6
+    elif 65 <  rsi <= 72: technical += 2
+    score += technical
     
-    # Sentiment score (30% weight) - normalized 0-100
-    sentiment_normalized = (sentiment_score - 50) / 100  # -0.5 to 0.5
-    score += (50 + sentiment_normalized * 50) * 0.3
+    # 3. Sentiment (20 points max)
+    score += (sentiment_score / 100) * 20
     
-    # Duration multiplier (30% weight)
+    # 4. Duration/Risk Multiplier (15 points max)
     multiplier = DURATION_MULTIPLIERS.get(duration, {}).get(risk_level, 1.0)
-    score += 50 * multiplier * 0.3
+    score += 10 * multiplier
     
     return int(min(100, max(0, score)))
 
@@ -404,7 +416,8 @@ def get_recommendations(goal: str, duration: str, risk: str, budget: float, inve
             sentiment_score = 50.0
         
         stock_risk = meta.get("risk", "medium")
-        score = _score(signals, sentiment_score, stock_risk, duration)
+        is_goal_match = sym in GOAL_CANDIDATES.get(goal, [])
+        score = _score(signals, sentiment_score, stock_risk, duration, is_goal_match)
         score = int(min(100, max(0, score + _opportunistic_bonus(meta, goal, duration, risk))))
         confidence = _calculate_confidence(score, sentiment_score, signals["rsi"], signals["trend"])
         scored.append({
