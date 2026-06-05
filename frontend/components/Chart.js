@@ -82,7 +82,10 @@ export default function Chart({ data }) {
         ticks: {
           color: "var(--text-secondary)",
           callback: function (value) {
-            return "₹" + value.toFixed(0);
+            if (value >= 100) {
+              return "₹" + value.toFixed(0);
+            }
+            return "₹" + value.toFixed(2);
           },
         },
       },

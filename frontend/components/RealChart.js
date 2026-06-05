@@ -967,7 +967,10 @@ export default function RealChart({
             size: 11,
           },
           callback: function (value) {
-            return "₹" + value.toFixed(0);
+            if (value >= 100) {
+              return "₹" + value.toFixed(0);
+            }
+            return "₹" + value.toFixed(2);
           },
         },
       },
