@@ -5,6 +5,64 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import { STOCK_METADATA } from "../services/stocks";
 
+function numToIndianWords(num) {
+  if (isNaN(num) || num === "" || parseFloat(num) === 0) return "";
+  
+  let n = Math.floor(parseFloat(num));
+  if (n < 0) return "Negative " + numToIndianWords(Math.abs(n));
+  
+  const singleDigits = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"];
+  const doubleDigits = ["Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+  const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+  
+  function helper(val) {
+    let str = "";
+    if (val >= 100) {
+      str += singleDigits[Math.floor(val / 100)] + " Hundred ";
+      val %= 100;
+    }
+    if (val >= 20) {
+      str += tens[Math.floor(val / 10)] + " ";
+      val %= 10;
+    }
+    if (val >= 10 && val < 20) {
+      str += doubleDigits[val - 10] + " ";
+      val = 0;
+    }
+    if (val > 0 && val < 10) {
+      str += singleDigits[val] + " ";
+    }
+    return str.trim();
+  }
+  
+  let result = "";
+  
+  if (n >= 10000000) {
+    const crores = Math.floor(n / 10000000);
+    result += helper(crores) + " Crore ";
+    n %= 10000000;
+  }
+  
+  if (n >= 100000) {
+    const lakhs = Math.floor(n / 100000);
+    result += helper(lakhs) + " Lakh ";
+    n %= 100000;
+  }
+  
+  if (n >= 1000) {
+    const thousands = Math.floor(n / 1000);
+    result += helper(thousands) + " Thousand ";
+    n %= 1000;
+  }
+  
+  if (n > 0) {
+    result += helper(n);
+  }
+  
+  const trimmed = result.trim();
+  return trimmed ? trimmed + " Rupees" : "";
+}
+
 const GOALS = [
   { id: "wealth",    label: "Wealth Creation",  desc: "Grow money aggressively over time",  icon: "🚀" },
   { id: "income",    label: "Steady Income",    desc: "Regular returns with lower risk",     icon: "💰" },
@@ -692,6 +750,19 @@ export default function Advisor() {
                 )}
               </div>
             </div>
+            {budget && !isNaN(budget) && parseFloat(budget) > 0 && (
+              <div style={{ 
+                fontSize: "0.78rem", 
+                color: "var(--accent)", 
+                fontWeight: 700, 
+                marginTop: "-6px",
+                marginBottom: "14px",
+                paddingLeft: "4px",
+                fontFamily: "'Space Grotesk', sans-serif"
+              }}>
+                ₹{Number(budget).toLocaleString("en-IN")} <span style={{ color: "var(--text-muted)", fontWeight: 500 }}>({numToIndianWords(budget)})</span>
+              </div>
+            )}
 
             {investmentType === "monthly" && (
               <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: "12px", alignItems: "center", background: "var(--input-bg)", border: "1.5px solid var(--border-subtle)", borderRadius: "14px", padding: "14px 16px", marginBottom: "14px" }}>
@@ -701,6 +772,7 @@ export default function Advisor() {
                   </p>
                   <p style={{ fontSize: "0.78rem", color: "var(--text-secondary)" }}>
                     Total planned investment: &#8377;{totalInvestment.toLocaleString("en-IN")}
+                    {totalInvestment > 0 && ` (${numToIndianWords(totalInvestment)})`}
                   </p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
