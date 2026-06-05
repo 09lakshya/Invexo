@@ -24,6 +24,13 @@ def _parse_pubdate(date_str: str) -> str:
         pass
     return "Recent"
 
+def _parse_xml(content: bytes) -> BeautifulSoup:
+    try:
+        return BeautifulSoup(content, "xml")
+    except Exception as e:
+        print(f"XML parser warning: {e}. Falling back to html.parser")
+        return BeautifulSoup(content, "html.parser")
+
 def _scrape_article_text(link: str) -> str:
     try:
         res = requests.get(link, headers=headers, timeout=8)
@@ -73,7 +80,7 @@ def get_general_news():
         try:
             res = requests.get(feed_url, headers=headers, timeout=8)
             if res.status_code == 200:
-                soup = BeautifulSoup(res.content, "xml")
+                soup = _parse_xml(res.content)
                 items = soup.find_all("item")
                 for item in items:
                     title = item.find("title").text if item.find("title") is not None else ""
@@ -173,7 +180,7 @@ def search_general_news(query: str):
     try:
         res = requests.get(url, headers=headers, timeout=8)
         if res.status_code == 200:
-            soup = BeautifulSoup(res.content, "xml")
+            soup = _parse_xml(res.content)
             items = soup.find_all("item")
             for item in items:
                 title = item.find("title").text if item.find("title") is not None else ""

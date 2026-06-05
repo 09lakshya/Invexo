@@ -8,6 +8,7 @@ websockets
 textblob
 requests
 beautifulsoup4
+lxml
 python-dateutil
 python-dotenv
 python-multipart
