@@ -13,12 +13,24 @@ default_origins = "*"
 raw_origins = os.getenv("CORS_ORIGINS", default_origins)
 allowed_origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+if "*" not in allowed_origins:
+    for o in ["https://invexo-one.vercel.app", "http://localhost:3000", "http://localhost:3001"]:
+        if o not in allowed_origins:
+            allowed_origins.append(o)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_origin_regex=r"https://.*\.vercel\.app",
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 app.include_router(market.router)
 app.include_router(predict.router)
