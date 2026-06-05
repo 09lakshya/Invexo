@@ -53,6 +53,16 @@ const PortfolioIcon = ({ size = 18, color = "currentColor" }) => (
   </svg>
 );
 
+// Newspaper Icon SVG
+const NewspaperIcon = ({ size = 18, color = "currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+    <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2" />
+    <path d="M18 14h-8" />
+    <path d="M15 18H10" />
+    <path d="M10 6h8v4h-8V6Z" />
+  </svg>
+);
+
 // Logout Icon SVG
 const LogOutIcon = ({ size = 18, color = "currentColor" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
@@ -64,6 +74,7 @@ const LogOutIcon = ({ size = 18, color = "currentColor" }) => (
 
 const NAV_LINKS = [
   { href: "/", label: "Dashboard", icon: DashboardIcon },
+  { href: "/news", label: "News", icon: NewspaperIcon },
   { href: "/advisor", label: "AI Advisor", icon: SparklesIcon },
   { href: "/calculator", label: "Calculator", icon: CalculatorIcon },
   { href: "/portfolio", label: "Portfolio", icon: PortfolioIcon },

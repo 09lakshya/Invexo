@@ -89,7 +89,8 @@ def initiate_signup_otp(email_addr: str, payload: dict) -> str:
     otp_store[email_addr.lower()] = {
         "otp": otp,
         "expires": expiry,
-        "payload": payload
+        "payload": payload,
+        "attempts": 0
     }
     send_otp_email(email_addr, otp)
     return otp
@@ -106,7 +107,14 @@ def verify_signup_otp(email_addr: str, otp: str) -> dict | None:
         del otp_store[key]
         return None
         
+    record["attempts"] = record.get("attempts", 0) + 1
+    if record["attempts"] > 5:
+        del otp_store[key]
+        return None
+        
     if record["otp"] != otp:
+        if record["attempts"] >= 5:
+            del otp_store[key]
         return None
         
     payload = record["payload"]
@@ -285,6 +293,12 @@ def update_profile_fields(user_id: int, fields: dict) -> dict | None:
     """Update dynamic fields for a user and return the updated user dict."""
     if not fields:
         return None
+
+    # SQL Injection Whitelist Defense
+    ALLOWED_COLUMNS = {"name", "profile_photo"}
+    for k in fields.keys():
+        if k not in ALLOWED_COLUMNS:
+            raise ValueError(f"Unauthorized profile column update: {k}")
 
     conn, is_postgres = get_db_connection()
     c = conn.cursor()

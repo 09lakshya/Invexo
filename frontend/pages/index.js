@@ -286,6 +286,7 @@ export default function Home() {
   const [modalPeriod, setModalPeriod] = useState("1m");
   const [modalLogoError, setModalLogoError] = useState(false);
   const [modalError, setModalError] = useState(null);
+  const modalHistoryCacheRef = useRef({});
 
   const getPeriodFormat = (p) => {
     const PERIODS = [
@@ -339,12 +340,22 @@ export default function Home() {
 
   useEffect(() => {
     if (!showChartModal || !activeStockSymbol) return;
+    
+    const normalizedSymbol = activeStockSymbol.replace(/\.NS$/i, "");
+    const cacheKey = `${normalizedSymbol}_${modalPeriod}`;
+    if (modalHistoryCacheRef.current[cacheKey]) {
+      setModalHistory(modalHistoryCacheRef.current[cacheKey]);
+      setModalLoading(false);
+      return;
+    }
+
     const loadHistory = async () => {
       setModalLoading(true);
-      const normalizedSymbol = activeStockSymbol.replace(/\.NS$/i, "");
       try {
         const histRes = await API.get(`/market/${normalizedSymbol}/history?period=${getPeriodFormat(modalPeriod)}`);
-        setModalHistory(Array.isArray(histRes.data) ? histRes.data : []);
+        const data = Array.isArray(histRes.data) ? histRes.data : [];
+        setModalHistory(data);
+        modalHistoryCacheRef.current[cacheKey] = data;
       } catch (err) {
         console.error("ERROR loading history:", err);
         setModalError("Data unavailable — market may be closed");

@@ -70,6 +70,16 @@ export default function StockPage() {
   const [zoomPercent, setZoomPercent] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const zoomRef                     = useRef(null);
+  const historyCacheRef             = useRef({});
+  const prefetchedSymbolRef         = useRef(null);
+
+  // Reset cache and prefetch refs when symbol changes
+  useEffect(() => {
+    if (normalizedSymbol) {
+      historyCacheRef.current = {};
+      prefetchedSymbolRef.current = null;
+    }
+  }, [normalizedSymbol]);
 
   const handleZoomStateChange = (zoomed, percent) => {
     setIsZoomed(zoomed);
@@ -131,12 +141,22 @@ export default function StockPage() {
 
   useEffect(() => {
     if (!router.isReady || !normalizedSymbol) return;
+
+    const cacheKey = `${normalizedSymbol}_${period}`;
+    if (historyCacheRef.current[cacheKey]) {
+      setHistory(historyCacheRef.current[cacheKey]);
+      setLoading(false);
+      return;
+    }
+
     const loadHistory = async () => {
       try {
         setLoading(true);
         setError(null);
         const histRes = await API.get(`/market/${normalizedSymbol}/history?period=${getPeriodFormat(period)}`);
-        setHistory(Array.isArray(histRes.data) ? histRes.data : []);
+        const data = Array.isArray(histRes.data) ? histRes.data : [];
+        setHistory(data);
+        historyCacheRef.current[cacheKey] = data;
       } catch (err) {
         console.error("ERROR loading history:", err);
         setError("Data unavailable — market may be closed");
@@ -146,6 +166,49 @@ export default function StockPage() {
     };
     loadHistory();
   }, [router.isReady, normalizedSymbol, period]);
+
+  // Background prefetcher for other periods to optimize horizon switching speed
+  useEffect(() => {
+    if (!router.isReady || !normalizedSymbol || loading || history.length === 0) return;
+    if (prefetchedSymbolRef.current === normalizedSymbol) return;
+    
+    prefetchedSymbolRef.current = normalizedSymbol;
+    
+    const periodsToPrefetch = PERIODS.map(p => p.key).filter(p => p !== period);
+    let active = true;
+    
+    const prefetchNext = async (index) => {
+      if (index >= periodsToPrefetch.length || !active) return;
+      const p = periodsToPrefetch[index];
+      const cacheKey = `${normalizedSymbol}_${p}`;
+      
+      // Skip if already in cache
+      if (historyCacheRef.current[cacheKey]) {
+        prefetchNext(index + 1);
+        return;
+      }
+      
+      try {
+        const histRes = await API.get(`/market/${normalizedSymbol}/history?period=${getPeriodFormat(p)}`);
+        const data = Array.isArray(histRes.data) ? histRes.data : [];
+        if (active) {
+          historyCacheRef.current[cacheKey] = data;
+        }
+      } catch (err) {
+        console.error(`Error prefetching period ${p}:`, err);
+      }
+      
+      if (active) {
+        setTimeout(() => prefetchNext(index + 1), 800);
+      }
+    };
+    
+    const timer = setTimeout(() => prefetchNext(0), 1000);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [router.isReady, normalizedSymbol, loading, history]);
 
   useEffect(() => {
     if (!router.isReady || !normalizedSymbol) return;
@@ -761,7 +824,25 @@ export default function StockPage() {
                 </div>
               </div>
               {/* Fullscreen chart body */}
-              <div style={{ flex: 1, padding: "12px", minHeight: 0 }}>
+              <div style={{ flex: 1, padding: "12px", minHeight: 0, position: "relative" }}>
+                {loading && (
+                  <div style={{
+                    position: "absolute",
+                    inset: 0,
+                    background: "rgba(8, 12, 26, 0.4)",
+                    backdropFilter: "blur(4px)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    flexDirection: "column",
+                    gap: "12px",
+                    zIndex: 10,
+                    borderRadius: "8px",
+                  }}>
+                    <div className="spinner" style={{ width: "36px", height: "36px" }} />
+                    <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", fontWeight: 600 }}>Updating chart...</p>
+                  </div>
+                )}
                 <RealChart
                   data={history}
                   chartType={chartType}

@@ -8,3 +8,5 @@ build
 .log
 *.db
 frontend/.env.local
+backend/services/*cache.json
+scratch/
