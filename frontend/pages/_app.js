@@ -78,6 +78,7 @@ export default function App({ Component, pageProps }) {
                 </footer>
               </div>
               <div
+                id="global-legal-disclaimer"
                 style={{
                   position: 'fixed',
                   bottom: 0,

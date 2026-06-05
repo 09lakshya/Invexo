@@ -300,6 +300,21 @@ export default function Home() {
     return PERIODS.find(x => x.key === p)?.yf || p;
   };
 
+  // Lock body scroll and hide legal disclaimer when modal is open
+  useEffect(() => {
+    if (showChartModal) {
+      document.body.style.overflow = "hidden";
+      document.body.setAttribute("data-fullscreen", "true");
+    } else {
+      document.body.style.overflow = "";
+      document.body.removeAttribute("data-fullscreen");
+    }
+    return () => {
+      document.body.style.overflow = "";
+      document.body.removeAttribute("data-fullscreen");
+    };
+  }, [showChartModal]);
+
   const openQuickView = async (symbol) => {
     setActiveStockSymbol(symbol);
     setShowChartModal(true);

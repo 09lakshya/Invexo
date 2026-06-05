@@ -65,6 +65,7 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher, zoomRef, onZ
   }, [zoomRange]);
 
   const visibleData = data.slice(zoomRange.start, zoomRange.end + 1);
+  const zoomPercent = data.length > 0 ? Math.round((1 - (visibleData.length / data.length)) * 100) : 0;
 
   const marginTop = 36; // Extra spacing for HUD
   const marginBottom = 28;
@@ -248,9 +249,9 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher, zoomRef, onZ
   useEffect(() => {
     const zoomed = zoomRange.start > 0 || zoomRange.end < data.length - 1 || yOffset !== 0;
     if (onZoomStateChange) {
-      onZoomStateChange(zoomed);
+      onZoomStateChange(zoomed, zoomPercent);
     }
-  }, [zoomRange, yOffset, data.length, onZoomStateChange]);
+  }, [zoomRange, yOffset, data.length, onZoomStateChange, zoomPercent]);
 
   // Active/Passive Touch event handling inside the graph margins to prevent whole-screen scrolling
   useEffect(() => {
@@ -422,7 +423,9 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher, zoomRef, onZ
           
           setZoomRange(prev => {
             const span = prev.end - prev.start;
-            const delta = Math.max(1, Math.round(span * 0.08));
+            // Reduce trackpad sensitivity by scaling multiplier with e.deltaY magnitude
+            const multiplier = Math.min(0.05, Math.max(0.008, Math.abs(e.deltaY) * 0.0005));
+            const delta = Math.max(1, Math.round(span * multiplier));
             if (direction > 0) {
               if (span > 4) {
                 return { start: prev.start + delta, end: prev.end - delta };
@@ -477,7 +480,9 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher, zoomRef, onZ
             
             setZoomRange(prev => {
               const s = prev.end - prev.start;
-              const delta = Math.max(1, Math.round(s * 0.08));
+              // Reduce trackpad sensitivity by scaling multiplier with e.deltaY magnitude
+              const multiplier = Math.min(0.05, Math.max(0.008, Math.abs(e.deltaY) * 0.0005));
+              const delta = Math.max(1, Math.round(s * multiplier));
               if (direction > 0) {
                 if (s > 4) {
                   return { start: prev.start + delta, end: prev.end - delta };
@@ -541,9 +546,17 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher, zoomRef, onZ
             <span style={{ color: (activeChangePct || 0) >= 0 ? colors.green : colors.red, fontWeight: 700, marginLeft: "4px" }}>
               {(activeChangePct || 0) >= 0 ? "\u25B2 +" : "\u25BC "}{Number(activeChangePct || 0).toFixed(2)}%
             </span>
+            {zoomPercent > 0 && (
+              <span style={{ color: "var(--accent)", fontWeight: 700, marginLeft: "10px" }}>
+                • Zoom: {zoomPercent}%
+              </span>
+            )}
           </>
         ) : (
-          <span style={{ fontWeight: 600, opacity: 0.85 }}>Drag to Pan | Scroll/Pinch to Zoom | Move cursor for details</span>
+          <span style={{ fontWeight: 600, opacity: 0.85 }}>
+            Drag to Pan | Scroll/Pinch to Zoom | Move cursor for details
+            {zoomPercent > 0 && ` (Zoomed: ${zoomPercent}%)`}
+          </span>
         )}
       </div>
 
@@ -741,7 +754,19 @@ export default function RealChart({
   const zoomRef = externalZoomRef || internalZoomRef;
 
   const [localIsZoomed, setLocalIsZoomed] = useState(false);
-  const onZoomStateChange = externalOnZoomStateChange || setLocalIsZoomed;
+  const [localZoomPercent, setLocalZoomPercent] = useState(0);
+  
+  const handleZoomStateChange = (zoomed, percent) => {
+    if (externalOnZoomStateChange) {
+      externalOnZoomStateChange(zoomed, percent);
+    } else {
+      setLocalIsZoomed(zoomed);
+      if (percent !== undefined) {
+        setLocalZoomPercent(percent);
+      }
+    }
+  };
+  const onZoomStateChange = handleZoomStateChange;
 
   // 🔥 FORCE VALID DATA (Normalize keys and sanitize nulls/NaNs)
   const cleaned = useMemo(() => {
@@ -1066,35 +1091,47 @@ export default function RealChart({
                 −
               </button>
               {localIsZoomed && (
-                <button
-                  onClick={() => {
-                    console.log("RealChart internal reset clicked, zoomRef:", zoomRef.current);
-                    zoomRef.current?.reset();
-                  }}
-                  title="Reset View"
-                  style={{
-                    padding: "4px 8px",
-                    borderRadius: "7px",
-                    border: "none",
-                    cursor: "pointer",
+                <>
+                  <span style={{
                     fontSize: "0.65rem",
                     fontWeight: 700,
-                    background: "transparent",
-                    color: "var(--filter-tab-inactive)",
-                    transition: "all 0.2s",
-                    fontFamily: "inherit",
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.background = "var(--accent-dim)";
-                    e.currentTarget.style.color = "var(--accent)";
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.background = "transparent";
-                    e.currentTarget.style.color = "var(--filter-tab-inactive)";
-                  }}
-                >
-                  ↺
-                </button>
+                    color: "var(--accent)",
+                    padding: "4px 6px",
+                    display: "flex",
+                    alignItems: "center",
+                  }}>
+                    {localZoomPercent}%
+                  </span>
+                  <button
+                    onClick={() => {
+                      console.log("RealChart internal reset clicked, zoomRef:", zoomRef.current);
+                      zoomRef.current?.reset();
+                    }}
+                    title="Reset View"
+                    style={{
+                      padding: "4px 8px",
+                      borderRadius: "7px",
+                      border: "none",
+                      cursor: "pointer",
+                      fontSize: "0.65rem",
+                      fontWeight: 700,
+                      background: "transparent",
+                      color: "var(--filter-tab-inactive)",
+                      transition: "all 0.2s",
+                      fontFamily: "inherit",
+                    }}
+                    onMouseEnter={e => {
+                      e.currentTarget.style.background = "var(--accent-dim)";
+                      e.currentTarget.style.color = "var(--accent)";
+                    }}
+                    onMouseLeave={e => {
+                      e.currentTarget.style.background = "transparent";
+                      e.currentTarget.style.color = "var(--filter-tab-inactive)";
+                    }}
+                  >
+                    ↺
+                  </button>
+                </>
               )}
             </div>
           )}

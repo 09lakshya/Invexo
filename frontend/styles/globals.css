@@ -1172,3 +1172,9 @@ input[type=number] {
     font-size: 16px !important;
   }
 }
+
+/* Hide global disclaimer in fullscreen chart mode */
+body[data-fullscreen="true"] #global-legal-disclaimer {
+  display: none !important;
+}
+

@@ -67,8 +67,16 @@ export default function StockPage() {
   const [error, setError]           = useState(null);
   const [logoError, setLogoError]   = useState(false);
   const [isZoomed, setIsZoomed]     = useState(false);
+  const [zoomPercent, setZoomPercent] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const zoomRef                     = useRef(null);
+
+  const handleZoomStateChange = (zoomed, percent) => {
+    setIsZoomed(zoomed);
+    if (percent !== undefined) {
+      setZoomPercent(percent);
+    }
+  };
 
   // Escape key to exit fullscreen
   useEffect(() => {
@@ -81,14 +89,19 @@ export default function StockPage() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isFullscreen]);
 
-  // Lock body scroll when fullscreen
+  // Lock body scroll and set fullscreen attribute when fullscreen
   useEffect(() => {
     if (isFullscreen) {
       document.body.style.overflow = "hidden";
+      document.body.setAttribute("data-fullscreen", "true");
     } else {
       document.body.style.overflow = "";
+      document.body.removeAttribute("data-fullscreen");
     }
-    return () => { document.body.style.overflow = ""; };
+    return () => {
+      document.body.style.overflow = "";
+      document.body.removeAttribute("data-fullscreen");
+    };
   }, [isFullscreen]);
 
   const metadata = STOCK_METADATA[normalizedSymbol] || {};
@@ -508,36 +521,49 @@ export default function StockPage() {
                     −
                   </button>
                   {isZoomed && (
-                    <button
-                      onClick={() => {
-                        console.log("StockPage reset button clicked. zoomRef:", zoomRef);
-                        console.log("StockPage reset button zoomRef.current:", zoomRef.current);
-                        zoomRef.current?.reset();
-                      }}
-                      title="Reset View"
-                      style={{
-                        padding: "7px 12px",
-                        borderRadius: "9px",
-                        border: "none",
-                        cursor: "pointer",
+                    <>
+                      <span style={{
+                        padding: "7px 4px",
                         fontSize: "0.75rem",
                         fontWeight: 700,
-                        background: "transparent",
-                        color: "var(--filter-tab-inactive)",
-                        transition: "all 0.2s",
+                        color: "var(--accent)",
                         fontFamily: "inherit",
-                      }}
-                      onMouseEnter={e => {
-                        e.currentTarget.style.background = "var(--accent-dim)";
-                        e.currentTarget.style.color = "var(--accent)";
-                      }}
-                      onMouseLeave={e => {
-                        e.currentTarget.style.background = "transparent";
-                        e.currentTarget.style.color = "var(--filter-tab-inactive)";
-                      }}
-                    >
-                      ↺
-                    </button>
+                        display: "flex",
+                        alignItems: "center"
+                      }}>
+                        {zoomPercent}%
+                      </span>
+                      <button
+                        onClick={() => {
+                          console.log("StockPage reset button clicked. zoomRef:", zoomRef);
+                          console.log("StockPage reset button zoomRef.current:", zoomRef.current);
+                          zoomRef.current?.reset();
+                        }}
+                        title="Reset View"
+                        style={{
+                          padding: "7px 12px",
+                          borderRadius: "9px",
+                          border: "none",
+                          cursor: "pointer",
+                          fontSize: "0.75rem",
+                          fontWeight: 700,
+                          background: "transparent",
+                          color: "var(--filter-tab-inactive)",
+                          transition: "all 0.2s",
+                          fontFamily: "inherit",
+                        }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.background = "var(--accent-dim)";
+                          e.currentTarget.style.color = "var(--accent)";
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.background = "transparent";
+                          e.currentTarget.style.color = "var(--filter-tab-inactive)";
+                        }}
+                      >
+                        ↺
+                      </button>
+                    </>
                   )}
                 </div>
               )}
@@ -639,6 +665,50 @@ export default function StockPage() {
                       </button>
                     ))}
                   </div>
+
+                  {/* Chart Type Switcher inside fullscreen header */}
+                  <div style={{
+                    display: "flex",
+                    background: "var(--filter-tab-bg)",
+                    border: "1px solid var(--filter-tab-border)",
+                    borderRadius: "10px",
+                    padding: "2px",
+                  }}>
+                    <button
+                      onClick={() => setChartType("line")}
+                      style={{
+                        padding: "5px 10px",
+                        borderRadius: "7px",
+                        border: "none",
+                        cursor: "pointer",
+                        fontSize: "0.7rem",
+                        fontWeight: 700,
+                        background: chartType === "line" ? "var(--accent-dim)" : "transparent",
+                        color: chartType === "line" ? "var(--accent)" : "var(--filter-tab-inactive)",
+                        transition: "all 0.2s",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      Line
+                    </button>
+                    <button
+                      onClick={() => setChartType("candle")}
+                      style={{
+                        padding: "5px 10px",
+                        borderRadius: "7px",
+                        border: "none",
+                        cursor: "pointer",
+                        fontSize: "0.7rem",
+                        fontWeight: 700,
+                        background: chartType === "candle" ? "var(--accent-dim)" : "transparent",
+                        color: chartType === "candle" ? "var(--accent)" : "var(--filter-tab-inactive)",
+                        transition: "all 0.2s",
+                        fontFamily: "inherit",
+                      }}
+                    >
+                      Candle
+                    </button>
+                  </div>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                   {chartType === "candle" && (
@@ -653,7 +723,20 @@ export default function StockPage() {
                       <button onClick={() => zoomRef.current?.zoomIn()} title="Zoom In" style={{ padding: "5px 10px", borderRadius: "7px", border: "none", cursor: "pointer", fontSize: "0.75rem", fontWeight: 700, background: "transparent", color: "var(--filter-tab-inactive)", transition: "all 0.2s", fontFamily: "inherit" }}>+</button>
                       <button onClick={() => zoomRef.current?.zoomOut()} title="Zoom Out" style={{ padding: "5px 10px", borderRadius: "7px", border: "none", cursor: "pointer", fontSize: "0.75rem", fontWeight: 700, background: "transparent", color: "var(--filter-tab-inactive)", transition: "all 0.2s", fontFamily: "inherit" }}>−</button>
                       {isZoomed && (
-                        <button onClick={() => zoomRef.current?.reset()} title="Reset View" style={{ padding: "5px 10px", borderRadius: "7px", border: "none", cursor: "pointer", fontSize: "0.65rem", fontWeight: 700, background: "transparent", color: "var(--filter-tab-inactive)", transition: "all 0.2s", fontFamily: "inherit" }}>↺</button>
+                        <>
+                          <span style={{
+                            padding: "5px 4px",
+                            fontSize: "0.7rem",
+                            fontWeight: 700,
+                            color: "var(--accent)",
+                            fontFamily: "inherit",
+                            display: "flex",
+                            alignItems: "center"
+                          }}>
+                            {zoomPercent}%
+                          </span>
+                          <button onClick={() => zoomRef.current?.reset()} title="Reset View" style={{ padding: "5px 10px", borderRadius: "7px", border: "none", cursor: "pointer", fontSize: "0.65rem", fontWeight: 700, background: "transparent", color: "var(--filter-tab-inactive)", transition: "all 0.2s", fontFamily: "inherit" }}>↺</button>
+                        </>
                       )}
                     </div>
                   )}
@@ -684,7 +767,7 @@ export default function StockPage() {
                   chartType={chartType}
                   setChartType={setChartType}
                   zoomRef={zoomRef}
-                  onZoomStateChange={setIsZoomed}
+                  onZoomStateChange={handleZoomStateChange}
                 />
               </div>
             </div>
@@ -724,7 +807,7 @@ export default function StockPage() {
                   chartType={chartType}
                   setChartType={setChartType}
                   zoomRef={zoomRef}
-                  onZoomStateChange={setIsZoomed}
+                  onZoomStateChange={handleZoomStateChange}
                 />
               </div>
             ) : (
