@@ -523,6 +523,7 @@ function RecoCard({ stock, rank, totalBudget }) {
 export default function Advisor() {
   const [goal, setGoal] = useState(null);
   const [duration, setDuration] = useState(null);
+  const [longTermYears, setLongTermYears] = useState("5");
   const [risk, setRisk] = useState(null);
   const [investmentType, setInvestmentType] = useState("one-time");
   const [budget, setBudget] = useState("");
@@ -531,8 +532,10 @@ export default function Advisor() {
   const [results, setResults] = useState(null);
   const [error, setError] = useState("");
 
+  const durationStepDone = !!duration && (duration !== "long" || (parseInt(longTermYears, 10) >= 3));
+
   const handleSubmit = async () => {
-    if (!goal || !duration || !risk || !budget) {
+    if (!goal || !durationStepDone || !risk || !budget) {
       setError("Please complete all four sections before continuing.");
       return;
     }
@@ -565,7 +568,7 @@ export default function Advisor() {
   const parsedMonths = parseInt(investmentMonths, 10) || DEFAULT_SIP_MONTHS[duration] || 0;
   const totalInvestment = isSip ? parsedBudget * parsedMonths : parsedBudget;
   const budgetStepDone = !!budget && (!isSip || !!investmentMonths);
-  const progress = [goal, duration, risk, budgetStepDone].filter(Boolean).length;
+  const progress = [goal, durationStepDone ? duration : null, risk, budgetStepDone].filter(Boolean).length;
   const progressTotal = 4;
   const suggestedStockCount = TARGET_STOCKS_BY_DURATION[duration] || TARGET_STOCKS_BY_DURATION.medium;
 
@@ -649,7 +652,7 @@ export default function Advisor() {
 
           {/* Step 2 — Duration */}
           <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "clamp(14px, 2vmin, 20px)", padding: "clamp(18px, 3vmin, 28px)", marginBottom: "16px", backdropFilter: "blur(16px)", animation: "fadeInUp 0.5s 0.2s ease both" }}>
-            <StepHeader number={2} title="How long do you plan to stay invested?" done={!!duration} />
+            <StepHeader number={2} title="How long do you plan to stay invested?" done={durationStepDone} />
             <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
               {DURATIONS.map((d) => (
                 <OptionCard
@@ -657,7 +660,10 @@ export default function Advisor() {
                   selected={duration === d.id}
                   onClick={() => {
                     setDuration(d.id);
-                    if (investmentType === "monthly") {
+                    if (d.id === "long") {
+                      setLongTermYears("5");
+                      setInvestmentMonths("60");
+                    } else if (investmentType === "monthly") {
                       setInvestmentMonths(String(DEFAULT_SIP_MONTHS[d.id]));
                     }
                   }}
@@ -666,6 +672,57 @@ export default function Advisor() {
                 />
               ))}
             </div>
+            {duration === "long" && (
+              <div style={{ 
+                marginTop: "16px", 
+                background: "var(--input-bg)", 
+                border: "1.5px solid var(--border-subtle)", 
+                borderRadius: "12px", 
+                padding: "14px 16px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: "12px",
+                animation: "fadeIn 0.3s ease"
+              }}>
+                <div>
+                  <label style={{ display: "block", fontSize: "0.68rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "4px" }}>
+                    Number of Years
+                  </label>
+                  <p style={{ fontSize: "0.78rem", color: "var(--text-secondary)", margin: 0 }}>
+                    Specify the investment horizon (3 to 30 years)
+                  </p>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                  <input
+                    type="number"
+                    min="3"
+                    max="30"
+                    value={longTermYears}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setLongTermYears(val);
+                      const years = parseInt(val, 10);
+                      if (years >= 3) {
+                        setInvestmentMonths(String(years * 12));
+                      }
+                    }}
+                    style={{
+                      width: "80px",
+                      background: "transparent",
+                      border: "none",
+                      outline: "none",
+                      color: "var(--text-primary)",
+                      fontSize: "1.15rem",
+                      fontWeight: 800,
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      textAlign: "right",
+                    }}
+                  />
+                  <span style={{ fontSize: "0.8rem", color: "var(--text-muted)", whiteSpace: "nowrap" }}>years</span>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Step 3 — Risk */}
@@ -807,7 +864,11 @@ export default function Advisor() {
                       setInvestmentMonths(value);
                       const months = parseInt(value, 10);
                       if (months > 0) {
-                        setDuration(durationFromMonths(months));
+                        const newDur = durationFromMonths(months);
+                        setDuration(newDur);
+                        if (newDur === "long") {
+                          setLongTermYears(String(Math.round(months / 12)));
+                        }
                       }
                     }}
                     placeholder="36"
