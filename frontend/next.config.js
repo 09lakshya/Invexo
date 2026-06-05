@@ -33,7 +33,7 @@ const nextConfig = {
           {
             key: 'Content-Security-Policy',
             // Default safe CSP allowing local assets, local backend connections, and Vercel domains
-            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*; connect-src 'self' http://localhost:8000 ws://localhost:8000 https://*.vercel.app;"
+            value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*; connect-src 'self' http://localhost:8000 ws://localhost:8000 https://*.vercel.app https://invexo-backend.onrender.com wss://invexo-backend.onrender.com;"
           }
         ]
       }
