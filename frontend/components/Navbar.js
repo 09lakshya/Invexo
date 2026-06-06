@@ -13,6 +13,15 @@ const GearIcon = ({ size = 18, color = "currentColor" }) => (
   </svg>
 );
 
+// Support/Help Icon SVG for Support & Feedback
+const SupportIcon = ({ size = 18, color = "currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+    <line x1="12" y1="17" x2="12.01" y2="17" />
+  </svg>
+);
+
 // Dashboard Icon SVG
 const DashboardIcon = ({ size = 18, color = "currentColor" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -79,6 +88,7 @@ const NAV_LINKS = [
   { href: "/calculator", label: "Calculator", icon: CalculatorIcon },
   { href: "/portfolio", label: "Portfolio", icon: PortfolioIcon },
   { href: "/settings", label: "Settings", icon: GearIcon, isGear: true },
+  { href: "/support", label: "Support & Feedback", icon: SupportIcon, isSupport: true },
 ];
 
 export default function Navbar() {
@@ -178,7 +188,7 @@ export default function Navbar() {
             }}
             className="hidden-mobile"
           >
-            {NAV_LINKS.filter(l => !l.isGear).map(({ href, label }) => {
+            {NAV_LINKS.filter(l => !l.isGear && !l.isSupport).map(({ href, label }) => {
               const active = router.pathname === href;
               return (
                 <Link
@@ -330,6 +340,33 @@ export default function Navbar() {
                   >
                     <GearIcon size={16} />
                     Settings
+                  </button>
+
+                  {/* Support & Feedback */}
+                  <button
+                    onClick={() => { setUserMenuOpen(false); router.push('/support'); }}
+                    style={{
+                      width: "100%",
+                      padding: "14px 18px",
+                      background: "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      textAlign: "left",
+                      fontSize: "0.875rem",
+                      fontWeight: 600,
+                      color: "var(--text-secondary)",
+                      fontFamily: "inherit",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "10px",
+                      transition: "background 0.15s",
+                      borderBottom: "1px solid var(--border-subtle)",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = "var(--hover-overlay)"}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                  >
+                    <SupportIcon size={16} />
+                    Support & Feedback
                   </button>
 
 
