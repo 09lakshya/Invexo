@@ -121,6 +121,24 @@ export function AuthProvider({ children }) {
     return u;
   };
 
+  const initiateSignupOtp = async (email, password, name, age) => {
+    const res = await API.post("/auth/signup/initiate", { email, password, name, age });
+    return res.data;
+  };
+
+  const verifySignupOtp = async (email, otp, rememberMe = false) => {
+    const res = await API.post("/auth/signup/verify", { email, otp });
+    const { token: tk, user: u } = res.data;
+    setToken(tk);
+    setUser(u);
+    if (rememberMe) {
+      localStorage.setItem("ntrade_token", tk);
+    } else {
+      sessionStorage.setItem("ntrade_token", tk);
+    }
+    return u;
+  };
+
   const logout = () => {
     setUser(null);
     setToken(null);
@@ -179,7 +197,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, token, loading, login, signup, logout, refreshUser, setUser, avatar, updateAvatar }}
+      value={{ user, token, loading, login, signup, initiateSignupOtp, verifySignupOtp, logout, refreshUser, setUser, avatar, updateAvatar }}
     >
       {children}
     </AuthContext.Provider>
