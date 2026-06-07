@@ -82,6 +82,190 @@ def send_otp_email(email_addr: str, otp: str):
             raise RuntimeError(f"Email delivery failed: {str(e)}")
 
 
+def send_welcome_email(email_addr: str, name: str):
+    """Sends a premium, branded HTML welcome email to the user upon successful signup."""
+    print("\n" + "="*50)
+    print(f"[WELCOME DEBUG] Sending welcome email to {email_addr}")
+    print("="*50 + "\n")
+
+    subject = "Welcome to Invexo - Your Financial Journey Starts Here!"
+    
+    html_content = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Welcome to Invexo</title>
+    <style>
+        body {{
+            font-family: 'Outfit', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #0b0f19;
+            color: #f3f4f6;
+            margin: 0;
+            padding: 0;
+            -webkit-font-smoothing: antialiased;
+        }}
+        .container {{
+            max-width: 600px;
+            margin: 40px auto;
+            background: linear-gradient(135deg, #111827 0%, #0f172a 100%);
+            border: 1px solid #1e293b;
+            border-radius: 16px;
+            padding: 40px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+        }}
+        .header {{
+            text-align: center;
+            margin-bottom: 30px;
+        }}
+        .logo {{
+            font-size: 28px;
+            font-weight: 800;
+            background: linear-gradient(to right, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: inline-block;
+            letter-spacing: -0.5px;
+        }}
+        .welcome-title {{
+            font-size: 24px;
+            font-weight: 700;
+            color: #ffffff;
+            margin-top: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }}
+        .content {{
+            font-size: 16px;
+            line-height: 1.6;
+            color: #cbd5e1;
+        }}
+        .highlight {{
+            color: #38bdf8;
+            font-weight: 600;
+        }}
+        .features {{
+            margin: 25px 0;
+            padding-left: 0;
+            list-style: none;
+        }}
+        .feature-item {{
+            margin-bottom: 12px;
+            padding-left: 24px;
+            position: relative;
+        }}
+        .feature-item::before {{
+            content: "✦";
+            position: absolute;
+            left: 0;
+            color: #818cf8;
+        }}
+        .cta-button {{
+            display: block;
+            width: fit-content;
+            margin: 30px auto 10px auto;
+            padding: 14px 28px;
+            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            color: #ffffff !important;
+            text-decoration: none;
+            font-weight: 600;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 4px 14px rgba(99, 102, 241, 0.4);
+        }}
+        .footer {{
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #1e293b;
+            text-align: center;
+            font-size: 12px;
+            color: #64748b;
+        }}
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">INVEXO</div>
+        </div>
+        <h1 class="welcome-title">Hi {name}, Welcome to Invexo!</h1>
+        <div class="content">
+            <p>We're thrilled to have you join our community. Invexo is designed to give you modern, state-of-the-art tools to analyze markets, track your investments, and build your wealth.</p>
+            <p>Here's what you can explore right away:</p>
+            <ul class="features">
+                <li class="feature-item"><span class="highlight">Real-time Dashboard:</span> Monitor global stock markets, view advanced charts, and track daily top-movers.</li>
+                <li class="feature-item"><span class="highlight">AI Predictions:</span> Leverage our machine learning models to forecast asset prices and trends.</li>
+                <li class="feature-item"><span class="highlight">Interactive Advisor:</span> Consult with our virtual AI advisor to optimize your investment strategy.</li>
+                <li class="feature-item"><span class="highlight">Live Portfolio:</span> Easily construct and keep track of your holdings in one unified interface.</li>
+            </ul>
+            <p>Get started by setting up your profile or creating your first portfolio today!</p>
+            <a href="https://invexo.co.in" class="cta-button">Go to Dashboard</a>
+        </div>
+        <div class="footer">
+            <p>© 2026 Invexo. All rights reserved.</p>
+            <p>This email was sent to {email_addr}. If you did not sign up for Invexo, you can safely ignore this email.</p>
+        </div>
+    </div>
+</body>
+</html>"""
+
+    # 1. Try Resend HTTP API if configured
+    resend_key = os.environ.get("RESEND_API_KEY", "")
+    if resend_key:
+        try:
+            import requests
+            sender = os.environ.get("RESEND_FROM", "onboarding@resend.dev")
+            res = requests.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {resend_key}"},
+                json={
+                    "from": sender,
+                    "to": [email_addr],
+                    "subject": subject,
+                    "html": html_content
+                },
+                timeout=10
+            )
+            if res.status_code in [200, 201]:
+                print(f"[Resend] Successfully sent welcome email to {email_addr}")
+                return
+            else:
+                raise RuntimeError(f"Resend API error (status {res.status_code}): {res.text}")
+        except Exception as e:
+            print(f"[Resend ERROR] Failed to send welcome email to {email_addr}: {e}")
+
+    # 2. Try SMTP if configured
+    host = os.environ.get("SMTP_HOST", "")
+    port_str = os.environ.get("SMTP_PORT", "")
+    user = os.environ.get("SMTP_USER", "")
+    password = os.environ.get("SMTP_PASSWORD", "")
+    sender = os.environ.get("SMTP_FROM", user)
+
+    if host and port_str and user and password:
+        try:
+            from email.mime.multipart import MIMEMultipart
+            port = int(port_str)
+            msg = MIMEMultipart("alternative")
+            msg["Subject"] = subject
+            msg["From"] = sender
+            msg["To"] = email_addr
+
+            part = MIMEText(html_content, "html")
+            msg.attach(part)
+
+            import smtplib
+            if port == 465:
+                server = smtplib.SMTP_SSL(host, port, timeout=10)
+            else:
+                server = smtplib.SMTP(host, port, timeout=10)
+                server.starttls()
+            server.login(user, password)
+            server.sendmail(sender, [email_addr], msg.as_string())
+            server.quit()
+            print(f"[SMTP] Successfully sent welcome email to {email_addr}")
+        except Exception as e:
+            print(f"[SMTP ERROR] Failed to send welcome email to {email_addr}: {e}")
+
+
 def initiate_signup_otp(email_addr: str, payload: dict) -> str:
     """Generates 6-digit OTP, stores signup payload, and triggers send."""
     otp = f"{random.randint(100000, 999999)}"

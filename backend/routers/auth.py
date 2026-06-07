@@ -107,6 +107,12 @@ def handle_signup(payload: SignupInput):
     if user is None:
         raise HTTPException(status_code=409, detail="An account with this email already exists")
 
+    try:
+        from services.auth_service import send_welcome_email
+        send_welcome_email(user["email"], user["name"])
+    except Exception as e:
+        print(f"[Welcome Email Warning] Failed to send welcome email: {e}")
+
     token = create_token(user["id"])
     return {"token": token, "user": user}
 
@@ -147,7 +153,6 @@ def handle_signup_verify(payload: VerifySignupInput):
     if signup_payload is None:
         raise HTTPException(status_code=400, detail="Invalid or expired OTP code")
 
-    # Register user in database
     user = signup(
         signup_payload["email"],
         signup_payload["password"],
@@ -156,6 +161,12 @@ def handle_signup_verify(payload: VerifySignupInput):
     )
     if user is None:
         raise HTTPException(status_code=409, detail="An account with this email already exists")
+
+    try:
+        from services.auth_service import send_welcome_email
+        send_welcome_email(user["email"], user["name"])
+    except Exception as e:
+        print(f"[Welcome Email Warning] Failed to send welcome email: {e}")
 
     token = create_token(user["id"])
     return {"token": token, "user": user}
