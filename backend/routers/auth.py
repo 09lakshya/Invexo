@@ -179,6 +179,10 @@ def handle_login(payload: LoginInput):
     if not _is_valid_email(payload.email):
         raise HTTPException(status_code=400, detail="Please enter a valid email address")
 
+    from services.auth_service import user_exists
+    if not user_exists(payload.email):
+        raise HTTPException(status_code=404, detail="Account not found")
+
     user = login(payload.email, payload.password)
     if user is None:
         raise HTTPException(status_code=401, detail="Invalid email or password")

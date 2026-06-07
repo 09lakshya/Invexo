@@ -207,10 +207,10 @@ export default function LoginPage() {
             </button>
           </span>
         );
-      } else if (mode === "login" && (msg.toLowerCase().includes("email not found") || msg.toLowerCase().includes("details not found"))) {
+      } else if (mode === "login" && (msg.toLowerCase().includes("email not found") || msg.toLowerCase().includes("details not found") || msg.toLowerCase().includes("account not found"))) {
         setError(
           <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-            Details not found.{" "}
+            Account not found.{" "}
             <button
               type="button"
               onClick={() => {
