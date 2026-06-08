@@ -54,7 +54,7 @@ export default function DailyPicks() {
           animation: "shimmer 2s infinite linear"
         }} />
         <h2 style={{ fontSize: "1.2rem", fontWeight: 800, marginBottom: "8px" }}>
-          Daily AI Stock Picks
+          Daily Edge
         </h2>
         <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginBottom: "24px" }}>
           Our AI is currently crunching millions of data points across Large, Mid, and Small Cap stocks...
@@ -101,7 +101,7 @@ export default function DailyPicks() {
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px", flexWrap: "wrap", gap: "16px" }}>
         <div>
           <h2 style={{ fontSize: "1.4rem", fontWeight: 800, marginBottom: "4px" }}>
-            Daily AI Stock Picks
+            Daily Edge
           </h2>
           <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem", margin: 0 }}>
             Highly curated recommendations based on predictive XGBoost models and market sentiment.

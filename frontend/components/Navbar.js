@@ -41,6 +41,14 @@ const SparklesIcon = ({ size = 18, color = "currentColor" }) => (
   </svg>
 );
 
+// Trending Up Icon SVG for Daily Edge
+const TrendingUpIcon = ({ size = 18, color = "currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+    <polyline points="17 6 23 6 23 12" />
+  </svg>
+);
+
 // Calculator Icon SVG
 const CalculatorIcon = ({ size = 18, color = "currentColor" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -83,6 +91,7 @@ const LogOutIcon = ({ size = 18, color = "currentColor" }) => (
 
 const NAV_LINKS = [
   { href: "/", label: "Dashboard", icon: DashboardIcon },
+  { href: "/daily-edge", label: "Daily Edge", icon: TrendingUpIcon },
   { href: "/news", label: "News", icon: NewspaperIcon },
   { href: "/advisor", label: "AI Advisor", icon: SparklesIcon },
   { href: "/calculator", label: "Calculator", icon: CalculatorIcon },
