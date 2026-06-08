@@ -5,13 +5,26 @@ from datetime import datetime
 from services.db import get_db_connection, get_cursor, execute_query
 from services.ai_service import predict_stock
 
-# A high-liquidity universe to screen daily
-# These are top components of NIFTY 50 and popular stocks
-NIFTY_UNIVERSE = [
+# Universes for different market caps
+LARGE_CAP_UNIVERSE = [
     "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "ICICIBANK.NS", "INFY.NS",
     "ITC.NS", "SBIN.NS", "BHARTIARTL.NS", "HINDUNILVR.NS", "BAJFINANCE.NS",
-    "L&T.NS", "KOTAKBANK.NS", "AXISBANK.NS", "ASIANPAINT.NS", "MARUTI.NS",
+    "LT.NS", "KOTAKBANK.NS", "AXISBANK.NS", "ASIANPAINT.NS", "MARUTI.NS",
     "SUNPHARMA.NS", "TITAN.NS", "ULTRACEMCO.NS", "WIPRO.NS", "TATAMOTORS.NS"
+]
+
+MID_CAP_UNIVERSE = [
+    "TRENT.NS", "HAL.NS", "TATAELXSI.NS", "IRCTC.NS", "DIXON.NS",
+    "POLYCAB.NS", "CUMMINSIND.NS", "COFORGE.NS", "PERSISTENT.NS", "AUBANK.NS",
+    "IDFCFIRSTB.NS", "FEDERALBNK.NS", "PAGEIND.NS", "VOLTAS.NS", "MAXHEALTH.NS",
+    "OBEROIRLTY.NS", "LUPIN.NS", "BSE.NS", "INDHOTEL.NS", "MRF.NS"
+]
+
+SMALL_CAP_UNIVERSE = [
+    "SUZLON.NS", "YESBANK.NS", "IDEA.NS", "RPOWER.NS", "JPPOWER.NS",
+    "SOUTHBANK.NS", "GMRINFRA.NS", "HCC.NS", "URJA.NS", "PCJEWELLER.NS",
+    "RVNL.NS", "IRFC.NS", "UCOBANK.NS", "IEX.NS", "NHPC.NS",
+    "ZOMATO.NS", "PAYTM.NS", "NYKAA.NS", "EASEMYTRIP.NS", "RCOM.NS"
 ]
 
 def init_daily_picks_db():
@@ -57,53 +70,33 @@ def get_daily_picks():
             return json.loads(row[0])
     return None
 
-def generate_daily_picks():
-    """Runs the AI model on the universe, picks top 3, and saves them."""
-    today = get_today_date_str()
-    
-    # Check if already generated for today
-    if get_daily_picks() is not None:
-        print(f"[Daily Picks] Already generated for {today}. Skipping.")
-        return
-        
-    print(f"[Daily Picks] Starting daily AI screening for {today}...")
-    
+def score_and_rank_universe(universe_name, symbols):
+    """Evaluates a list of symbols and returns the top 5 to 10 sorted by AI score."""
+    print(f"[Daily Picks] Evaluating universe: {universe_name}...")
     results = []
-    
-    for symbol in NIFTY_UNIVERSE:
-        print(f"[Daily Picks] Evaluating {symbol}...")
+    for symbol in symbols:
         try:
-            # Predict stock runs XGBoost, technicals, and news sentiment
             res = predict_stock(symbol)
             if "error" in res:
                 continue
                 
-            # Composite Scoring Logic
-            # We want high predicted upside, positive sentiment, and good fundamentals.
-            # Upside % from XGBoost
             predicted_price = res.get("xgb_predicted_price") or res.get("predicted_price", res["current_price"])
             upside_pct = ((predicted_price - res["current_price"]) / res["current_price"]) * 100
             
-            # Fundamentals & Sentiment
-            news_score = res.get("news_sentiment", 0) * 10  # Range approx -10 to +10
-            fundamental_score = res.get("fundamental_score", 50) - 50 # Centered around 0
-            
-            # Technical Bonus: MACD positive is good, RSI oversold (< 40) is good
+            news_score = res.get("news_sentiment", 0) * 10
+            fundamental_score = res.get("fundamental_score", 50) - 50
             rsi = res.get("rsi", 50)
-            rsi_bonus = (50 - rsi) * 0.2  # Max ~10 points bonus if oversold
+            rsi_bonus = (50 - rsi) * 0.2
             macd = res.get("macd", 0)
             macd_bonus = 5 if macd > 0 else -5
             
-            # Final composite score
-            # A 1% upside is roughly 10 points
             composite_score = (upside_pct * 10) + news_score + fundamental_score + rsi_bonus + macd_bonus
             
-            # Convert NaN to 0 if any
             if composite_score != composite_score:
                 composite_score = 0
                 
             results.append({
-                "symbol": symbol.replace(".NS", ""), # Clean up for UI
+                "symbol": symbol.replace(".NS", ""),
                 "full_symbol": symbol,
                 "current_price": res["current_price"],
                 "target_price": predicted_price,
@@ -113,25 +106,38 @@ def generate_daily_picks():
                 "sentiment": res.get("news_impact", "neutral").capitalize(),
                 "reasoning": f"AI model projects {round(upside_pct, 2)}% upside. Technical trend is {res.get('trend', 'neutral')}."
             })
-            
-            # Sleep briefly to avoid rate limits on news/finance APIs
-            time.sleep(1)
-            
+            time.sleep(0.5)
         except Exception as e:
             print(f"[Daily Picks] Error evaluating {symbol}: {e}")
             continue
             
-    # Sort by highest composite score
     results.sort(key=lambda x: x["score"], reverse=True)
+    return results[:10]  # Return top 10
+
+def generate_daily_picks():
+    """Runs the AI model on all universes, picks top stocks, and saves them."""
+    today = get_today_date_str()
     
-    # Pick top 3
-    top_picks = results[:3]
+    if get_daily_picks() is not None:
+        print(f"[Daily Picks] Already generated for {today}. Skipping.")
+        return
+        
+    print(f"[Daily Picks] Starting comprehensive daily AI screening for {today}...")
     
-    # Save to database
+    large_cap_picks = score_and_rank_universe("Large Cap", LARGE_CAP_UNIVERSE)
+    mid_cap_picks = score_and_rank_universe("Mid Cap", MID_CAP_UNIVERSE)
+    small_cap_picks = score_and_rank_universe("Small Cap / Penny", SMALL_CAP_UNIVERSE)
+    
+    final_picks = {
+        "large_cap": large_cap_picks,
+        "mid_cap": mid_cap_picks,
+        "small_cap": small_cap_picks
+    }
+    
     conn, is_postgres = get_db_connection()
     c = conn.cursor()
     
-    picks_json_str = json.dumps(top_picks)
+    picks_json_str = json.dumps(final_picks)
     
     if is_postgres:
         execute_query(c, """
@@ -149,4 +155,4 @@ def generate_daily_picks():
     conn.commit()
     conn.close()
     
-    print(f"[Daily Picks] Successfully saved {len(top_picks)} top picks for {today}.")
+    print(f"[Daily Picks] Successfully saved multi-cap picks for {today}.")

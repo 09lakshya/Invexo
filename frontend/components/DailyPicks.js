@@ -4,6 +4,7 @@ import API from '../services/api';
 export default function DailyPicks() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('large_cap');
 
   useEffect(() => {
     let interval;
@@ -52,11 +53,11 @@ export default function DailyPicks() {
           backgroundSize: "200% 100%",
           animation: "shimmer 2s infinite linear"
         }} />
-        <h2 style={{ fontSize: "1.2rem", fontWeight: 800, marginBottom: "8px", display: "flex", alignItems: "center", gap: "8px" }}>
-          <span>✨</span> Daily AI Stock Picks
+        <h2 style={{ fontSize: "1.2rem", fontWeight: 800, marginBottom: "8px" }}>
+          Daily AI Stock Picks
         </h2>
         <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginBottom: "24px" }}>
-          Our AI is currently crunching millions of data points to find today's best opportunities...
+          Our AI is currently crunching millions of data points across Large, Mid, and Small Cap stocks...
         </p>
         
         <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
@@ -74,7 +75,19 @@ export default function DailyPicks() {
     );
   }
 
-  if (!data?.picks || data.picks.length === 0) return null;
+  if (!data?.picks) return null;
+
+  // Determine picks array based on format
+  const isOldFormat = Array.isArray(data.picks);
+  const currentPicks = isOldFormat ? data.picks : (data.picks[activeTab] || []);
+
+  if (currentPicks.length === 0) return null;
+
+  const tabs = [
+    { id: 'large_cap', label: 'Large Cap' },
+    { id: 'mid_cap', label: 'Mid Cap' },
+    { id: 'small_cap', label: 'Small Cap' }
+  ];
 
   return (
     <div style={{
@@ -85,20 +98,54 @@ export default function DailyPicks() {
       marginBottom: "32px",
       border: "1px solid var(--border)"
     }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "8px" }}>
-        <h2 style={{ fontSize: "1.4rem", fontWeight: 800, display: "flex", alignItems: "center", gap: "8px" }}>
-          <span style={{ color: "var(--accent)" }}>✨</span> Daily AI Stock Picks
-        </h2>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px", flexWrap: "wrap", gap: "16px" }}>
+        <div>
+          <h2 style={{ fontSize: "1.4rem", fontWeight: 800, marginBottom: "4px" }}>
+            Daily AI Stock Picks
+          </h2>
+          <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem", margin: 0 }}>
+            Highly curated recommendations based on predictive XGBoost models and market sentiment.
+          </p>
+        </div>
         <span style={{ fontSize: "0.75rem", background: "var(--purple-dim)", color: "var(--purple)", padding: "4px 8px", borderRadius: "8px", fontWeight: 700 }}>
           UPDATED TODAY
         </span>
       </div>
-      <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem", marginBottom: "24px" }}>
-        Highly curated recommendations based on predictive XGBoost models, fundamental strength, and live market sentiment.
-      </p>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "16px" }}>
-        {data.picks.map((pick, i) => (
+      {!isOldFormat && (
+        <div style={{ 
+          display: "flex", 
+          gap: "8px", 
+          marginBottom: "24px", 
+          background: "var(--surface-hover)", 
+          padding: "4px", 
+          borderRadius: "12px", 
+          width: "fit-content" 
+        }}>
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              style={{
+                padding: "8px 16px",
+                borderRadius: "8px",
+                border: "none",
+                background: activeTab === tab.id ? "var(--accent)" : "transparent",
+                color: activeTab === tab.id ? "#fff" : "var(--text-secondary)",
+                fontWeight: 700,
+                fontSize: "0.85rem",
+                cursor: "pointer",
+                transition: "all 0.2s"
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "16px" }}>
+        {currentPicks.map((pick, i) => (
           <div key={i} style={{
             background: "linear-gradient(145deg, var(--surface-hover), var(--surface))",
             border: "1px solid var(--border)",
@@ -152,9 +199,6 @@ export default function DailyPicks() {
               </span>
               <span style={{ fontSize: "0.7rem", background: "var(--surface-hover)", color: "var(--text-secondary)", padding: "4px 8px", borderRadius: "6px", fontWeight: 600 }}>
                 {pick.sentiment} News
-              </span>
-              <span style={{ fontSize: "0.7rem", background: "var(--surface-hover)", color: "var(--text-secondary)", padding: "4px 8px", borderRadius: "6px", fontWeight: 600 }}>
-                {pick.confidence} Confidence
               </span>
             </div>
 
