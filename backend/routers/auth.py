@@ -222,6 +222,21 @@ def handle_forgot_password_initiate(payload: ForgotPasswordInitiateInput):
     return {"message": "If this email is registered, a password reset code has been sent."}
 
 
+class VerifyForgotPasswordOtpInput(BaseModel):
+    email: str
+    otp: str
+
+@router.post("/forgot-password/verify-otp")
+def handle_forgot_password_verify_otp(payload: VerifyForgotPasswordOtpInput):
+    if not payload.email or not payload.otp:
+        raise HTTPException(status_code=400, detail="Email and OTP are required")
+        
+    from services.auth_service import verify_forgot_password_otp_only
+    if not verify_forgot_password_otp_only(payload.email, payload.otp):
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP code")
+        
+    return {"message": "OTP verified"}
+
 @router.post("/forgot-password/reset")
 def handle_forgot_password_reset(payload: ForgotPasswordResetInput):
     if not payload.email or not payload.otp or not payload.new_password:

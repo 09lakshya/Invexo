@@ -144,6 +144,11 @@ export function AuthProvider({ children }) {
     return res.data;
   };
 
+  const verifyForgotPasswordOtp = async (email, otp) => {
+    const res = await API.post("/auth/forgot-password/verify-otp", { email, otp });
+    return res.data;
+  };
+
   const resetPassword = async (email, otp, new_password) => {
     const res = await API.post("/auth/forgot-password/reset", { email, otp, new_password });
     return res.data;
@@ -210,7 +215,7 @@ export function AuthProvider({ children }) {
       value={{ 
         user, token, loading, 
         login, signup, initiateSignupOtp, verifySignupOtp, 
-        initiateForgotPassword, resetPassword,
+        initiateForgotPassword, verifyForgotPasswordOtp, resetPassword,
         logout, refreshUser, setUser, 
         avatar, updateAvatar 
       }}

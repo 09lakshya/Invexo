@@ -6,7 +6,7 @@ import API from "../services/api";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, loading, login, signup, initiateSignupOtp, verifySignupOtp, setUser, initiateForgotPassword, resetPassword } = useAuth();
+  const { user, loading, login, signup, initiateSignupOtp, verifySignupOtp, setUser, initiateForgotPassword, verifyForgotPasswordOtp, resetPassword } = useAuth();
 
   const [mode, setMode] = useState("login"); // "login" | "signup"
   const [flowMode, setFlowMode] = useState("credentials"); // "credentials" | "otp"
@@ -263,30 +263,45 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       if (mode === "forgot-password") {
-        if (password !== confirmPw) {
-          setError("Passwords do not match.");
-          setSubmitting(false);
-          return;
-        }
-        if (password.length < 6) {
-          setError("New password must be at least 6 characters.");
-          setSubmitting(false);
-          return;
-        }
-        await resetPassword(email, code, password);
-        setMode("login");
-        setFlowMode("credentials");
-        setPassword("");
-        setConfirmPw("");
-        setOtpVal(["", "", "", "", "", ""]);
-        // Show success somehow, or just redirect. Wait, let's just let it be login screen and they can log in.
-        // Actually, we can add a small success message later.
+        await verifyForgotPasswordOtp(email, code);
+        setFlowMode("new-password");
       } else {
         await verifySignupOtp(email, code, rememberMe);
         router.replace("/");
       }
     } catch (err) {
       const msg = err?.response?.data?.detail || "Invalid or expired OTP code.";
+      setError(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleNewPasswordSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    
+    if (password !== confirmPw) {
+      setError("Passwords do not match.");
+      return;
+    }
+    if (password.length < 6) {
+      setError("New password must be at least 6 characters.");
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const code = otpVal.join("");
+      await resetPassword(email, code, password);
+      setMode("login");
+      setFlowMode("credentials");
+      setPassword("");
+      setConfirmPw("");
+      setOtpVal(["", "", "", "", "", ""]);
+      // Optional: success message
+    } catch (err) {
+      const msg = err?.response?.data?.detail || "Something went wrong.";
       setError(msg);
     } finally {
       setSubmitting(false);
@@ -446,13 +461,14 @@ export default function LoginPage() {
               {flowMode === "otp" ? "Verify Email" : mode === "login" ? "Sign In" : mode === "forgot-password" ? "Reset Password" : "Create Account"}
             </h2>
 
-            {flowMode === "otp" ? (
-              <form onSubmit={handleOtpSubmit}>
+            {(flowMode === "otp" || flowMode === "new-password") ? (
+              <form onSubmit={flowMode === "otp" ? handleOtpSubmit : handleNewPasswordSubmit}>
                 <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", marginBottom: "20px", lineHeight: 1.5 }}>
                   Please enter the 6-digit verification code sent to <strong style={{ color: "var(--accent)" }}>{email}</strong>:
                 </p>
 
                 {/* 6 Digit Inputs */}
+                {flowMode === "otp" && (
                 <div style={{ display: "flex", gap: "10px", justifyContent: "space-between", marginBottom: "20px" }}>
                   {otpVal.map((digit, index) => (
                     <input
@@ -490,9 +506,10 @@ export default function LoginPage() {
                     />
                   ))}
                 </div>
+                )}
 
                 {/* New Password for Forgot Password Flow */}
-                {mode === "forgot-password" && (
+                {mode === "forgot-password" && flowMode === "new-password" && (
                   <div style={{ marginBottom: "20px" }}>
                     <label style={{
                       display: "block",
@@ -569,7 +586,7 @@ export default function LoginPage() {
                 )}
 
                 {/* Confirm Password for Forgot Password Flow */}
-                {mode === "forgot-password" && (
+                {mode === "forgot-password" && flowMode === "new-password" && (
                   <div style={{ marginBottom: "20px" }}>
                     <label style={{
                       display: "block",
@@ -689,7 +706,9 @@ export default function LoginPage() {
                     marginBottom: "20px",
                   }}
                 >
-                  {submitting ? "Verifying..." : "Verify & Register"}
+                  {submitting 
+                    ? (flowMode === "new-password" ? "Resetting..." : "Verifying...")
+                    : (flowMode === "new-password" ? "Reset Password" : mode === "forgot-password" ? "Verify OTP" : "Verify & Register")}
                 </button>
 
                 {/* Actions: Resend / Back */}
