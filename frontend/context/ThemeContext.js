@@ -7,17 +7,18 @@ export function useTheme() {
 }
 
 export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState("dark");
+  const [theme, setTheme] = useState("light");
 
   // On mount — restore theme preference
   useEffect(() => {
     const stored = localStorage.getItem("ntrade_theme");
-    if (stored === "light" || stored === "dark") {
+    if (stored) {
       setTheme(stored);
       document.documentElement.setAttribute("data-theme", stored);
     } else {
-      // Default to dark
-      document.documentElement.setAttribute("data-theme", "dark");
+      // Default to light
+      setTheme("light");
+      document.documentElement.setAttribute("data-theme", "light");
     }
   }, []);
 
