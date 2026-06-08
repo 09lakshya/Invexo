@@ -4,6 +4,7 @@ import Link from "next/link";
 import StockCard from "../components/StockCard";
 import RealChart from "../components/RealChart";
 import Navbar from "../components/Navbar";
+import DailyPicks from "../components/DailyPicks";
 import API from "../services/api";
 import Head from "next/head";
 import { STOCK_METADATA } from "../services/stocks";
@@ -694,6 +695,11 @@ export default function Home() {
                 ))}
               </div>
             )}
+          </div>
+
+          {/* ── Daily AI Picks ───────────────────────────────────────── */}
+          <div style={{ animation: "fadeInUp 0.5s 0.08s ease both" }}>
+            <DailyPicks />
           </div>
 
           {/* ── Index Cards ──────────────────────────────────────────── */}

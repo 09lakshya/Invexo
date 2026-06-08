@@ -21,3 +21,4 @@ curl_cffi
 ta
 xgboost
 scikit-learn
+apscheduler

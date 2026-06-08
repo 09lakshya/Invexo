@@ -65,3 +65,22 @@ app.include_router(advisor.router)       # ← added
 app.include_router(auth.router, dependencies=[Depends(rate_limit_auth)])
 app.include_router(admin.router)         # ← added
 
+from apscheduler.schedulers.background import BackgroundScheduler
+import threading
+
+scheduler = BackgroundScheduler()
+
+@app.on_event("startup")
+def startup_event():
+    from services.daily_picks_service import generate_daily_picks
+    scheduler.add_job(generate_daily_picks, 'cron', hour=0, minute=0)
+    scheduler.start()
+    
+    # Kick off an immediate run if needed
+    thread = threading.Thread(target=generate_daily_picks)
+    thread.daemon = True
+    thread.start()
+
+@app.on_event("shutdown")
+def shutdown_event():
+    scheduler.shutdown()
