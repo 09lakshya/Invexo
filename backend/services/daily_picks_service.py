@@ -118,9 +118,13 @@ def generate_daily_picks():
     """Runs the AI model on all universes, picks top stocks, and saves them."""
     today = get_today_date_str()
     
-    if get_daily_picks() is not None:
-        print(f"[Daily Picks] Already generated for {today}. Skipping.")
-        return
+    picks = get_daily_picks()
+    if picks is not None:
+        if isinstance(picks, list):
+            print(f"[Daily Picks] Found legacy array format for {today}. Forcing regeneration to multi-cap format.")
+        else:
+            print(f"[Daily Picks] Already generated multi-cap picks for {today}. Skipping.")
+            return
         
     print(f"[Daily Picks] Starting comprehensive daily AI screening for {today}...")
     
