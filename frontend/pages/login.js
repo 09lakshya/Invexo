@@ -173,6 +173,7 @@ export default function LoginPage() {
       } else if (mode === "forgot-password") {
         await initiateForgotPassword(email);
         setFlowMode("otp");
+        setPassword(""); // ensure new password field starts empty
         setCooldown(60);
         setTimeout(() => {
           const firstInput = document.getElementById("otp-input-0");
@@ -783,6 +784,7 @@ export default function LoginPage() {
                               onClick={() => {
                                 setMode("forgot-password");
                                 setFlowMode("credentials");
+                                setPassword(""); // clear any autofilled password
                                 setError("");
                               }}
                               style={{
