@@ -118,43 +118,6 @@ export default function DailyPicks() {
         </span>
       </div>
 
-      {topPicks.length > 0 && (
-        <div style={{ marginBottom: "32px" }}>
-          <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "16px", color: "var(--text-primary)" }}>
-            Picks for Tomorrow
-          </h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "16px" }}>
-            {topPicks.map((pick, i) => (
-              <div key={i} style={{
-                background: "linear-gradient(135deg, var(--accent-dim), transparent)",
-                border: "1px solid var(--accent-glow)",
-                borderRadius: "16px",
-                padding: "16px",
-                position: "relative",
-                display: "flex",
-                flexDirection: "column",
-                gap: "8px"
-              }}>
-                <div style={{ fontSize: "0.7rem", fontWeight: 800, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                  {pick.category} Top Pick
-                </div>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <div style={{ fontSize: "1.2rem", fontWeight: 800 }}>{pick.symbol}</div>
-                    <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{pick.full_symbol}</div>
-                  </div>
-                  <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: "1rem", fontWeight: 700 }}>₹{pick.current_price?.toFixed(2)}</div>
-                    <div style={{ color: "var(--green)", fontSize: "0.8rem", fontWeight: 700 }}>
-                      ↗ {pick.upside}%
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       {!isOldFormat && (
         <div style={{ 
@@ -192,10 +155,11 @@ export default function DailyPicks() {
         {currentPicks.map((pick, i) => (
           <div key={i} style={{
             background: "linear-gradient(145deg, var(--surface-hover), var(--surface))",
-            border: "1px solid var(--border)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
             borderRadius: "16px",
             padding: "20px",
-            transition: "transform 0.2s, box-shadow 0.2s",
+            transition: "transform 0.2s, box-shadow 0.2s, border-color 0.2s",
             cursor: "pointer",
             display: "flex",
             flexDirection: "column",
@@ -210,8 +174,8 @@ export default function DailyPicks() {
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.transform = "none";
-            e.currentTarget.style.boxShadow = "none";
-            e.currentTarget.style.borderColor = "var(--border)";
+            e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.1)";
+            e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)";
           }}>
             {i === 0 && (
                <div style={{
@@ -246,12 +210,51 @@ export default function DailyPicks() {
               </span>
             </div>
 
-            <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", lineHeight: 1.5, margin: 0, marginTop: "4px", paddingLeft: "10px", borderLeft: "2px solid var(--border)" }}>
+            <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", lineHeight: 1.5, margin: 0, marginTop: "4px", paddingLeft: "10px", borderLeft: "2px solid rgba(255,255,255,0.1)" }}>
               {pick.reasoning}
             </p>
           </div>
         ))}
       </div>
+
+      {topPicks.length > 0 && (
+        <div style={{ marginTop: "40px", paddingTop: "24px", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+          <h3 style={{ fontSize: "1rem", fontWeight: 700, marginBottom: "16px", color: "var(--text-primary)" }}>
+            Picks for Tomorrow
+          </h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px" }}>
+            {topPicks.map((pick, i) => (
+              <div key={i} style={{
+                background: "linear-gradient(135deg, var(--surface-hover), var(--surface))",
+                border: "1px solid var(--border)",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
+                borderRadius: "12px",
+                padding: "12px",
+                position: "relative",
+                display: "flex",
+                flexDirection: "column",
+                gap: "6px"
+              }}>
+                <div style={{ fontSize: "0.65rem", fontWeight: 800, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  {pick.category} Top Pick
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: "1rem", fontWeight: 800 }}>{pick.symbol}</div>
+                    <div style={{ fontSize: "0.65rem", color: "var(--text-muted)" }}>{pick.full_symbol}</div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: "0.9rem", fontWeight: 700 }}>₹{pick.current_price?.toFixed(2)}</div>
+                    <div style={{ color: "var(--green)", fontSize: "0.75rem", fontWeight: 700 }}>
+                      ↗ {pick.upside}%
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       
       <style>{`
         @keyframes shimmer {
