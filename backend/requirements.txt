@@ -21,6 +21,3 @@ curl_cffi
 ta
 xgboost
 scikit-learn
-transformers
---extra-index-url https://download.pytorch.org/whl/cpu
-torch

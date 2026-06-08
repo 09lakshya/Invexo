@@ -115,50 +115,45 @@ def calculate_stochastic(df, k_period=14, d_period=3):
     return k_series, d
 
 
-_finbert_pipeline = None
-
-def get_finbert_pipeline():
-    global _finbert_pipeline
-    if _finbert_pipeline is None:
-        try:
-            from transformers import pipeline
-            # Load the ProsusAI/finbert model for financial sentiment analysis
-            _finbert_pipeline = pipeline("sentiment-analysis", model="ProsusAI/finbert")
-        except Exception as e:
-            print(f"Error loading FinBERT: {e}")
-            _finbert_pipeline = "fallback"
-    return _finbert_pipeline
-
 def analyze_financial_sentiment(text):
-    """Analyze sentiment of text using FinBERT"""
+    """Analyze sentiment using Hugging Face API with TextBlob fallback"""
     if not text:
         return 50.0
+        
+    hf_token = os.environ.get("HF_API_KEY")
+    short_text = str(text)[:500]
     
-    pipeline_fn = get_finbert_pipeline()
-    if pipeline_fn == "fallback":
-        # Fallback to neutral if loading failed
-        return 50.0
-        
+    if hf_token:
+        try:
+            API_URL = "https://api-inference.huggingface.co/models/ProsusAI/finbert"
+            headers = {"Authorization": f"Bearer {hf_token}"}
+            # Add a short timeout so the API doesn't hang the UI
+            response = requests.post(API_URL, headers=headers, json={"inputs": short_text}, timeout=3)
+            
+            if response.status_code == 200:
+                result = response.json()[0][0]
+                label = result['label']
+                score = result['score']
+                
+                if label == 'positive':
+                    return 55.0 + (score * 45.0)
+                elif label == 'negative':
+                    return 45.0 - (score * 45.0)
+                else:
+                    return 50.0
+            else:
+                print(f"HF API Error {response.status_code}: {response.text}")
+        except Exception as e:
+            print(f"HF API Exception: {e}")
+            
+    # Fallback to TextBlob if HF_API_KEY is missing, rate-limited, or fails
     try:
-        # FinBERT has a max length limit (typically 512 tokens), let's truncate
-        short_text = str(text)[:500]
-        result = pipeline_fn(short_text)[0]
-        label = result['label']
-        score = result['score']
-        
-        # Convert to 0-100 scale: 
-        # positive -> 55 to 100
-        # neutral -> 45 to 55
-        # negative -> 0 to 45
-        if label == 'positive':
-            return 55.0 + (score * 45.0)
-        elif label == 'negative':
-            return 45.0 - (score * 45.0)
-        else:
-            # Neutral: center around 50
-            return 50.0
+        blob = TextBlob(short_text)
+        polarity = blob.sentiment.polarity
+        # Convert -1.0 to 1.0 scale to 0-100 scale
+        return ((polarity + 1.0) / 2.0) * 100.0
     except Exception as e:
-        print(f"FinBERT sentiment error: {e}")
+        print(f"TextBlob error: {e}")
         return 50.0
 
 
