@@ -121,7 +121,7 @@ export default function DailyPicks() {
       {topPicks.length > 0 && (
         <div style={{ marginBottom: "32px" }}>
           <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "16px", color: "var(--text-primary)" }}>
-            ⚡ Picks for Tomorrow
+            Picks for Tomorrow
           </h3>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "16px" }}>
             {topPicks.map((pick, i) => (
