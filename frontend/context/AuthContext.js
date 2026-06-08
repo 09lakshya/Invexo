@@ -139,6 +139,16 @@ export function AuthProvider({ children }) {
     return u;
   };
 
+  const initiateForgotPassword = async (email) => {
+    const res = await API.post("/auth/forgot-password/initiate", { email });
+    return res.data;
+  };
+
+  const resetPassword = async (email, otp, new_password) => {
+    const res = await API.post("/auth/forgot-password/reset", { email, otp, new_password });
+    return res.data;
+  };
+
   const logout = () => {
     setUser(null);
     setToken(null);
@@ -197,7 +207,13 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider
-      value={{ user, token, loading, login, signup, initiateSignupOtp, verifySignupOtp, logout, refreshUser, setUser, avatar, updateAvatar }}
+      value={{ 
+        user, token, loading, 
+        login, signup, initiateSignupOtp, verifySignupOtp, 
+        initiateForgotPassword, resetPassword,
+        logout, refreshUser, setUser, 
+        avatar, updateAvatar 
+      }}
     >
       {children}
     </AuthContext.Provider>

@@ -35,6 +35,16 @@ class VerifySignupInput(BaseModel):
     otp: str
 
 
+class ForgotPasswordInitiateInput(BaseModel):
+    email: str
+
+
+class ForgotPasswordResetInput(BaseModel):
+    email: str
+    otp: str
+    new_password: str
+
+
 ALLOWED_DOMAINS = {
     "gmail.com", "googlemail.com", "yahoo.com", "yahoo.in", "yahoo.co.in",
     "yahoo.co.uk", "outlook.com", "hotmail.com", "live.com", "msn.com",
@@ -189,6 +199,43 @@ def handle_login(payload: LoginInput):
 
     token = create_token(user["id"])
     return {"token": token, "user": user}
+
+
+@router.post("/forgot-password/initiate")
+def handle_forgot_password_initiate(payload: ForgotPasswordInitiateInput):
+    if not payload.email:
+        raise HTTPException(status_code=400, detail="Email is required")
+    if not _is_valid_email(payload.email):
+        raise HTTPException(status_code=400, detail="Please enter a valid email address")
+
+    from services.auth_service import user_exists, initiate_forgot_password_otp
+    if not user_exists(payload.email):
+        # Return generic success to prevent email enumeration
+        return {"message": "If this email is registered, a password reset code has been sent."}
+
+    try:
+        initiate_forgot_password_otp(payload.email)
+    except Exception as e:
+        print(f"Error initiating forgot password: {e}")
+        # Still return success to prevent enumeration, or we could return 500
+    
+    return {"message": "If this email is registered, a password reset code has been sent."}
+
+
+@router.post("/forgot-password/reset")
+def handle_forgot_password_reset(payload: ForgotPasswordResetInput):
+    if not payload.email or not payload.otp or not payload.new_password:
+        raise HTTPException(status_code=400, detail="Email, OTP, and new password are required")
+    if len(payload.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters")
+
+    from services.auth_service import reset_password_with_otp
+    success = reset_password_with_otp(payload.email, payload.otp, payload.new_password)
+    
+    if not success:
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP code")
+
+    return {"message": "Password changed successfully"}
 
 
 @router.get("/me")

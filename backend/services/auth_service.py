@@ -314,6 +314,115 @@ def user_exists(email: str) -> bool:
     conn.close()
     return row is not None
 
+def send_reset_otp_email(email_addr: str, otp: str):
+    """Sends a password reset OTP to the user."""
+    print("\n" + "="*50)
+    print(f"[RESET OTP DEBUG] Reset OTP for {email_addr}: {otp}")
+    print("="*50 + "\n")
+
+    subject = "Invexo - Password Reset Verification Code"
+    text_content = (
+        f"You requested a password reset for your Invexo account.\n\n"
+        f"Your 6-digit verification code (OTP) is: {otp}\n\n"
+        f"This code will expire in 5 minutes. If you did not request this, please ignore this email."
+    )
+
+    # 1. Try Resend
+    resend_key = os.environ.get("RESEND_API_KEY", "")
+    if resend_key:
+        try:
+            import requests
+            sender = os.environ.get("RESEND_FROM", "onboarding@resend.dev")
+            requests.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {resend_key}"},
+                json={"from": sender, "to": [email_addr], "subject": subject, "text": text_content},
+                timeout=10
+            )
+            return
+        except Exception as e:
+            print(f"[Resend ERROR] Failed to send reset email: {e}")
+
+    # 2. Try SMTP
+    host = os.environ.get("SMTP_HOST", "")
+    port_str = os.environ.get("SMTP_PORT", "")
+    user = os.environ.get("SMTP_USER", "")
+    password = os.environ.get("SMTP_PASSWORD", "")
+    sender = os.environ.get("SMTP_FROM", user)
+
+    if host and port_str and user and password:
+        try:
+            port = int(port_str)
+            msg = MIMEText(text_content)
+            msg["Subject"] = subject
+            msg["From"] = sender
+            msg["To"] = email_addr
+
+            import smtplib
+            if port == 465:
+                server = smtplib.SMTP_SSL(host, port, timeout=10)
+            else:
+                server = smtplib.SMTP(host, port, timeout=10)
+                server.starttls()
+            server.login(user, password)
+            server.sendmail(sender, [email_addr], msg.as_string())
+            server.quit()
+        except Exception as e:
+            print(f"[SMTP ERROR] Failed to send reset email: {e}")
+
+def initiate_forgot_password_otp(email_addr: str) -> str:
+    """Generates 6-digit OTP for password reset and stores it."""
+    otp = f"{random.randint(100000, 999999)}"
+    expiry = datetime.now() + timedelta(minutes=5)
+    
+    # Store in the same dictionary but with a special payload marker
+    otp_store[email_addr.lower()] = {
+        "otp": otp,
+        "expires": expiry,
+        "payload": {"type": "reset"},
+        "attempts": 0
+    }
+    send_reset_otp_email(email_addr, otp)
+    return otp
+
+def reset_password_with_otp(email_addr: str, otp: str, new_password: str) -> bool:
+    """Verifies OTP and updates the password."""
+    key = email_addr.lower()
+    if key not in otp_store:
+        return False
+        
+    record = otp_store[key]
+    if datetime.now() > record["expires"]:
+        del otp_store[key]
+        return False
+        
+    record["attempts"] = record.get("attempts", 0) + 1
+    if record["attempts"] > 5:
+        del otp_store[key]
+        return False
+        
+    if record["otp"] != otp:
+        if record["attempts"] >= 5:
+            del otp_store[key]
+        return False
+        
+    if record.get("payload", {}).get("type") != "reset":
+        return False
+        
+    del otp_store[key]
+    
+    # Hash the new password and update the database
+    new_hash = bcrypt.hashpw(new_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    
+    conn, is_postgres = get_db_connection()
+    c = conn.cursor()
+    execute_query(c, "UPDATE users SET password_hash = ? WHERE email = ?", (new_hash, key), is_postgres)
+    conn.commit()
+    updated = c.rowcount > 0
+    conn.close()
+    
+    return updated
+
 JWT_SECRET = os.environ.get("JWT_SECRET", "")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRY_DAYS = 30  # Long-lived tokens for "keep me signed in"
