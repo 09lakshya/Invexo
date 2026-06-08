@@ -385,6 +385,64 @@ def initiate_forgot_password_otp(email_addr: str) -> str:
     send_reset_otp_email(email_addr, otp)
     return otp
 
+def send_password_updated_email(email_addr: str):
+    """Sends a confirmation email that the password was updated."""
+    print("\n" + "="*50)
+    print(f"[PASSWORD UPDATED DEBUG] Sending confirmation to {email_addr}")
+    print("="*50 + "\n")
+
+    subject = "Invexo - Password Updated Successfully"
+    text_content = (
+        f"Hello,\n\n"
+        f"Your password for your Invexo account has been successfully updated.\n\n"
+        f"If you did not make this change, please contact our support team immediately.\n\n"
+        f"Best regards,\nThe Invexo Team"
+    )
+
+    # 1. Try Resend
+    resend_key = os.environ.get("RESEND_API_KEY", "")
+    if resend_key:
+        try:
+            import requests
+            sender = os.environ.get("RESEND_FROM", "onboarding@resend.dev")
+            requests.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {resend_key}"},
+                json={"from": sender, "to": [email_addr], "subject": subject, "text": text_content},
+                timeout=10
+            )
+            return
+        except Exception as e:
+            print(f"[Resend ERROR] Failed to send password update email: {e}")
+
+    # 2. Try SMTP
+    host = os.environ.get("SMTP_HOST", "")
+    port_str = os.environ.get("SMTP_PORT", "")
+    user = os.environ.get("SMTP_USER", "")
+    password = os.environ.get("SMTP_PASSWORD", "")
+    sender = os.environ.get("SMTP_FROM", user)
+
+    if host and port_str and user and password:
+        try:
+            port = int(port_str)
+            msg = MIMEText(text_content)
+            msg["Subject"] = subject
+            msg["From"] = sender
+            msg["To"] = email_addr
+
+            import smtplib
+            if port == 465:
+                server = smtplib.SMTP_SSL(host, port, timeout=10)
+            else:
+                server = smtplib.SMTP(host, port, timeout=10)
+                server.starttls()
+            server.login(user, password)
+            server.sendmail(sender, [email_addr], msg.as_string())
+            server.quit()
+        except Exception as e:
+            print(f"[SMTP ERROR] Failed to send password update email: {e}")
+
+
 def reset_password_with_otp(email_addr: str, otp: str, new_password: str) -> bool:
     """Verifies OTP and updates the password."""
     key = email_addr.lower()
@@ -420,6 +478,9 @@ def reset_password_with_otp(email_addr: str, otp: str, new_password: str) -> boo
     conn.commit()
     updated = c.rowcount > 0
     conn.close()
+    
+    if updated:
+        send_password_updated_email(email_addr)
     
     return updated
 
