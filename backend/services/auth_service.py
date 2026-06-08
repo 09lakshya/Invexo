@@ -423,6 +423,31 @@ def reset_password_with_otp(email_addr: str, otp: str, new_password: str) -> boo
     
     return updated
 
+def verify_forgot_password_otp_only(email_addr: str, otp: str) -> bool:
+    """Verifies the OTP but does not reset the password yet. Marks as verified."""
+    key = email_addr.lower()
+    if key not in otp_store:
+        return False
+        
+    record = otp_store[key]
+    if datetime.now() > record["expires"]:
+        del otp_store[key]
+        return False
+        
+    if record.get("payload", {}).get("type") != "reset":
+        del otp_store[key]
+        return False
+        
+    record["attempts"] = record.get("attempts", 0) + 1
+    if record["otp"] != otp:
+        if record["attempts"] >= 5:
+            del otp_store[key]
+        return False
+        
+    # Mark as verified, keep it in store so they can submit the new password next
+    record["verified"] = True
+    return True
+
 JWT_SECRET = os.environ.get("JWT_SECRET", "")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRY_DAYS = 30  # Long-lived tokens for "keep me signed in"
