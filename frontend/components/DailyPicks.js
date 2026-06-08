@@ -89,6 +89,12 @@ export default function DailyPicks() {
     { id: 'small_cap', label: 'Small Cap' }
   ];
 
+  const topPicks = !isOldFormat && data.picks.large_cap && data.picks.mid_cap && data.picks.small_cap ? [
+    { category: "Large Cap", ...data.picks.large_cap[0] },
+    { category: "Mid Cap", ...data.picks.mid_cap[0] },
+    { category: "Small Cap", ...data.picks.small_cap[0] }
+  ].filter(p => p.symbol) : [];
+
   return (
     <div style={{
       background: "var(--surface)",
@@ -111,6 +117,44 @@ export default function DailyPicks() {
           UPDATED TODAY
         </span>
       </div>
+
+      {topPicks.length > 0 && (
+        <div style={{ marginBottom: "32px" }}>
+          <h3 style={{ fontSize: "1.1rem", fontWeight: 700, marginBottom: "16px", color: "var(--text-primary)" }}>
+            ⚡ Picks for Tomorrow
+          </h3>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: "16px" }}>
+            {topPicks.map((pick, i) => (
+              <div key={i} style={{
+                background: "linear-gradient(135deg, var(--accent-dim), transparent)",
+                border: "1px solid var(--accent-glow)",
+                borderRadius: "16px",
+                padding: "16px",
+                position: "relative",
+                display: "flex",
+                flexDirection: "column",
+                gap: "8px"
+              }}>
+                <div style={{ fontSize: "0.7rem", fontWeight: 800, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                  {pick.category} Top Pick
+                </div>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: "1.2rem", fontWeight: 800 }}>{pick.symbol}</div>
+                    <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>{pick.full_symbol}</div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div style={{ fontSize: "1rem", fontWeight: 700 }}>₹{pick.current_price?.toFixed(2)}</div>
+                    <div style={{ color: "var(--green)", fontSize: "0.8rem", fontWeight: 700 }}>
+                      ↗ {pick.upside}%
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {!isOldFormat && (
         <div style={{ 
