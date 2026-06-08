@@ -18,3 +18,8 @@ alembic
 bcrypt
 PyJWT
 curl_cffi
+ta
+xgboost
+scikit-learn
+transformers
+torch

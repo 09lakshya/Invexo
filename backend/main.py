@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from routers import market, predict, search, news, portfolio, advisor, auth
+from routers import market, predict, search, news, portfolio, advisor, auth, admin
 from services.rate_limiter import rate_limit_auth
 
 app = FastAPI()
@@ -63,4 +63,5 @@ app.include_router(news.router)          # ← added
 app.include_router(portfolio.router)     # ← added
 app.include_router(advisor.router)       # ← added
 app.include_router(auth.router, dependencies=[Depends(rate_limit_auth)])
+app.include_router(admin.router)         # ← added
 

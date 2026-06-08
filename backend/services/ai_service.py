@@ -8,6 +8,9 @@ import os
 import time
 import gc
 from functools import wraps
+import json
+import xgboost as xgb
+import ta
 
 from services.ticker_utils import (
     _yf_session,
@@ -112,59 +115,51 @@ def calculate_stochastic(df, k_period=14, d_period=3):
     return k_series, d
 
 
-FINANCIAL_LEXICON = {
-    # Bullish keywords (positive influence)
-    "profit": 1.2, "revenue": 1.1, "earnings": 1.1, "growth": 1.2, "surges": 1.5,
-    "rises": 1.1, "leap": 1.4, "leaps": 1.4, "jump": 1.2, "jumps": 1.2,
-    "beat": 1.3, "beats": 1.3, "outperform": 1.4, "outperforms": 1.4,
-    "bullish": 1.5, "buy": 1.2, "strong": 1.2, "recovery": 1.3, "recover": 1.2,
-    "upward": 1.2, "gains": 1.2, "gain": 1.1, "positive": 1.1, "expansion": 1.2,
-    "expand": 1.1, "dividend": 1.3, "acquisition": 1.3, "partnership": 1.2,
-    "deal": 1.1, "hikes": 1.3, "hike": 1.2, "record-breaking": 1.5, "soars": 1.5,
-    
-    # Bearish keywords (negative influence)
-    "loss": -1.3, "losses": -1.4, "drop": -1.1, "drops": -1.1, "slump": -1.4,
-    "slumps": -1.4, "fall": -1.1, "falls": -1.1, "decline": -1.2, "declines": -1.2,
-    "bearish": -1.5, "sell": -1.2, "weak": -1.2, "plunge": -1.5, "plunges": -1.5,
-    "downward": -1.2, "debt": -1.1, "defaults": -1.5, "default": -1.4,
-    "investigation": -1.4, "probe": -1.4, "fine": -1.2, "fined": -1.3,
-    "regulatory": -1.1, "sanction": -1.3, "warning": -1.2, "warns": -1.2,
-    "miss": -1.2, "misses": -1.2, "scam": -1.6, "fraud": -1.6, "crash": -1.5,
-    "crashes": -1.5, "liabilities": -1.1, "bankrupt": -1.8, "bankruptcy": -1.8
-}
+_finbert_pipeline = None
 
+def get_finbert_pipeline():
+    global _finbert_pipeline
+    if _finbert_pipeline is None:
+        try:
+            from transformers import pipeline
+            # Load the ProsusAI/finbert model for financial sentiment analysis
+            _finbert_pipeline = pipeline("sentiment-analysis", model="ProsusAI/finbert")
+        except Exception as e:
+            print(f"Error loading FinBERT: {e}")
+            _finbert_pipeline = "fallback"
+    return _finbert_pipeline
 
 def analyze_financial_sentiment(text):
-    """Analyze sentiment of text using TextBlob adjusted by a financial lexicon"""
+    """Analyze sentiment of text using FinBERT"""
     if not text:
         return 50.0
-    try:
-        blob = TextBlob(str(text))
-        polarity = blob.sentiment.polarity
-        base_score = (polarity + 1) * 50.0  # 0 to 100
-    except Exception:
-        base_score = 50.0
+    
+    pipeline_fn = get_finbert_pipeline()
+    if pipeline_fn == "fallback":
+        # Fallback to neutral if loading failed
+        return 50.0
         
-    # Apply financial lexicon weights
     try:
-        text_lower = str(text).lower()
-        words = text_lower.split()
-        adjustment = 0.0
-        matched_words = 0
-        for word in words:
-            clean_word = word.strip(".,!?;:()\"'")
-            if clean_word in FINANCIAL_LEXICON:
-                adjustment += FINANCIAL_LEXICON[clean_word]
-                matched_words += 1
-                
-        if matched_words > 0:
-            # Scale adjustment to maximum +/- 25 points influence
-            avg_adj = (adjustment / matched_words) * 15.0
-            base_score += avg_adj
-    except Exception:
-        pass
+        # FinBERT has a max length limit (typically 512 tokens), let's truncate
+        short_text = str(text)[:500]
+        result = pipeline_fn(short_text)[0]
+        label = result['label']
+        score = result['score']
         
-    return max(0.0, min(100.0, base_score))
+        # Convert to 0-100 scale: 
+        # positive -> 55 to 100
+        # neutral -> 45 to 55
+        # negative -> 0 to 45
+        if label == 'positive':
+            return 55.0 + (score * 45.0)
+        elif label == 'negative':
+            return 45.0 - (score * 45.0)
+        else:
+            # Neutral: center around 50
+            return 50.0
+    except Exception as e:
+        print(f"FinBERT sentiment error: {e}")
+        return 50.0
 
 
 def analyze_sentiment(text):
@@ -421,42 +416,39 @@ def predict_stock(symbol: str):
         change = current_price - prev_price
         percent_change = (change / prev_price) * 100
 
-        # ===== TECHNICAL INDICATORS =====
-        rsi = calculate_rsi(close).iloc[-1]
+        # ===== TECHNICAL INDICATORS (using ta library) =====
+        rsi = float(ta.momentum.RSIIndicator(close=close, window=14).rsi().iloc[-1])
         
         # MACD
-        macd_line, signal_line, histogram = calculate_macd(close)
-        current_macd = macd_line.iloc[-1]
-        current_signal = signal_line.iloc[-1]
-        current_histogram = histogram.iloc[-1]
+        macd_obj = ta.trend.MACD(close=close)
+        current_macd = float(macd_obj.macd().iloc[-1])
+        current_signal = float(macd_obj.macd_signal().iloc[-1])
+        current_histogram = float(macd_obj.macd_diff().iloc[-1])
         
         # Bollinger Bands
-        upper_bb, middle_bb, lower_bb = calculate_bollinger_bands(close)
-        current_upper = upper_bb.iloc[-1]
-        current_middle = middle_bb.iloc[-1]
-        current_lower = lower_bb.iloc[-1]
+        bb_obj = ta.volatility.BollingerBands(close=close, window=20, window_dev=2)
+        current_upper = float(bb_obj.bollinger_hband().iloc[-1])
+        current_middle = float(bb_obj.bollinger_mavg().iloc[-1])
+        current_lower = float(bb_obj.bollinger_lband().iloc[-1])
         
         # Moving Averages (SMA)
-        ma20 = close.rolling(20).mean().iloc[-1]
-        ma50 = close.rolling(50).mean().iloc[-1]
-        ma200 = close.rolling(200).mean().iloc[-1] if len(close) >= 200 else np.nan
+        ma20 = float(close.rolling(20).mean().iloc[-1])
+        ma50 = float(close.rolling(50).mean().iloc[-1])
         
         # Exponential Moving Averages (EMA 9 and 21)
-        ema9 = close.ewm(span=9, adjust=False).mean()
-        ema21 = close.ewm(span=21, adjust=False).mean()
-        current_ema9 = ema9.iloc[-1]
-        current_ema21 = ema21.iloc[-1]
+        current_ema9 = float(ta.trend.EMAIndicator(close=close, window=9).ema_indicator().iloc[-1])
+        current_ema21 = float(ta.trend.EMAIndicator(close=close, window=21).ema_indicator().iloc[-1])
         
         # ADX (Average Directional Index)
-        plus_di_series, minus_di_series, adx_series = calculate_adx(df)
-        current_adx = adx_series.iloc[-1]
-        current_plus_di = plus_di_series.iloc[-1]
-        current_minus_di = minus_di_series.iloc[-1]
+        adx_obj = ta.trend.ADXIndicator(high=df["High"], low=df["Low"], close=df["Close"], window=14)
+        current_adx = float(adx_obj.adx().iloc[-1])
+        current_plus_di = float(adx_obj.adx_pos().iloc[-1])
+        current_minus_di = float(adx_obj.adx_neg().iloc[-1])
         
         # Stochastic Oscillator
-        stoch_k_series, stoch_d_series = calculate_stochastic(df)
-        current_stoch_k = stoch_k_series.iloc[-1]
-        current_stoch_d = stoch_d_series.iloc[-1]
+        stoch_obj = ta.momentum.StochasticOscillator(high=df["High"], low=df["Low"], close=df["Close"], window=14, smooth_window=3)
+        current_stoch_k = float(stoch_obj.stoch().iloc[-1])
+        current_stoch_d = float(stoch_obj.stoch_signal().iloc[-1])
         
         # Volume Analysis
         avg_volume = volume.rolling(20).mean().iloc[-1]
@@ -602,8 +594,8 @@ def predict_stock(symbol: str):
         intraday_bias = expected_move * 0.35
         day_close_prediction = current_price * (1 + intraday_bias) + slope * 0.35
         
-        day_close_prediction = max(day_close_prediction, lower_bb.iloc[-1])
-        day_close_prediction = min(day_close_prediction, upper_bb.iloc[-1])
+        day_close_prediction = max(day_close_prediction, current_lower)
+        day_close_prediction = min(day_close_prediction, current_upper)
 
         # ===== CONFIDENCE CALIBRATION =====
         # Base confidence from consensus ratio (ranges from 50% to 90% typically)
@@ -639,12 +631,49 @@ def predict_stock(symbol: str):
         raw_day_close_conf = base_confidence + (adx_boost * 0.6) - (vol_penalty * 1.2) + agreement_boost
         day_close_confidence = int(max(40, min(97, round(raw_day_close_conf))))
 
+        # ===== XGBOOST INFERENCE =====
+        xgb_prediction = None
+        try:
+            model_base_name = symbol.replace('.NS', '').replace('.BO', '')
+            base_dir = os.path.dirname(os.path.dirname(__file__))
+            models_dir = os.environ.get("RENDER_DISK_PATH", os.path.join(base_dir, "models"))
+            model_path = os.path.join(models_dir, f"{model_base_name}_xgb.json")
+            
+            if os.path.exists(model_path):
+                # Load XGBoost model
+                model = xgb.XGBRegressor()
+                model.load_model(model_path)
+                
+                # We need to construct the feature row precisely as it was during training
+                roc_5 = float(ta.momentum.ROCIndicator(close=close, window=5).roc().iloc[-1])
+                roc_20 = float(ta.momentum.ROCIndicator(close=close, window=20).roc().iloc[-1])
+                vol_ema_20 = float(ta.trend.EMAIndicator(close=volume, window=20).ema_indicator().iloc[-1])
+                
+                features = [
+                    current_price, current_volume, rsi, current_macd, current_signal, current_histogram,
+                    current_upper, current_middle, current_lower, current_upper - current_lower,
+                    current_ema9, current_ema21, current_adx, current_plus_di, current_minus_di,
+                    current_stoch_k, current_stoch_d, roc_5, roc_20, vol_ema_20
+                ]
+                
+                X_pred = pd.DataFrame([features], columns=[
+                    'Close', 'Volume', 'rsi', 'macd', 'macd_signal', 'macd_diff',
+                    'bb_upper', 'bb_middle', 'bb_lower', 'bb_width',
+                    'ema9', 'ema21', 'adx', 'plus_di', 'minus_di',
+                    'stoch_k', 'stoch_d', 'roc_5', 'roc_20', 'vol_ema_20'
+                ])
+                
+                xgb_prediction = float(model.predict(X_pred)[0])
+        except Exception as e:
+            print(f"XGB inference error for {symbol}: {e}")
+
         result = {
             "current_price": round(current_price, 2),
             "change": round(change, 2),
             "percent_change": round(percent_change, 2),
             "predicted_price": round(predicted_price, 2),
             "day_close_prediction": round(day_close_prediction, 2),
+            "xgb_predicted_price": round(xgb_prediction, 2) if xgb_prediction else None,
             "confidence": confidence,
             "day_close_confidence": day_close_confidence,
             "trend": trend,
