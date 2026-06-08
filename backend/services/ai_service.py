@@ -397,6 +397,31 @@ def predict_stock(symbol: str):
         # Get more historical data for better accuracy
         stock = yf.Ticker(_get_working_ticker(symbol))
         df = stock.history(period="6mo")  # Reduced from 1y to 6mo to save memory
+        
+        # Fetch the real-time last price to ensure accuracy and append if necessary
+        try:
+            last_price = stock.fast_info.get("lastPrice")
+            if last_price is not None and not np.isnan(last_price):
+                import pandas as pd
+                if not df.empty:
+                    # If last row's Close is NaN, drop it first
+                    if pd.isna(df['Close'].iloc[-1]):
+                        df = df.dropna(subset=["Close"])
+                    
+                    if not df.empty:
+                        last_date = df.index[-1].date()
+                        today = pd.Timestamp.now(tz=df.index.tz).date()
+                        if last_date < today:
+                            # Append new row
+                            new_idx = pd.Timestamp.now(tz=df.index.tz)
+                            df.loc[new_idx] = df.iloc[-1] # copy previous row for defaults
+                            df.at[new_idx, 'Close'] = float(last_price)
+                        else:
+                            # Update today's row
+                            df.iloc[-1, df.columns.get_loc('Close')] = float(last_price)
+        except Exception as e:
+            print("Error patching last price:", e)
+
         df = df.dropna(subset=["Close"])
         
         if df.empty or len(df) < 50:

@@ -12,8 +12,14 @@ def get_stock_price(symbol: str):
     for ticker_symbol in _ticker_candidates(symbol):
         try:
             stock = yf.Ticker(ticker_symbol)
-            df = stock.history(period="2d")
-
+            
+            # Try fast_info for real-time accurate price
+            last_price = stock.fast_info.get("lastPrice")
+            if last_price is not None and not __import__("math").isnan(last_price):
+                return float(last_price)
+                
+            # Fallback to intraday 5m
+            df = stock.history(period="1d", interval="5m")
             if df.empty:
                 continue
 
