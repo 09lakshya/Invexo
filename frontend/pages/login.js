@@ -500,7 +500,6 @@ export default function LoginPage() {
                         type={showPassword ? "text" : "password"}
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder="••••••••"
                         autoComplete="new-password"
                         style={{
                           width: "100%",
@@ -710,7 +709,6 @@ export default function LoginPage() {
                           type="email"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
-                          placeholder="you@example.com"
                           autoComplete="email"
                           style={inputStyle}
                           onFocus={(e) =>
@@ -731,7 +729,6 @@ export default function LoginPage() {
                             type={showPassword ? "text" : "password"}
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
-                            placeholder="••••••••"
                             autoComplete={
                               mode === "login" ? "current-password" : "new-password"
                             }
@@ -822,7 +819,6 @@ export default function LoginPage() {
                               type={showConfirmPw ? "text" : "password"}
                               value={confirmPw}
                               onChange={(e) => setConfirmPw(e.target.value)}
-                              placeholder="••••••••"
                               autoComplete="new-password"
                               style={{ ...inputStyle, paddingRight: "46px" }}
                               onFocus={(e) =>
