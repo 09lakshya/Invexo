@@ -126,6 +126,18 @@ def generate_daily_picks(force=False):
     """Runs the AI model on all universes, picks top stocks, and saves them."""
     today = get_today_date_str()
     
+    # Atomic file-based lock to prevent multiple uvicorn worker processes from running concurrently
+    import tempfile
+    lock_file = os.path.join(tempfile.gettempdir(), f"invexo_picks_{today}.lock")
+    if not force:
+        try:
+            fd = os.open(lock_file, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.write(fd, b"locked")
+            os.close(fd)
+        except FileExistsError:
+            print(f"[Daily Picks] Another worker process is already generating picks for {today}. Skipping duplicate execution.")
+            return
+            
     picks = get_daily_picks()
     if picks is not None and not force:
         if isinstance(picks, list):
