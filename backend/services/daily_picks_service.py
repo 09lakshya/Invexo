@@ -143,13 +143,33 @@ def generate_daily_picks(force=False):
         if isinstance(picks, list):
             print(f"[Daily Picks] Found legacy array format for {today}. Forcing regeneration to multi-cap format.")
         else:
-            # Check for legacy abnormal predictions (e.g. >15% upside caused by extrapolation bug)
+            # Check for legacy abnormal predictions (e.g. >3% for large caps, >5% for mid caps, >8% for small caps)
             # and auto-trigger regeneration if found.
             has_anomaly = False
             if isinstance(picks, dict):
+                large_caps = {
+                    "RELIANCE", "TCS", "HDFCBANK", "ICICIBANK", "INFY",
+                    "ITC", "SBIN", "BHARTIARTL", "HINDUNILVR", "BAJFINANCE",
+                    "LT", "KOTAKBANK", "AXISBANK", "ASIANPAINT", "MARUTI",
+                    "SUNPHARMA", "TITAN", "ULTRACEMCO", "WIPRO", "TATAMOTORS"
+                }
+                mid_caps = {
+                    "TRENT", "HAL", "TATAELXSI", "IRCTC", "DIXON",
+                    "POLYCAB", "CUMMINSIND", "COFORGE", "PERSISTENT", "AUBANK",
+                    "IDFCFIRSTB", "FEDERALBNK", "PAGEIND", "VOLTAS", "MAXHEALTH",
+                    "OBEROIRLTY", "LUPIN", "BSE", "INDHOTEL", "MRF"
+                }
                 for cap, cap_picks in picks.items():
                     for pick in cap_picks:
-                        if pick.get("upside", 0) > 15:
+                        symbol = pick.get("symbol", "").upper().replace(".NS", "").replace(".BO", "")
+                        upside = pick.get("upside", 0)
+                        if symbol in large_caps and upside > 3.0:
+                            has_anomaly = True
+                            break
+                        elif symbol in mid_caps and upside > 5.0:
+                            has_anomaly = True
+                            break
+                        elif symbol not in large_caps and symbol not in mid_caps and upside > 8.0:
                             has_anomaly = True
                             break
             
