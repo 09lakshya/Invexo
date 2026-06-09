@@ -413,6 +413,8 @@ export default function LoginPage() {
             >
               {flowMode === "otp"
                 ? "We've sent a 6-digit verification code to your email."
+                : flowMode === "new-password"
+                ? "Choose a new password for your account."
                 : mode === "login"
                 ? "Welcome back. Sign in to continue."
                 : mode === "forgot-password"
@@ -463,9 +465,11 @@ export default function LoginPage() {
 
             {(flowMode === "otp" || flowMode === "new-password") ? (
               <form onSubmit={flowMode === "otp" ? handleOtpSubmit : handleNewPasswordSubmit}>
-                <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", marginBottom: "20px", lineHeight: 1.5 }}>
-                  Please enter the 6-digit verification code sent to <strong style={{ color: "var(--accent)" }}>{email}</strong>:
-                </p>
+                {flowMode === "otp" && (
+                  <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", marginBottom: "20px", lineHeight: 1.5 }}>
+                    Please enter the 6-digit verification code sent to <strong style={{ color: "var(--accent)" }}>{email}</strong>:
+                  </p>
+                )}
 
                 {/* 6 Digit Inputs */}
                 {flowMode === "otp" && (
@@ -712,49 +716,51 @@ export default function LoginPage() {
                 </button>
 
                 {/* Actions: Resend / Back */}
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.85rem" }}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setFlowMode("credentials");
-                      setError("");
-                    }}
-                    style={{
-                      background: "none",
-                      border: "none",
-                      color: "var(--text-muted)",
-                      cursor: "pointer",
-                      padding: 0,
-                      textDecoration: "underline",
-                      fontFamily: "inherit",
-                    }}
-                  >
-                    Edit Details
-                  </button>
-
-                  {cooldown > 0 ? (
-                    <span style={{ color: "var(--text-muted)" }}>
-                      Resend code in {cooldown}s
-                    </span>
-                  ) : (
+                {flowMode === "otp" && (
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.85rem" }}>
                     <button
                       type="button"
-                      onClick={handleResendOtp}
+                      onClick={() => {
+                        setFlowMode("credentials");
+                        setError("");
+                      }}
                       style={{
                         background: "none",
                         border: "none",
-                        color: "var(--accent)",
-                        fontWeight: 700,
+                        color: "var(--text-muted)",
                         cursor: "pointer",
                         padding: 0,
                         textDecoration: "underline",
                         fontFamily: "inherit",
                       }}
                     >
-                      Resend Code
+                      Edit Details
                     </button>
-                  )}
-                </div>
+
+                    {cooldown > 0 ? (
+                      <span style={{ color: "var(--text-muted)" }}>
+                        Resend code in {cooldown}s
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleResendOtp}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "var(--accent)",
+                          fontWeight: 700,
+                          cursor: "pointer",
+                          padding: 0,
+                          textDecoration: "underline",
+                          fontFamily: "inherit",
+                        }}
+                      >
+                        Resend Code
+                      </button>
+                    )}
+                  </div>
+                )}
               </form>
             ) : (
               <>
