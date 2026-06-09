@@ -2,8 +2,6 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends, Security
 from fastapi.security import APIKeyHeader
 import os
 
-from scripts.train_xgboost import run_training_job
-
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 # Very simple security for the cron job ping
@@ -21,6 +19,7 @@ async def trigger_training(background_tasks: BackgroundTasks, token: str = Depen
     Triggers the XGBoost ML training script in the background.
     Protected by X-Admin-Token header.
     """
+    from scripts.train_xgboost import run_training_job
     # Run in background so the caller doesn't timeout waiting for 2000+ models to train
     background_tasks.add_task(run_training_job, all_symbols=True, force=True)
     return {"status": "success", "message": "Background ML training job started"}

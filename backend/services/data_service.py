@@ -1,4 +1,3 @@
-import yfinance as yf
 import requests
 from datetime import datetime
 import pytz
@@ -9,6 +8,7 @@ from services.ticker_utils import _yf_session, ttl_cache, _ticker_candidates
 # =========================
 @ttl_cache(maxsize=100, ttl=60)
 def get_stock_price(symbol: str):
+    import yfinance as yf
     for ticker_symbol in _ticker_candidates(symbol):
         try:
             stock = yf.Ticker(ticker_symbol)

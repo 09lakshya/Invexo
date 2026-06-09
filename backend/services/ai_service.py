@@ -1,7 +1,6 @@
 import yfinance as yf
 import numpy as np
 import pandas as pd
-from textblob import TextBlob
 import requests
 from bs4 import BeautifulSoup
 import os
@@ -9,8 +8,6 @@ import time
 import gc
 from functools import wraps
 import json
-import xgboost as xgb
-import ta
 
 from services.ticker_utils import (
     _yf_session,
@@ -150,6 +147,7 @@ def analyze_financial_sentiment(text):
             
     # Fallback to TextBlob if HF_API_KEY is missing, rate-limited, or fails
     try:
+        from textblob import TextBlob
         blob = TextBlob(short_text)
         polarity = blob.sentiment.polarity
         # Convert -1.0 to 1.0 scale to 0-100 scale
@@ -395,6 +393,8 @@ def calculate_technical_quality_score(close, volume):
 
 @ttl_cache(maxsize=100, ttl=300)
 def predict_stock(symbol: str):
+    import ta
+    import xgboost as xgb
     try:
         # Get more historical data for better accuracy
         stock = yf.Ticker(_get_working_ticker(symbol), session=_yf_session)

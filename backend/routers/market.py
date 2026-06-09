@@ -4,7 +4,6 @@ import io
 import os
 import json
 from contextlib import redirect_stdout, redirect_stderr
-import yfinance as yf
 import gc
 from services.data_service import get_stock_price, get_history
 
@@ -77,6 +76,7 @@ async def update_market_cache():
             # Bulk download all tickers at once (fast!)
             # yfinance can print noisy "Failed download" messages directly to stdout/stderr.
             # Suppress those here and let our own fallback/cache handling decide behavior.
+            import yfinance as yf
             with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
                 df = yf.download(ticker_string, period="5d", interval="1d", progress=False)
             

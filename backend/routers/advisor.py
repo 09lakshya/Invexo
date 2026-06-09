@@ -1,7 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Optional
-from services.advisor_service import get_recommendations
 from services.calculator_service import calculate_investment, calculate_portfolio_metrics, estimate_returns
 
 router = APIRouter(prefix="/advisor")
@@ -25,6 +24,7 @@ class CalculatorInput(BaseModel):
 
 @router.post("/recommend")
 def recommend(payload: AdvisorInput):
+    from services.advisor_service import get_recommendations
     return get_recommendations(
         goal=payload.goal,
         duration=payload.duration,
