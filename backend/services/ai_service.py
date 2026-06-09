@@ -706,10 +706,41 @@ def predict_stock(symbol: str):
                 
                 # Check for unrealistic target price (e.g. daily circuit limits in India are max 20%)
                 # If predicted change is > 15%, we treat it as an extrapolation outlier and fall back.
-                xgb_change = abs(xgb_prediction - current_price) / current_price
-                if xgb_change > 0.15:
+                xgb_change_pct = (xgb_prediction - current_price) / current_price
+                if abs(xgb_change_pct) > 0.15:
                     print(f"[AI Service] XGBoost prediction for {symbol} is unrealistic ({xgb_prediction:.2f} vs {current_price:.2f}). Discarding.")
                     xgb_prediction = None
+                else:
+                    # Clip the prediction to realistic daily boundaries based on market cap universe
+                    symbol_clean = symbol.upper()
+                    if not symbol_clean.endswith(".NS") and not symbol_clean.endswith(".BO"):
+                        symbol_with_suffix = f"{symbol_clean}.NS"
+                    else:
+                        symbol_with_suffix = symbol_clean
+
+                    large_caps = {
+                        "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "ICICIBANK.NS", "INFY.NS",
+                        "ITC.NS", "SBIN.NS", "BHARTIARTL.NS", "HINDUNILVR.NS", "BAJFINANCE.NS",
+                        "LT.NS", "KOTAKBANK.NS", "AXISBANK.NS", "ASIANPAINT.NS", "MARUTI.NS",
+                        "SUNPHARMA.NS", "TITAN.NS", "ULTRACEMCO.NS", "WIPRO.NS", "TATAMOTORS.NS"
+                    }
+                    mid_caps = {
+                        "TRENT.NS", "HAL.NS", "TATAELXSI.NS", "IRCTC.NS", "DIXON.NS",
+                        "POLYCAB.NS", "CUMMINSIND.NS", "COFORGE.NS", "PERSISTENT.NS", "AUBANK.NS",
+                        "IDFCFIRSTB.NS", "FEDERALBNK.NS", "PAGEIND.NS", "VOLTAS.NS", "MAXHEALTH.NS",
+                        "OBEROIRLTY.NS", "LUPIN.NS", "BSE.NS", "INDHOTEL.NS", "MRF.NS"
+                    }
+                    
+                    if symbol_with_suffix in large_caps:
+                        max_xgb_change = 0.03
+                    elif symbol_with_suffix in mid_caps:
+                        max_xgb_change = 0.05
+                    else:
+                        max_xgb_change = 0.08
+                        
+                    if abs(xgb_change_pct) > max_xgb_change:
+                        clipped_change = np.clip(xgb_change_pct, -max_xgb_change, max_xgb_change)
+                        xgb_prediction = current_price * (1 + clipped_change)
         except Exception as e:
             print(f"XGB inference error for {symbol}: {e}")
 
