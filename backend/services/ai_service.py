@@ -397,14 +397,13 @@ def calculate_technical_quality_score(close, volume):
 def predict_stock(symbol: str):
     try:
         # Get more historical data for better accuracy
-        stock = yf.Ticker(_get_working_ticker(symbol))
+        stock = yf.Ticker(_get_working_ticker(symbol), session=_yf_session)
         df = stock.history(period="6mo")  # Reduced from 1y to 6mo to save memory
         
         # Fetch the real-time last price to ensure accuracy and append if necessary
         try:
             last_price = stock.fast_info.get("lastPrice")
             if last_price is not None and not np.isnan(last_price):
-                import pandas as pd
                 if not df.empty:
                     # If last row's Close is NaN, drop it first
                     if pd.isna(df['Close'].iloc[-1]):
@@ -581,9 +580,12 @@ def predict_stock(symbol: str):
 
         sentiment_factor = (news_sentiment - 50) / 100  # -0.5 to 0.5
         fundamental_factor = (fundamental_score - 50) / 100  # -0.5 to 0.5
-        momentum_5d = close.iloc[-1] / close.iloc[-min(6, len(close))] - 1
-        momentum_20d = close.iloc[-1] / close.iloc[-min(21, len(close))] - 1
-        mean_reversion = (current_middle - current_price) / current_price if current_price else 0
+        
+        # Scale multi-day returns to 1-day daily terms for realistic daily horizon
+        momentum_5d = (close.iloc[-1] / close.iloc[-min(6, len(close))] - 1) / 5
+        momentum_20d = (close.iloc[-1] / close.iloc[-min(21, len(close))] - 1) / 20
+        # Scale mean reversion to daily terms (assuming a 10-day adjustment period)
+        mean_reversion = ((current_middle - current_price) / current_price if current_price else 0) / 10
 
         # ADX regime scaling: trending vs range-bound
         # Normalize ADX from 0 to 1 between 15 (choppy) and 45 (extremely trending)
@@ -599,11 +601,12 @@ def predict_stock(symbol: str):
         expected_move = (
             (momentum_5d * 0.6 + momentum_20d * 0.4) * w_momentum
             + mean_reversion * w_reversion
-            + sentiment_factor * w_sentiment
-            + fundamental_factor * w_fundamental
+            + (sentiment_factor / 10) * w_sentiment       # Scale daily impact of sentiment
+            + (fundamental_factor / 10) * w_fundamental  # Scale daily impact of fundamentals
         )
         
-        max_move = max(0.015, min(0.08, volatility * 2.2))
+        # Dynamic daily cap based on volatility (typically capped at 3-5% for large/mid/small cap safety)
+        max_move = max(0.015, min(0.04, volatility * 1.5))
         expected_move = max(-max_move, min(max_move, expected_move))
         predicted_price = current_price * (1 + expected_move)
 
@@ -660,8 +663,18 @@ def predict_stock(symbol: str):
             base_dir = os.path.dirname(os.path.dirname(__file__))
             models_dir = os.environ.get("RENDER_DISK_PATH", os.path.join(base_dir, "models"))
             model_path = os.path.join(models_dir, f"{model_base_name}_xgb.json")
+            meta_path = os.path.join(models_dir, f"{model_base_name}_meta.json")
             
-            if os.path.exists(model_path):
+            # Load metadata to verify model quality
+            r2_good = True
+            if os.path.exists(meta_path):
+                with open(meta_path, 'r') as f:
+                    meta_meta = json.load(f)
+                    # Discard model if validation R2 is negative or extremely low
+                    if meta_meta.get("r2", 1.0) < 0.1:
+                        r2_good = False
+            
+            if os.path.exists(model_path) and r2_good:
                 global _loaded_models
                 if model_path not in _loaded_models:
                     model = xgb.XGBRegressor()
@@ -690,6 +703,13 @@ def predict_stock(symbol: str):
                 ])
                 
                 xgb_prediction = float(model.predict(X_pred)[0])
+                
+                # Check for unrealistic target price (e.g. daily circuit limits in India are max 20%)
+                # If predicted change is > 15%, we treat it as an extrapolation outlier and fall back.
+                xgb_change = abs(xgb_prediction - current_price) / current_price
+                if xgb_change > 0.15:
+                    print(f"[AI Service] XGBoost prediction for {symbol} is unrealistic ({xgb_prediction:.2f} vs {current_price:.2f}). Discarding.")
+                    xgb_prediction = None
         except Exception as e:
             print(f"XGB inference error for {symbol}: {e}")
 

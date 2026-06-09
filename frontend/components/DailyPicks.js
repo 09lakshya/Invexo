@@ -203,7 +203,7 @@ export default function DailyPicks() {
 
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "4px" }}>
               <span style={{ fontSize: "0.7rem", background: "var(--accent-dim)", color: "var(--accent)", padding: "4px 8px", borderRadius: "6px", fontWeight: 700 }}>
-                Target: ₹{pick.target_price?.toFixed(2)}
+                1-Day Target: ₹{pick.target_price?.toFixed(2)}
               </span>
               <span style={{ fontSize: "0.7rem", background: "var(--surface-hover)", color: "var(--text-secondary)", padding: "4px 8px", borderRadius: "6px", fontWeight: 600 }}>
                 {pick.sentiment} News

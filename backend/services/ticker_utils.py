@@ -51,7 +51,7 @@ def _ticker_candidates(symbol: str):
 def _working_ticker(symbol: str):
     for candidate in _ticker_candidates(symbol):
         try:
-            df = yf.Ticker(candidate).history(period="5d")
+            df = yf.Ticker(candidate, session=_yf_session).history(period="5d")
             df = df.dropna(subset=["Close"])
             if not df.empty:
                 return candidate
