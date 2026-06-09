@@ -39,6 +39,7 @@ def init_daily_picks_db():
                 picks_json TEXT NOT NULL
             )
         """)
+        c.execute("ALTER TABLE daily_picks ENABLE ROW LEVEL SECURITY")
     else:
         c.execute("""
             CREATE TABLE IF NOT EXISTS daily_picks (

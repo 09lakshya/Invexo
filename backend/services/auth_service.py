@@ -539,6 +539,7 @@ def init_users_db():
                 profile_photo TEXT
             )
         """)
+        c.execute("ALTER TABLE users ENABLE ROW LEVEL SECURITY")
     else:
         c.execute("""
             CREATE TABLE IF NOT EXISTS users (

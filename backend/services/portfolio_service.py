@@ -17,6 +17,7 @@ def init_db():
                 added_on      VARCHAR(255)
             )
         """)
+        c.execute("ALTER TABLE portfolio ENABLE ROW LEVEL SECURITY")
     else:
         c.execute("""
             CREATE TABLE IF NOT EXISTS portfolio (
