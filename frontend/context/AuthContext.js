@@ -42,6 +42,36 @@ const resizeImage = (base64Str, maxWidth = 150, maxHeight = 150) => {
   });
 };
 
+const setCookie = (name, value, days) => {
+  let expires = "";
+  if (days) {
+    const date = new Date();
+    date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+    expires = "; expires=" + date.toUTCString();
+  }
+  if (typeof document !== "undefined") {
+    document.cookie = name + "=" + (value || "") + expires + "; path=/; secure; samesite=lax";
+  }
+};
+
+const getCookie = (name) => {
+  if (typeof document === "undefined") return null;
+  const nameEQ = name + "=";
+  const ca = document.cookie.split(';');
+  for (let i = 0; i < ca.length; i++) {
+    let c = ca[i];
+    while (c.charAt(0) == ' ') c = c.substring(1, c.length);
+    if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length, c.length);
+  }
+  return null;
+};
+
+const eraseCookie = (name) => {
+  if (typeof document !== "undefined") {
+    document.cookie = name + '=; Max-Age=-99999999; path=/';
+  }
+};
+
 const AuthContext = createContext(null);
 
 export function useAuth() {
@@ -56,7 +86,8 @@ export function AuthProvider({ children }) {
   const refreshUser = async () => {
     const stored =
       localStorage.getItem("ntrade_token") ||
-      sessionStorage.getItem("ntrade_token");
+      sessionStorage.getItem("ntrade_token") ||
+      getCookie("ntrade_token");
 
     if (!stored) return null;
 
@@ -68,11 +99,12 @@ export function AuthProvider({ children }) {
     return res.data;
   };
 
-  // On mount, restore session from localStorage or sessionStorage
+  // On mount, restore session from localStorage, sessionStorage, or cookie
   useEffect(() => {
     const stored =
       localStorage.getItem("ntrade_token") ||
-      sessionStorage.getItem("ntrade_token");
+      sessionStorage.getItem("ntrade_token") ||
+      getCookie("ntrade_token");
 
     if (!stored) {
       setLoading(false);
@@ -91,6 +123,7 @@ export function AuthProvider({ children }) {
         // Token invalid or expired; clear it
         localStorage.removeItem("ntrade_token");
         sessionStorage.removeItem("ntrade_token");
+        eraseCookie("ntrade_token");
       })
       .finally(() => setLoading(false));
   }, []);
@@ -102,8 +135,10 @@ export function AuthProvider({ children }) {
     setUser(u);
     if (rememberMe) {
       localStorage.setItem("ntrade_token", tk);
+      setCookie("ntrade_token", tk, 30); // 30 days
     } else {
       sessionStorage.setItem("ntrade_token", tk);
+      setCookie("ntrade_token", tk, null); // session cookie
     }
     return u;
   };
@@ -115,8 +150,10 @@ export function AuthProvider({ children }) {
     setUser(u);
     if (rememberMe) {
       localStorage.setItem("ntrade_token", tk);
+      setCookie("ntrade_token", tk, 30);
     } else {
       sessionStorage.setItem("ntrade_token", tk);
+      setCookie("ntrade_token", tk, null);
     }
     return u;
   };
@@ -133,8 +170,10 @@ export function AuthProvider({ children }) {
     setUser(u);
     if (rememberMe) {
       localStorage.setItem("ntrade_token", tk);
+      setCookie("ntrade_token", tk, 30);
     } else {
       sessionStorage.setItem("ntrade_token", tk);
+      setCookie("ntrade_token", tk, null);
     }
     return u;
   };
@@ -159,6 +198,7 @@ export function AuthProvider({ children }) {
     setToken(null);
     localStorage.removeItem("ntrade_token");
     sessionStorage.removeItem("ntrade_token");
+    eraseCookie("ntrade_token");
     // Also clear old portfolio uid if present
     localStorage.removeItem("ntrade_uid");
   };
