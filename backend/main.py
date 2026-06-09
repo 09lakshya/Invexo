@@ -70,14 +70,18 @@ import threading
 
 scheduler = BackgroundScheduler()
 
+
+
+
 @app.on_event("startup")
 def startup_event():
+
     from services.daily_picks_service import generate_daily_picks
     scheduler.add_job(generate_daily_picks, 'cron', hour=0, minute=0)
     scheduler.start()
     
-    # Kick off an immediate run if needed
-    thread = threading.Thread(target=generate_daily_picks)
+    # Kick off an immediate run (forced, to clear out old anomalous cache)
+    thread = threading.Thread(target=generate_daily_picks, kwargs={"force": True})
     thread.daemon = True
     thread.start()
 

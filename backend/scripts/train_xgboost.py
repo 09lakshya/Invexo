@@ -76,10 +76,8 @@ def train_model(symbol, df):
     """Train XGBoost model using time-based split"""
     print(f"[{symbol}] Training on {len(df)} days of data...")
     
-    # Target is next day's close price
-    # Since we want to predict the *next* day's close, we shift the Close column by -1
-    # Note: For real trading we might predict % return instead, but price is easier for UI integration
-    df['target'] = df['Close'].shift(-1)
+    # Predict % return instead of absolute price for better stationarity
+    df['target'] = (df['Close'].shift(-1) - df['Close']) / df['Close']
     
     # Drop the last row since it doesn't have a target
     df = df.dropna()

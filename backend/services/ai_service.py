@@ -670,8 +670,8 @@ def predict_stock(symbol: str):
             if os.path.exists(meta_path):
                 with open(meta_path, 'r') as f:
                     meta_meta = json.load(f)
-                    # Discard model if validation R2 is negative or extremely low
-                    if meta_meta.get("r2", 1.0) < 0.1:
+                    # Discard model if validation R2 is extremely low
+                    if meta_meta.get("r2", 1.0) < -0.5:
                         r2_good = False
             
             if os.path.exists(model_path) and r2_good:
@@ -702,7 +702,13 @@ def predict_stock(symbol: str):
                     'stoch_k', 'stoch_d', 'roc_5', 'roc_20', 'vol_ema_20'
                 ])
                 
-                xgb_prediction = float(model.predict(X_pred)[0])
+                raw_xgb = float(model.predict(X_pred)[0])
+                
+                # Backward compatibility: old models output absolute price (>10), new models output % return (between -1 and 1)
+                if abs(raw_xgb) < 2.0:
+                    xgb_prediction = current_price * (1 + raw_xgb)
+                else:
+                    xgb_prediction = raw_xgb
                 
                 # Check for unrealistic target price (e.g. daily circuit limits in India are max 20%)
                 # If predicted change is > 15%, we treat it as an extrapolation outlier and fall back.
