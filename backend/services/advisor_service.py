@@ -297,37 +297,64 @@ def _calculate_confidence(score: int, sentiment_score: float, rsi: float, trend:
 
 # ── Plain-language reason ─────────────────────────────────────────────────────
 def _reason(meta: dict, signals: dict, goal: str, duration: str, sentiment_score: float = 50) -> str:
-    name, sector = meta["name"], meta["sector"]
-    dur = DURATION_LABELS.get(duration, "")
+    name = meta.get("name", "This stock")
+    sector = meta.get("sector", "the market")
+    desc = meta.get("desc", "")
+    risk = meta.get("risk", "medium")
+    cap = meta.get("cap", "large")
+    dur = DURATION_LABELS.get(duration, "the long term")
 
-    trend_phrase = (
-        "showing strong upward momentum"
-        if signals["trend"] == "BULLISH"
-        else "currently in a consolidation phase"
-    )
+    # 1. Company Context
+    context = desc if desc else f"{name} is a key player in the {sector} sector."
+    
+    # 2. Goal & Risk Alignment
+    if goal == "wealth":
+        if risk == "high":
+            alignment = f"As a higher-risk play, it's an aggressive wealth creation candidate over the next {dur}."
+        else:
+            alignment = f"It offers steady, compounding wealth creation potential over the next {dur}."
+    elif goal == "income":
+        alignment = f"Its stable business model makes it a solid choice for consistent returns."
+    elif goal == "retirement":
+        alignment = f"Given its profile, it serves as a reliable anchor for a long-term retirement portfolio."
+    elif goal == "education":
+        alignment = f"It balances necessary growth with reasonable safety to help fund education goals over {dur}."
+    elif goal == "safety":
+        alignment = f"This is a defensive, capital-preservation pick designed to weather market volatility."
+    else:
+        alignment = f"It aligns well with your {goal} strategy over {dur}."
 
+    # 3. Technical Momentum
     rsi = signals["rsi"]
-    if   rsi < 35:         rsi_note = "Its RSI suggests it may be undervalued — potentially a great entry point."
-    elif rsi <= 55:        rsi_note = "Its RSI is in a healthy zone — not overbought, with room left to grow."
-    elif rsi <= 68:        rsi_note = "Strong buying interest — keep an eye out for any pullback before entering."
-    else:                  rsi_note = "RSI is elevated — the stock has run up recently. Consider waiting for a dip."
+    trend = signals["trend"]
+    
+    if trend == "BULLISH":
+        tech = "The stock is currently riding a strong upward trend."
+        if rsi < 40:
+            tech += " Surprisingly, it is not overbought yet, presenting a very attractive entry point."
+        elif rsi <= 60:
+            tech += " Momentum is healthy with room left to run."
+        else:
+            tech += " It has rallied hard recently, so consider accumulating on small dips."
+    else:
+        tech = "The stock is currently consolidating or in a downtrend."
+        if rsi < 35:
+            tech += " It appears technically oversold, which often signals a value-buying opportunity."
+        else:
+            tech += " It's building a base; patience may be rewarded once the trend shifts."
 
-    # Add sentiment context
-    sentiment_phrase = ""
-    if sentiment_score > 65:
-        sentiment_phrase = " Recent news sentiment is positive, adding to the bullish case."
-    elif sentiment_score < 35:
-        sentiment_phrase = " However, recent news sentiment is mixed — monitor news before investing."
+    # 4. Sentiment Context
+    if sentiment_score >= 65:
+        sentiment = "Recent news is optimistic, providing strong tailwinds."
+    elif sentiment_score > 55:
+        sentiment = "Media coverage has been generally positive."
+    elif sentiment_score < 40:
+        sentiment = "Current news sentiment is cautious, so keep an eye on developments."
+    else:
+        sentiment = ""
 
-    goal_sentence = {
-        "wealth":     f"Picked for wealth creation — {name} ({sector}) has strong long-term growth potential over {dur}.",
-        "income":     f"Suitable for steady returns — {name} is a reliable company with consistent performance.",
-        "retirement": f"Ideal for retirement planning — {name} is a blue-chip known for stability over {dur}.",
-        "education":  f"Good for an education fund — {name} balances growth and safety over {dur}.",
-        "safety":     f"A safe pick — {name} is one of India's most established companies in {sector}.",
-    }.get(goal, f"A strong pick in the {sector} sector.")
-
-    return f"{goal_sentence} It is currently {trend_phrase}. {rsi_note}{sentiment_phrase}"
+    reasoning = f"{context} {alignment} {tech} {sentiment}".strip()
+    return reasoning
 
 
 # ── Fetch signals and news sentiment for one ticker ───────────────────────────
