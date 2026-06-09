@@ -122,17 +122,30 @@ def score_and_rank_universe(universe_name, symbols):
     results.sort(key=lambda x: x["score"], reverse=True)
     return results[:10]  # Return top 10
 
-def generate_daily_picks():
+def generate_daily_picks(force=False):
     """Runs the AI model on all universes, picks top stocks, and saves them."""
     today = get_today_date_str()
     
     picks = get_daily_picks()
-    if picks is not None:
+    if picks is not None and not force:
         if isinstance(picks, list):
             print(f"[Daily Picks] Found legacy array format for {today}. Forcing regeneration to multi-cap format.")
         else:
-            print(f"[Daily Picks] Already generated multi-cap picks for {today}. Skipping.")
-            return
+            # Check for legacy abnormal predictions (e.g. >15% upside caused by extrapolation bug)
+            # and auto-trigger regeneration if found.
+            has_anomaly = False
+            if isinstance(picks, dict):
+                for cap, cap_picks in picks.items():
+                    for pick in cap_picks:
+                        if pick.get("upside", 0) > 15:
+                            has_anomaly = True
+                            break
+            
+            if not has_anomaly:
+                print(f"[Daily Picks] Already generated valid multi-cap picks for {today}. Skipping.")
+                return
+            else:
+                print(f"[Daily Picks] Detected abnormal predictions for {today}. Forcing auto-regeneration.")
         
     print(f"[Daily Picks] Starting comprehensive daily AI screening for {today}...")
     
