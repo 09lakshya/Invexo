@@ -21,18 +21,44 @@ def get_stock_news(symbol: str):
         for item in news_data[:6]:
             if not isinstance(item, dict):
                 continue
-            title = item.get("title", "")
+            content = item.get("content") or {}
+            title = item.get("title") or content.get("title") or ""
             if not title:
                 continue
-            ts = item.get("providerPublishTime", 0)
+            
+            ts = item.get("providerPublishTime")
+            if not ts:
+                pub_date = content.get("pubDate")
+                if pub_date:
+                    try:
+                        from datetime import datetime
+                        dt = datetime.strptime(pub_date[:10], "%Y-%m-%d")
+                        ts = dt.timestamp()
+                    except Exception:
+                        ts = 0
+            
             try:
-                date_str = datetime.fromtimestamp(ts).strftime("%d %b %Y")
+                if ts:
+                    date_str = datetime.fromtimestamp(ts).strftime("%d %b %Y")
+                else:
+                    date_str = "Recent"
             except Exception:
                 date_str = "Recent"
+                
+            link = item.get("link")
+            if not link:
+                click = content.get("clickThroughUrl") or {}
+                link = click.get("url", "#")
+                
+            publisher = item.get("publisher")
+            if not publisher:
+                prov = content.get("provider") or {}
+                publisher = prov.get("displayName", "")
+
             result.append({
                 "title": title,
-                "link": item.get("link", "#"),
-                "publisher": item.get("publisher", ""),
+                "link": link,
+                "publisher": publisher,
                 "date": date_str,
             })
         return result

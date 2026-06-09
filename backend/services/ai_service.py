@@ -26,6 +26,8 @@ try:
 except Exception:
     pass
 
+_loaded_models = {}
+
 
 def calculate_rsi(prices, period=14):
     delta = prices.diff()
@@ -660,9 +662,13 @@ def predict_stock(symbol: str):
             model_path = os.path.join(models_dir, f"{model_base_name}_xgb.json")
             
             if os.path.exists(model_path):
-                # Load XGBoost model
-                model = xgb.XGBRegressor()
-                model.load_model(model_path)
+                global _loaded_models
+                if model_path not in _loaded_models:
+                    model = xgb.XGBRegressor()
+                    model.load_model(model_path)
+                    _loaded_models[model_path] = model
+                else:
+                    model = _loaded_models[model_path]
                 
                 # We need to construct the feature row precisely as it was during training
                 roc_5 = float(ta.momentum.ROCIndicator(close=close, window=5).roc().iloc[-1])

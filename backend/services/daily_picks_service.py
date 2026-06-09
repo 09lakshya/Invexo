@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import concurrent.futures
 from datetime import datetime
 from services.db import get_db_connection, get_cursor, execute_query
 from services.ai_service import predict_stock
@@ -74,11 +75,12 @@ def score_and_rank_universe(universe_name, symbols):
     """Evaluates a list of symbols and returns the top 5 to 10 sorted by AI score."""
     print(f"[Daily Picks] Evaluating universe: {universe_name}...")
     results = []
-    for symbol in symbols:
+    
+    def process_symbol(symbol):
         try:
             res = predict_stock(symbol)
             if "error" in res:
-                continue
+                return None
                 
             predicted_price = res.get("xgb_predicted_price") or res.get("predicted_price", res["current_price"])
             upside_pct = ((predicted_price - res["current_price"]) / res["current_price"]) * 100
@@ -95,7 +97,7 @@ def score_and_rank_universe(universe_name, symbols):
             if composite_score != composite_score:
                 composite_score = 0
                 
-            results.append({
+            return {
                 "symbol": symbol.replace(".NS", ""),
                 "full_symbol": symbol,
                 "current_price": res["current_price"],
@@ -105,11 +107,17 @@ def score_and_rank_universe(universe_name, symbols):
                 "confidence": res.get("day_close_confidence", "Moderate"),
                 "sentiment": res.get("news_impact", "neutral").capitalize(),
                 "reasoning": f"AI model projects {round(upside_pct, 2)}% upside. Technical trend is {res.get('trend', 'neutral')}."
-            })
-            time.sleep(0.5)
+            }
         except Exception as e:
             print(f"[Daily Picks] Error evaluating {symbol}: {e}")
-            continue
+            return None
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        future_to_symbol = {executor.submit(process_symbol, sym): sym for sym in symbols}
+        for future in concurrent.futures.as_completed(future_to_symbol):
+            res = future.result()
+            if res:
+                results.append(res)
             
     results.sort(key=lambda x: x["score"], reverse=True)
     return results[:10]  # Return top 10

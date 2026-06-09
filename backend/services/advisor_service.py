@@ -343,9 +343,10 @@ def _fetch_signals_and_sentiment(symbol: str):
         news = getattr(stock_obj, 'news', []) or []
         sentiments = []
         for item in news[:5]:
-            title = item.get("title", "") or ""
-            summary = item.get("summary", "") or ""
-            text = f"{title} {summary}"
+            content = item.get("content") or {}
+            title = item.get("title") or content.get("title") or ""
+            summary = item.get("summary") or item.get("publisher") or content.get("summary") or content.get("description") or ""
+            text = f"{title} {summary}".strip()
             sentiments.append(_analyze_sentiment(text))
         sentiment_score = np.mean(sentiments) if sentiments else 50.0
     except Exception:
