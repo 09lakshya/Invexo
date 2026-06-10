@@ -675,13 +675,9 @@ def predict_stock(symbol: str):
                         r2_good = False
             
             if os.path.exists(model_path) and r2_good:
-                global _loaded_models
-                if model_path not in _loaded_models:
-                    model = xgb.XGBRegressor()
-                    model.load_model(model_path)
-                    _loaded_models[model_path] = model
-                else:
-                    model = _loaded_models[model_path]
+                # Do not cache models globally to avoid OOM on memory-constrained servers
+                model = xgb.XGBRegressor()
+                model.load_model(model_path)
                 
                 # We need to construct the feature row precisely as it was during training
                 roc_5 = float(ta.momentum.ROCIndicator(close=close, window=5).roc().iloc[-1])

@@ -116,7 +116,7 @@ def score_and_rank_universe(universe_name, symbols):
             print(f"[Daily Picks] Error evaluating {symbol}: {e}")
             return None
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
         future_to_symbol = {executor.submit(process_symbol, sym): sym for sym in symbols}
         for future in concurrent.futures.as_completed(future_to_symbol):
             res = future.result()
