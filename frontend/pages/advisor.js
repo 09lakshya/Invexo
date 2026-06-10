@@ -215,6 +215,7 @@ function PortfolioSummary({ stocks, budget, investmentType, investmentMonths }) 
   const realValue = totalExpectedReturns / inflationFactor;
   const realProfit = realValue - totalBudget;
   const realReturnPct = ((realProfit / totalBudget) * 100).toFixed(2);
+  const cagr = (((totalExpectedReturns / totalBudget) ** (1 / horizonYears)) - 1) * 100;
 
   const stats = [
     { label: isSip ? "Total SIP" : "Total Investment", value: `₹${totalBudget.toLocaleString("en-IN")}`, color: "var(--text-primary)" },
@@ -271,6 +272,7 @@ function PortfolioSummary({ stocks, budget, investmentType, investmentMonths }) 
             { label: "Returns",  value: `₹${totalProfit.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`, color: "var(--green)" },
             { label: "Total Value", value: `₹${totalExpectedReturns.toLocaleString("en-IN", { maximumFractionDigits: 0 })}`, color: "var(--green)" },
             { label: "Return %", value: `${returnPct}%`, color: "var(--green)" },
+            { label: "CAGR", value: `${cagr.toFixed(2)}%`, color: "var(--green)" },
           ].map(({ label, value, color }) => (
             <div key={label} style={{ background: "var(--bg-primary)", borderRadius: "10px", padding: "12px" }}>
               <p style={{ fontSize: "0.65rem", color: "var(--text-muted)", marginBottom: "6px", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em" }}>{label}</p>
@@ -423,10 +425,13 @@ function RecoCard({ stock, rank, totalBudget }) {
         </div>
 
         <div style={{ textAlign: "right" }}>
-          <p style={{ fontSize: "1.4rem", fontWeight: 800, color: "var(--text-primary)", fontFamily: "'Space Grotesk', sans-serif", letterSpacing: "-0.02em" }}>
+          <p style={{ fontSize: "1.4rem", fontWeight: 800, color: "var(--text-primary)", fontFamily: "'Space Grotesk', sans-serif", letterSpacing: "-0.02em", margin: 0 }}>
             ₹{stock.current_price}
           </p>
-          <p style={{ fontSize: "0.8rem", fontWeight: 700, color: bull ? "var(--green)" : "var(--red)" }}>
+          <p style={{ fontSize: "0.85rem", fontWeight: 700, color: "var(--text-secondary)", marginTop: "2px", marginBottom: "4px" }}>
+            Target: ₹{(stock.current_price * (1 + (stock.risk_level === 'high' ? 0.20 : stock.risk_level === 'medium' ? 0.14 : 0.10))).toFixed(2)}
+          </p>
+          <p style={{ fontSize: "0.8rem", fontWeight: 700, color: bull ? "var(--green)" : "var(--red)", margin: 0 }}>
             {bull ? "\u25B2 BULLISH" : "\u25BC BEARISH"}
           </p>
         </div>

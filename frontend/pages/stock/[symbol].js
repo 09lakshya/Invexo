@@ -694,9 +694,11 @@ export default function StockPage() {
                 background: "var(--bg-card)",
                 backdropFilter: "blur(16px)",
                 flexShrink: 0,
+                flexWrap: "wrap",
+                gap: "12px"
               }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                  <span style={{ color: "var(--text-primary)", fontWeight: 800, fontSize: "1rem", fontFamily: "'Space Grotesk', sans-serif" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", maxWidth: "100%" }}>
+                  <span style={{ color: "var(--text-primary)", fontWeight: 800, fontSize: "1rem", fontFamily: "'Space Grotesk', sans-serif", whiteSpace: "nowrap" }}>
                     {companyName} · {normalizedSymbol}
                   </span>
                   <div style={{
@@ -706,6 +708,9 @@ export default function StockPage() {
                     border: "1px solid var(--filter-tab-border)",
                     borderRadius: "10px",
                     padding: "2px",
+                    overflowX: "auto",
+                    WebkitOverflowScrolling: "touch",
+                    maxWidth: "100%",
                   }}>
                     {PERIODS.map(({ key, label }) => (
                       <button
@@ -722,6 +727,7 @@ export default function StockPage() {
                           transition: "all 0.2s",
                           background: period === key ? "var(--accent-dim)" : "transparent",
                           color: period === key ? "var(--accent)" : "var(--filter-tab-inactive)",
+                          flexShrink: 0,
                         }}
                       >
                         {label}
@@ -736,6 +742,7 @@ export default function StockPage() {
                     border: "1px solid var(--filter-tab-border)",
                     borderRadius: "10px",
                     padding: "2px",
+                    flexShrink: 0,
                   }}>
                     <button
                       onClick={() => setChartType("line")}
@@ -773,7 +780,7 @@ export default function StockPage() {
                     </button>
                   </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
                   {chartType === "candle" && (
                     <div style={{
                       display: "flex",
@@ -782,6 +789,7 @@ export default function StockPage() {
                       border: "1px solid var(--filter-tab-border)",
                       borderRadius: "10px",
                       padding: "2px",
+                      flexShrink: 0,
                     }}>
                       <button onClick={() => zoomRef.current?.zoomIn()} title="Zoom In" style={{ padding: "5px 10px", borderRadius: "7px", border: "none", cursor: "pointer", fontSize: "0.75rem", fontWeight: 700, background: "transparent", color: "var(--filter-tab-inactive)", transition: "all 0.2s", fontFamily: "inherit" }}>+</button>
                       <button onClick={() => zoomRef.current?.zoomOut()} title="Zoom Out" style={{ padding: "5px 10px", borderRadius: "7px", border: "none", cursor: "pointer", fontSize: "0.75rem", fontWeight: 700, background: "transparent", color: "var(--filter-tab-inactive)", transition: "all 0.2s", fontFamily: "inherit" }}>−</button>
@@ -817,6 +825,7 @@ export default function StockPage() {
                       color: "var(--red)",
                       transition: "all 0.2s",
                       fontFamily: "inherit",
+                      flexShrink: 0,
                     }}
                   >
                     ✕ Exit

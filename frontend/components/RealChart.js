@@ -912,6 +912,9 @@ export default function RealChart({
     layout: {
       padding: {
         top: showSwitcher ? 24 : 0,
+        right: 12,
+        left: 4,
+        bottom: 4,
       },
     },
     interaction: {
