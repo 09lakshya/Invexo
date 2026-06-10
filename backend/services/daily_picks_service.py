@@ -86,6 +86,9 @@ def score_and_rank_universe(universe_name, symbols):
             predicted_price = res.get("xgb_predicted_price") or res.get("predicted_price", res["current_price"])
             upside_pct = ((predicted_price - res["current_price"]) / res["current_price"]) * 100
             
+            if upside_pct <= 0:
+                return None
+            
             news_score = res.get("news_sentiment", 0) * 10
             fundamental_score = res.get("fundamental_score", 50) - 50
             rsi = res.get("rsi", 50)
