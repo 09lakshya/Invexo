@@ -208,6 +208,11 @@ export default function DailyPicks() {
               <span style={{ fontSize: "0.7rem", background: "var(--surface-hover)", color: "var(--text-secondary)", padding: "4px 8px", borderRadius: "6px", fontWeight: 600 }}>
                 {pick.sentiment} News
               </span>
+              {pick.confidence && (
+                <span style={{ fontSize: "0.7rem", background: "var(--purple-dim)", color: "var(--purple)", padding: "4px 8px", borderRadius: "6px", fontWeight: 700 }}>
+                  {pick.confidence}% Confidence
+                </span>
+              )}
             </div>
 
             <p style={{ fontSize: "0.8rem", color: "var(--text-secondary)", lineHeight: 1.5, margin: 0, marginTop: "4px", paddingLeft: "10px", borderLeft: "2px solid rgba(255,255,255,0.1)" }}>
@@ -248,6 +253,11 @@ export default function DailyPicks() {
                     <div style={{ color: "var(--green)", fontSize: "0.75rem", fontWeight: 700 }}>
                       ↗ {pick.upside}%
                     </div>
+                    {pick.confidence && (
+                      <div style={{ color: "var(--purple)", fontSize: "0.7rem", fontWeight: 700, marginTop: "2px" }}>
+                        {pick.confidence}% Conf
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
