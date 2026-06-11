@@ -135,6 +135,34 @@ function TickerTape({ stocks }) {
 function IndexCard({ symbol, data, prevData }) {
   if (!data) return null;
   const prc = data.price || 0;
+  
+  if (prc === 0) {
+    return (
+      <div
+        style={{
+          background: "var(--bg-card)",
+          border: "1px solid var(--border-subtle)",
+          borderRadius: "clamp(14px, 2vmin, 20px)",
+          padding: "clamp(16px, 3vmin, 24px) clamp(18px, 3vmin, 28px)",
+          flex: "1 1 200px",
+          minWidth: "min(220px, 100%)",
+          boxShadow: "var(--shadow-card)",
+        }}
+      >
+        <div style={{ marginBottom: "12px" }}>
+          <span style={{ fontSize: "0.7rem", fontWeight: 700, color: "var(--text-muted)", letterSpacing: "0.1em", textTransform: "uppercase" }}>
+            {symbol === "NIFTY50" ? "NIFTY 50" : symbol === "SENSEX" ? "BSE SENSEX" : symbol}
+          </span>
+        </div>
+        <div className="skeleton" style={{ width: "50%", height: "38px", marginBottom: "12px", borderRadius: "6px" }} />
+        <div style={{ display: "flex", gap: "10px" }}>
+          <div className="skeleton" style={{ width: "60px", height: "20px", borderRadius: "4px" }} />
+          <div className="skeleton" style={{ width: "45px", height: "20px", borderRadius: "10px" }} />
+        </div>
+      </div>
+    );
+  }
+
   const prevPrc = prevData?.price || prc;
   const isUp = data.percent >= 0;
   const flash = prc > prevPrc ? "up" : prc < prevPrc ? "down" : null;
