@@ -46,7 +46,7 @@ function genSparkline(price, change, n = 20) {
   return pts;
 }
 
-export default function StockCard({ symbol, price, change, percent, color, small, onClick }) {
+export default function StockCard({ symbol, price, change, percent, color, small, onClick, isWatched, onToggleWatchlist }) {
   const router = useRouter();
   const prc = typeof price === "number" && Number.isFinite(price) ? price : 0;
   const chg = typeof change === "number" && Number.isFinite(change) ? change : 0;
@@ -182,43 +182,70 @@ export default function StockCard({ symbol, price, change, percent, color, small
             </div>
           </div>
 
-          {hasData ? (
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: "3px",
-                padding: "3px 8px",
-                borderRadius: "20px",
-                fontSize: "0.65rem",
-                fontWeight: 700,
-                background: isPositive ? "var(--green-dim)" : "var(--red-dim)",
-                color: isPositive ? "var(--green)" : "var(--red)",
-                border: `1px solid ${isPositive ? "var(--green-dim)" : "var(--red-dim)"}`,
-                letterSpacing: "0.03em",
-              }}
-            >
-              {isPositive ? "\u25B2" : "\u25BC"}
-            </span>
-          ) : (
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                padding: "3px 8px",
-                borderRadius: "20px",
-                fontSize: "0.62rem",
-                fontWeight: 700,
-                background: "var(--red-dim)",
-                color: "var(--red)",
-                border: "1px solid var(--red-dim)",
-                letterSpacing: "0.03em",
-                textTransform: "uppercase",
-              }}
-            >
-              Data Unavailable
-            </span>
-          )}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            {onToggleWatchlist && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleWatchlist();
+                }}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: "1.1rem",
+                  padding: "4px",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: isWatched ? "var(--gold)" : "var(--text-muted)",
+                  transition: "all 0.2s ease",
+                  outline: "none",
+                }}
+                title={isWatched ? "Remove from watchlist" : "Add to watchlist"}
+              >
+                {isWatched ? "★" : "☆"}
+              </button>
+            )}
+
+            {hasData ? (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "3px",
+                  padding: "3px 8px",
+                  borderRadius: "20px",
+                  fontSize: "0.65rem",
+                  fontWeight: 700,
+                  background: isPositive ? "var(--green-dim)" : "var(--red-dim)",
+                  color: isPositive ? "var(--green)" : "var(--red)",
+                  border: `1px solid ${isPositive ? "var(--green-dim)" : "var(--red-dim)"}`,
+                  letterSpacing: "0.03em",
+                }}
+              >
+                {isPositive ? "\u25B2" : "\u25BC"}
+              </span>
+            ) : (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  padding: "3px 8px",
+                  borderRadius: "20px",
+                  fontSize: "0.62rem",
+                  fontWeight: 700,
+                  background: "var(--red-dim)",
+                  color: "var(--red)",
+                  border: "1px solid var(--red-dim)",
+                  letterSpacing: "0.03em",
+                  textTransform: "uppercase",
+                }}
+              >
+                Data Unavailable
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Price */}

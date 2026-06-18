@@ -11,6 +11,11 @@ def handle_get_portfolio(current_user: dict = Depends(get_current_user)):
     user_id = str(current_user["id"])
     return PortfolioService.get_portfolio(user_id)
 
+@router.get("/analytics")
+def handle_get_portfolio_analytics(current_user: dict = Depends(get_current_user)):
+    user_id = str(current_user["id"])
+    return PortfolioService.get_portfolio_analytics(user_id)
+
 @router.post("/add", response_model=dict)
 @limiter.limit("15/minute")
 def handle_add_holding(

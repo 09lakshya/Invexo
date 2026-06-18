@@ -29,11 +29,14 @@ def create_access_token(user_id: int) -> str:
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
+import uuid
+
 def create_refresh_token(user_id: int) -> str:
     """Creates a long-lived refresh token and stores it in Redis."""
     payload = {
         "sub": str(user_id),
         "type": "refresh",
+        "jti": str(uuid.uuid4()),
         "iat": datetime.now(timezone.utc),
         "exp": datetime.now(timezone.utc) + timedelta(days=JWT_REFRESH_EXPIRY_DAYS),
     }

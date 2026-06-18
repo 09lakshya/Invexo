@@ -73,6 +73,92 @@ export default function StockPage() {
   const historyCacheRef             = useRef({});
   const prefetchedSymbolRef         = useRef(null);
 
+  // Watchlist & Alerts states
+  const [watchlist, setWatchlist] = useState([]);
+  const [isWatched, setIsWatched] = useState(false);
+  const [watchlistLoading, setWatchlistLoading] = useState(false);
+  const [alerts, setAlerts] = useState([]);
+  const [alertTargetPrice, setAlertTargetPrice] = useState("");
+  const [alertCondition, setAlertCondition] = useState("above");
+
+  const fetchWatchlist = async () => {
+    try {
+      const res = await API.get("/watchlist/");
+      setWatchlist(res.data.map(item => item.symbol.toUpperCase()));
+      if (normalizedSymbol) {
+        setIsWatched(res.data.some(item => item.symbol.toUpperCase() === normalizedSymbol.toUpperCase()));
+      }
+    } catch (err) {
+      console.error("Failed to fetch watchlist:", err);
+    }
+  };
+
+  const fetchAlerts = async () => {
+    try {
+      const res = await API.get("/alerts/");
+      setAlerts(res.data);
+    } catch (err) {
+      console.error("Failed to fetch alerts:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (router.isReady && normalizedSymbol) {
+      fetchWatchlist();
+      fetchAlerts();
+    }
+  }, [router.isReady, normalizedSymbol]);
+
+  useEffect(() => {
+    if (prediction && prediction.current_price) {
+      setAlertTargetPrice(String(prediction.current_price));
+    }
+  }, [prediction]);
+
+  const toggleWatchlist = async () => {
+    if (!normalizedSymbol) return;
+    setWatchlistLoading(true);
+    try {
+      if (isWatched) {
+        await API.delete(`/watchlist/${normalizedSymbol.toUpperCase()}`);
+        setIsWatched(false);
+      } else {
+        await API.post("/watchlist/", { symbol: normalizedSymbol.toUpperCase() });
+        setIsWatched(true);
+      }
+    } catch (err) {
+      console.error("Error toggling watchlist:", err);
+    } finally {
+      setWatchlistLoading(false);
+    }
+  };
+
+  const handleCreateAlert = async () => {
+    if (!normalizedSymbol || !alertTargetPrice) return;
+    try {
+      await API.post("/alerts/", {
+        symbol: normalizedSymbol.toUpperCase(),
+        target_price: parseFloat(alertTargetPrice),
+        condition: alertCondition
+      });
+      fetchAlerts();
+      alert(`Alert set for ${normalizedSymbol.toUpperCase()} when price goes ${alertCondition} ₹${alertTargetPrice}`);
+    } catch (err) {
+      console.error("Failed to create alert:", err);
+      alert("Failed to create alert");
+    }
+  };
+
+  const handleDeleteAlert = async (id) => {
+    try {
+      await API.delete(`/alerts/${id}`);
+      fetchAlerts();
+    } catch (err) {
+      console.error("Failed to delete alert:", err);
+      alert("Failed to delete alert");
+    }
+  };
+
   // Reset cache and prefetch refs when symbol changes
   useEffect(() => {
     if (normalizedSymbol) {
@@ -377,9 +463,32 @@ export default function StockPage() {
                   >
                     {companyName}
                   </h1>
-                  <p style={{ color: "var(--accent)", fontWeight: 700, fontSize: "1.1rem", marginTop: "4px", margin: 0 }}>
-                    NSE: {normalizedSymbol}
-                  </p>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
+                    <p style={{ color: "var(--accent)", fontWeight: 700, fontSize: "1.1rem", margin: 0 }}>
+                      NSE: {normalizedSymbol}
+                    </p>
+                    <button
+                      onClick={toggleWatchlist}
+                      disabled={watchlistLoading}
+                      style={{
+                        background: "var(--bg-card)",
+                        border: "1px solid var(--border-medium)",
+                        borderRadius: "8px",
+                        padding: "4px 8px",
+                        cursor: "pointer",
+                        color: isWatched ? "var(--gold)" : "var(--text-muted)",
+                        fontSize: "0.8rem",
+                        fontWeight: 700,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "4px",
+                        transition: "all 0.2s",
+                      }}
+                      title={isWatched ? "Remove from Watchlist" : "Add to Watchlist"}
+                    >
+                      {isWatched ? "★ Watched" : "☆ Watch"}
+                    </button>
+                  </div>
                 </div>
               </div>
               <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
@@ -1119,6 +1228,104 @@ export default function StockPage() {
                   </div>
                 </div>
               )}
+
+              {/* Smart Alerts Setter Card */}
+              <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "20px", padding: "24px", backdropFilter: "blur(12px)", boxShadow: "var(--shadow-card)", display: "flex", flexDirection: "column", gap: "12px" }}>
+                <p className="section-label">Price Triggers</p>
+                <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: "1.2rem", fontWeight: 800, color: "var(--text-primary)", margin: 0 }}>Smart Alerts</h2>
+                
+                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    <span style={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}>Alert when price goes</span>
+                    <select
+                      value={alertCondition}
+                      onChange={(e) => setAlertCondition(e.target.value)}
+                      style={{
+                        background: "var(--bg-secondary)",
+                        color: "var(--text-primary)",
+                        border: "1px solid var(--border-medium)",
+                        borderRadius: "8px",
+                        padding: "6px 10px",
+                        fontSize: "0.8rem",
+                        fontWeight: 600,
+                      }}
+                    >
+                      <option value="above">Above</option>
+                      <option value="below">Below</option>
+                    </select>
+                  </div>
+                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                    <div style={{ position: "relative", display: "flex", alignItems: "center", flex: 1 }}>
+                      <span style={{ position: "absolute", left: "10px", fontSize: "0.82rem", color: "var(--text-muted)" }}>₹</span>
+                      <input
+                        type="number"
+                        step="any"
+                        value={alertTargetPrice}
+                        onChange={(e) => setAlertTargetPrice(e.target.value)}
+                        style={{
+                          background: "var(--bg-secondary)",
+                          color: "var(--text-primary)",
+                          border: "1px solid var(--border-medium)",
+                          borderRadius: "8px",
+                          padding: "6px 10px 6px 22px",
+                          fontSize: "0.8rem",
+                          fontWeight: 600,
+                          width: "100%",
+                        }}
+                      />
+                    </div>
+                    <button
+                      onClick={handleCreateAlert}
+                      className="btn-primary"
+                      style={{ padding: "6px 16px", fontSize: "0.8rem", color: "var(--bg-primary)" }}
+                    >
+                      Set Alert
+                    </button>
+                  </div>
+                </div>
+
+                {/* Active Alerts for this Ticker */}
+                {alerts.filter(a => a.symbol === normalizedSymbol.toUpperCase() && a.is_active).length > 0 ? (
+                  <div style={{ marginTop: "8px", borderTop: "1px solid var(--border-subtle)", paddingTop: "8px" }}>
+                    <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontWeight: 600, margin: "0 0 8px 0" }}>Active Alerts:</p>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
+                      {alerts.filter(a => a.symbol === normalizedSymbol.toUpperCase() && a.is_active).map(a => (
+                        <div key={a.id} style={{
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "space-between",
+                          background: "var(--bg-secondary)",
+                          border: "1px solid var(--border-subtle)",
+                          borderRadius: "8px",
+                          padding: "6px 10px",
+                          fontSize: "0.75rem",
+                          fontWeight: 600,
+                          color: "var(--text-primary)"
+                        }}>
+                          <span>Price {a.condition.toUpperCase()} ₹{a.target_price}</span>
+                          <button
+                            onClick={() => handleDeleteAlert(a.id)}
+                            style={{
+                              background: "transparent",
+                              border: "none",
+                              color: "var(--red)",
+                              cursor: "pointer",
+                              fontSize: "0.75rem",
+                              padding: "2px 4px",
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", margin: "8px 0 0 0", fontStyle: "italic" }}>
+                    No alerts set for this stock.
+                  </p>
+                )}
+              </div>
             </div>
           ) : null}
 

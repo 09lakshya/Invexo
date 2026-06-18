@@ -63,9 +63,12 @@ def get_db_connection():
         raise
 
 def get_cursor(conn, is_postgres=True):
-    return conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    if is_postgres:
+        return conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    return conn.cursor()
 
 def execute_query(c, sql, params=(), is_postgres=True):
-    sql = sql.replace("?", "%s")
+    if is_postgres:
+        sql = sql.replace("?", "%s")
     c.execute(sql, params)
     return c

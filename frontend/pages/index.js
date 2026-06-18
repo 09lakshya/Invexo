@@ -305,6 +305,86 @@ export default function Home() {
   const [focused, setFocused] = useState(false);
   const searchRef = useRef(null);
 
+  // Watchlist & Alerts states
+  const [watchlist, setWatchlist] = useState([]);
+  const [alerts, setAlerts] = useState([]);
+  const [watchlistLoading, setWatchlistLoading] = useState(false);
+  const [alertsLoading, setAlertsLoading] = useState(false);
+  const [alertTargetPrice, setAlertTargetPrice] = useState("");
+  const [alertCondition, setAlertCondition] = useState("above");
+
+  const fetchWatchlist = async () => {
+    setWatchlistLoading(true);
+    try {
+      const res = await API.get("/watchlist/");
+      setWatchlist(res.data.map(item => item.symbol.toUpperCase()));
+    } catch (err) {
+      console.error("Failed to fetch watchlist:", err);
+    } finally {
+      setWatchlistLoading(false);
+    }
+  };
+
+  const fetchAlerts = async () => {
+    setAlertsLoading(true);
+    try {
+      const res = await API.get("/alerts/");
+      setAlerts(res.data);
+    } catch (err) {
+      console.error("Failed to fetch alerts:", err);
+    } finally {
+      setAlertsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchWatchlist();
+    fetchAlerts();
+  }, []);
+
+  const toggleWatchlist = async (symbol) => {
+    const cleanSym = symbol.toUpperCase().replace(/\.NS$/i, "").replace(/\.BO$/i, "");
+    const isWatched = watchlist.includes(cleanSym);
+    try {
+      if (isWatched) {
+        await API.delete(`/watchlist/${cleanSym}`);
+        setWatchlist(prev => prev.filter(s => s !== cleanSym));
+      } else {
+        await API.post("/watchlist/", { symbol: cleanSym });
+        setWatchlist(prev => [...prev, cleanSym]);
+      }
+    } catch (err) {
+      console.error("Failed to toggle watchlist:", err);
+    }
+  };
+
+  const handleCreateAlert = async () => {
+    if (!activeStockSymbol || !alertTargetPrice) return;
+    const cleanSym = activeStockSymbol.toUpperCase().replace(/\.NS$/i, "").replace(/\.BO$/i, "");
+    try {
+      await API.post("/alerts/", {
+        symbol: cleanSym,
+        target_price: parseFloat(alertTargetPrice),
+        condition: alertCondition
+      });
+      fetchAlerts();
+      alert(`Alert set for ${cleanSym} when price goes ${alertCondition} ₹${alertTargetPrice}`);
+    } catch (err) {
+      console.error("Failed to create alert:", err);
+      alert("Failed to create alert");
+    }
+  };
+
+  const handleDeleteAlert = async (id) => {
+    try {
+      await API.delete(`/alerts/${id}`);
+      fetchAlerts();
+    } catch (err) {
+      console.error("Failed to delete alert:", err);
+      alert("Failed to delete alert");
+    }
+  };
+
   // States for Quick View Chart Modal
   const [activeStockSymbol, setActiveStockSymbol] = useState(null);
   const [showChartModal, setShowChartModal] = useState(false);
@@ -353,6 +433,9 @@ export default function Home() {
     setModalPrediction(null);
     setModalError(null);
     setModalLogoError(false);
+    const curPrc = stocks[symbol]?.price || 0;
+    setAlertTargetPrice(curPrc ? String(curPrc) : "");
+    setAlertCondition("above");
     const normalizedSymbol = symbol.replace(/\.NS$/i, "");
     try {
       const predRes = await API.get(`/predict/${normalizedSymbol}.NS`);
@@ -454,6 +537,11 @@ export default function Home() {
     displayed = viewAll ? gainers : gainers.slice(0, 10);
   } else if (filterCategory === "Losers") {
     displayed = viewAll ? losers : losers.slice(0, 10);
+  } else if (filterCategory === "Watchlist") {
+    const watchedStockEntries = stockEntries.filter(([sym]) => watchlist.includes(sym.toUpperCase().replace(/\.NS$/i, "").replace(/\.BO$/i, "")));
+    const missingSymbols = watchlist.filter(sym => !stockEntries.some(([s]) => s.toUpperCase().replace(/\.NS$/i, "").replace(/\.BO$/i, "") === sym));
+    const missingEntries = missingSymbols.map(sym => [sym + ".NS", stocks[sym + ".NS"] || stocks[sym] || { price: 0, change: 0, percent: 0 }]);
+    displayed = [...watchedStockEntries, ...missingEntries];
   } else {
     const topGainers = gainers.slice(0, 10);
     const topLosers = losers.slice(0, 10);
@@ -817,7 +905,7 @@ export default function Home() {
                 {viewAll ? "Show Top 10" : "View All"}
               </button>
               <div style={{ display: "flex", gap: "4px", background: "var(--filter-tab-bg)", border: "1px solid var(--filter-tab-border)", borderRadius: "12px", padding: "4px" }}>
-                {["All", "Gainers", "Losers"].map((cat) => (
+                {["All", "Gainers", "Losers", "Watchlist"].map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setFilterCategory(cat)}
@@ -835,15 +923,17 @@ export default function Home() {
                         ? "var(--green-dim)"
                         : cat === "Losers"
                         ? "var(--red-dim)"
+                        : cat === "Watchlist"
+                        ? "var(--gold-dim, rgba(255, 193, 7, 0.15))"
                         : "var(--accent-dim)"
                       : "transparent",
                     color: filterCategory === cat
-                      ? cat === "Gainers" ? "var(--green)" : cat === "Losers" ? "var(--red)" : "var(--accent)"
+                      ? cat === "Gainers" ? "var(--green)" : cat === "Losers" ? "var(--red)" : cat === "Watchlist" ? "var(--gold)" : "var(--accent)"
                       : "var(--filter-tab-inactive)",
                     boxShadow: filterCategory === cat ? "0 2px 8px var(--shadow-card)" : "none",
                   }}
                 >
-                  {cat}
+                  {cat === "Watchlist" ? "★ Watchlist" : cat}
                 </button>
               ))}
               </div>
@@ -905,6 +995,8 @@ export default function Home() {
                       percent={current?.percent}
                       color={colorClass}
                       onClick={() => openQuickView(sym)}
+                      isWatched={watchlist.includes(sym.toUpperCase().replace(/\.NS$/i, "").replace(/\.BO$/i, ""))}
+                      onToggleWatchlist={() => toggleWatchlist(sym)}
                     />
                   </div>
                 );
@@ -1180,6 +1272,107 @@ export default function Home() {
                 </div>
               </div>
             )}
+
+            {/* Price Alerts Panel */}
+            <div style={{
+              background: "var(--input-bg)",
+              border: "1px solid var(--border-subtle)",
+              borderRadius: "12px",
+              padding: "16px",
+              display: "flex",
+              flexDirection: "column",
+              gap: "10px",
+              marginTop: "8px"
+            }}>
+              <p style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.05em", margin: 0 }}>
+                🔔 Set Price Alert
+              </p>
+              
+              <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
+                <span style={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}>Alert me when price goes</span>
+                <select
+                  value={alertCondition}
+                  onChange={(e) => setAlertCondition(e.target.value)}
+                  style={{
+                    background: "var(--bg-secondary)",
+                    color: "var(--text-primary)",
+                    border: "1px solid var(--border-medium)",
+                    borderRadius: "8px",
+                    padding: "6px 10px",
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                  }}
+                >
+                  <option value="above">Above</option>
+                  <option value="below">Below</option>
+                </select>
+                <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                  <span style={{ position: "absolute", left: "10px", fontSize: "0.82rem", color: "var(--text-muted)" }}>₹</span>
+                  <input
+                    type="number"
+                    step="any"
+                    value={alertTargetPrice}
+                    onChange={(e) => setAlertTargetPrice(e.target.value)}
+                    style={{
+                      background: "var(--bg-secondary)",
+                      color: "var(--text-primary)",
+                      border: "1px solid var(--border-medium)",
+                      borderRadius: "8px",
+                      padding: "6px 10px 6px 22px",
+                      fontSize: "0.8rem",
+                      fontWeight: 600,
+                      width: "120px",
+                    }}
+                  />
+                </div>
+                <button
+                  onClick={handleCreateAlert}
+                  className="btn-primary"
+                  style={{ padding: "6px 12px", fontSize: "0.8rem", color: "var(--bg-primary)" }}
+                >
+                  Create Alert
+                </button>
+              </div>
+
+              {/* Active Alerts for this Ticker */}
+              {alerts.filter(a => a.symbol === normalizedActiveSymbol && a.is_active).length > 0 && (
+                <div style={{ marginTop: "4px", borderTop: "1px solid var(--border-subtle)", paddingTop: "8px" }}>
+                  <p style={{ fontSize: "0.7rem", color: "var(--text-muted)", fontWeight: 600, margin: "0 0 6px 0" }}>Active Alerts:</p>
+                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                    {alerts.filter(a => a.symbol === normalizedActiveSymbol && a.is_active).map(a => (
+                      <span key={a.id} style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        background: "var(--bg-secondary)",
+                        border: "1px solid var(--border-subtle)",
+                        borderRadius: "6px",
+                        padding: "3px 8px",
+                        fontSize: "0.75rem",
+                        fontWeight: 600,
+                        color: "var(--text-primary)"
+                      }}>
+                        {a.condition.toUpperCase()} ₹{a.target_price}
+                        <button
+                          onClick={() => handleDeleteAlert(a.id)}
+                          style={{
+                            background: "transparent",
+                            border: "none",
+                            color: "var(--red)",
+                            cursor: "pointer",
+                            fontSize: "0.75rem",
+                            padding: 0,
+                            marginLeft: "4px",
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Modal Actions */}
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "4px" }}>

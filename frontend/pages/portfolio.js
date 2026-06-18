@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Navbar from "../components/Navbar";
 import API from "../services/api";
 import Head from "next/head";
@@ -188,6 +189,7 @@ function HoldingRow({ h, onRemove }) {
         <button
           onClick={handleRemove}
           disabled={removing}
+          aria-label={`Remove ${cleanSymbol} from portfolio`}
           style={{
             background: "var(--red-dim)",
             border: "1px solid var(--red-dim)",
@@ -212,8 +214,7 @@ function HoldingRow({ h, onRemove }) {
 // ── Main Portfolio Page ───────────────────────────────────────────────────
 export default function Portfolio() {
   const { user } = useAuth();
-  const [holdings, setHoldings]   = useState([]);
-  const [loading, setLoading]     = useState(true);
+  const queryClient = useQueryClient();
   const [showForm, setShowForm]   = useState(false);
 
   const [searchQ, setSearchQ]         = useState("");
@@ -221,25 +222,101 @@ export default function Portfolio() {
   const [selSymbol, setSelSymbol]     = useState("");
   const [quantity, setQuantity]       = useState("");
   const [buyPrice, setBuyPrice]       = useState("");
-  const [adding, setAdding]           = useState(false);
   const [formErr, setFormErr]         = useState("");
 
-  useEffect(() => {
-    if (!user) return;
-    fetchPortfolio();
-  }, [user]);
+  // AI Copilot Drawer States
+  const [showCopilot, setShowCopilot] = useState(false);
+  const [chatInput, setChatInput]     = useState("");
+  const [chatHistory, setChatHistory] = useState([
+    {
+      sender: "copilot",
+      text: "👋 **Hello! I'm Invexo Copilot, your AI investment assistant.**\n\nHow can I help you with your portfolio or stock research today?"
+    }
+  ]);
+  const [chatLoading, setChatLoading] = useState(false);
 
-  const fetchPortfolio = async () => {
-    setLoading(true);
+  const sendCopilotMessage = async () => {
+    if (!chatInput.trim()) return;
+    const msg = chatInput;
+    setChatInput("");
+    setChatHistory(prev => [...prev, { sender: "user", text: msg }]);
+    setChatLoading(true);
     try {
-      const res = await API.get("/portfolio/me");
-      setHoldings(Array.isArray(res.data) ? res.data : []);
-    } catch {
-      setHoldings([]);
+      const res = await API.post("/copilot/chat", { message: msg });
+      setChatHistory(prev => [...prev, { sender: "copilot", text: res.data.response }]);
+    } catch (err) {
+      setChatHistory(prev => [...prev, { sender: "copilot", text: "⚠️ Failed to get response. Please try again." }]);
     } finally {
-      setLoading(false);
+      setChatLoading(false);
     }
   };
+
+  const formatCopilotText = (text) => {
+    if (!text) return "";
+    return text.split("\n").map((line, idx) => {
+      if (line.startsWith("### ")) {
+        return <h4 key={idx} style={{ margin: "14px 0 6px 0", fontSize: "1rem", fontWeight: 800, fontFamily: "Space Grotesk, sans-serif", color: "var(--accent)" }}>{line.replace("### ", "")}</h4>;
+      }
+      if (line.startsWith("## ")) {
+        return <h3 key={idx} style={{ margin: "16px 0 8px 0", fontSize: "1.1rem", fontWeight: 800, fontFamily: "Space Grotesk, sans-serif", color: "var(--accent)" }}>{line.replace("## ", "")}</h3>;
+      }
+      if (line.startsWith("* ")) {
+        const parts = line.replace("* ", "").split(/\*\*(.*?)\*\//g);
+        const parsed = parts.map((part, i) => i % 2 === 1 ? <strong key={i} style={{ color: "var(--accent)", fontWeight: 700 }}>{part}</strong> : part);
+        return <li key={idx} style={{ marginLeft: "14px", listStyleType: "disc", fontSize: "0.85rem", lineHeight: "1.5", marginBottom: "4px" }}>{parsed}</li>;
+      }
+      // Simple regex bold replacement (split by **)
+      const parts = line.split(/\*\*(.*?)\*\*/g);
+      const content = parts.map((part, i) => i % 2 === 1 ? <strong key={i} style={{ color: "var(--text-primary)", fontWeight: 700 }}>{part}</strong> : part);
+      return <p key={idx} style={{ margin: "6px 0", fontSize: "0.85rem", lineHeight: "1.5", color: "var(--text-secondary)" }}>{content}</p>;
+    });
+  };
+
+  const { data: holdings = [], isLoading: loading } = useQuery({
+    queryKey: ["portfolio", user?.id],
+    queryFn: async () => {
+      const res = await API.get("/portfolio/me");
+      return Array.isArray(res.data) ? res.data : [];
+    },
+    enabled: !!user,
+  });
+
+  const { data: analytics } = useQuery({
+    queryKey: ["portfolio-analytics", user?.id],
+    queryFn: async () => {
+      const res = await API.get("/portfolio/analytics");
+      return res.data;
+    },
+    enabled: !!user && holdings.length > 0,
+  });
+
+  const addMutation = useMutation({
+    mutationFn: async (newHolding) => {
+      return API.post("/portfolio/add", newHolding);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["portfolio", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["portfolio-analytics", user?.id] });
+      setShowForm(false);
+      setSearchQ(""); setSelSymbol(""); setQuantity(""); setBuyPrice("");
+    },
+    onError: () => {
+      setFormErr("Could not add holding. Please try again.");
+    }
+  });
+
+  const removeMutation = useMutation({
+    mutationFn: async (id) => {
+      return API.delete(`/portfolio/remove/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["portfolio", user?.id] });
+      queryClient.invalidateQueries({ queryKey: ["portfolio-analytics", user?.id] });
+    },
+    onError: () => {
+      alert("Failed to remove. Please try again.");
+    }
+  });
 
   const handleSearch = async (q) => {
     setSearchQ(q);
@@ -262,32 +339,20 @@ export default function Portfolio() {
   const addHolding = async () => {
     if (!selSymbol || !quantity || !buyPrice) { setFormErr("Please fill in all three fields."); return; }
     if (parseFloat(quantity) <= 0 || parseFloat(buyPrice) <= 0) { setFormErr("Quantity and price must be greater than zero."); return; }
-    setFormErr(""); setAdding(true);
-    try {
-      await API.post("/portfolio/add", {
-        symbol: selSymbol,
-        company_name: selSymbol,
-        quantity: parseFloat(quantity),
-        buy_price: parseFloat(buyPrice),
-      });
-      setShowForm(false);
-      setSearchQ(""); setSelSymbol(""); setQuantity(""); setBuyPrice("");
-      await fetchPortfolio();
-    } catch {
-      setFormErr("Could not add holding. Please try again.");
-    } finally {
-      setAdding(false);
-    }
+    setFormErr("");
+    addMutation.mutate({
+      symbol: selSymbol,
+      company_name: selSymbol,
+      quantity: parseFloat(quantity),
+      buy_price: parseFloat(buyPrice),
+    });
   };
 
   const removeHolding = async (id) => {
-    try {
-      await API.delete(`/portfolio/${id}`);
-      await fetchPortfolio();
-    } catch {
-      alert("Failed to remove. Please try again.");
-    }
+    return removeMutation.mutateAsync(id);
   };
+
+  const adding = addMutation.isPending;
 
   // Summary
   const totalInvested = holdings.reduce((s, h) => s + h.invested, 0);
@@ -570,6 +635,206 @@ export default function Portfolio() {
                 <span style={{ fontSize: "0.8rem", color: "var(--text-secondary)" }}>
                   Net P&L: <strong style={{ color: isProfitable ? "var(--green)" : "var(--red)" }}>{isProfitable ? "+" : "−"}₹{fmt(Math.abs(totalPnL))}</strong>
                 </span>
+              </div>
+            </div>
+          )}
+
+          {/* ── Portfolio Analytics & Risk Dashboard ───────────────────────────────── */}
+          {analytics && holdings.length > 0 && (
+            <div style={{ marginTop: "40px", animation: "fadeInUp 0.6s ease both" }}>
+              <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: "1.5rem", fontWeight: 800, color: "var(--text-primary)", marginBottom: "18px", letterSpacing: "-0.02em" }}>
+                Portfolio Risk & Diversification Analytics
+              </h2>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "20px" }}>
+                {/* Diversification Score & Advice */}
+                <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "18px", padding: "24px", display: "flex", flexDirection: "column", justifyContent: "space-between" }}>
+                  <div>
+                    <p style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "12px" }}>Diversification Score</p>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: "8px", marginBottom: "14px" }}>
+                      <span style={{ fontSize: "2.4rem", fontWeight: 900, fontFamily: "'Space Grotesk', sans-serif", color: "var(--accent)" }}>{analytics.metrics.diversification_score}</span>
+                      <span style={{ fontSize: "1rem", color: "var(--text-muted)", fontWeight: 700 }}>/ 100</span>
+                    </div>
+                    {/* Progress Bar */}
+                    <div style={{ width: "100%", height: "6px", background: "var(--border-subtle)", borderRadius: "3px", overflow: "hidden", marginBottom: "18px" }}>
+                      <div style={{ width: `${analytics.metrics.diversification_score}%`, height: "100%", background: "linear-gradient(90deg, var(--accent) 0%, var(--purple) 100%)", borderRadius: "3px", transition: "width 1s ease-in-out" }} />
+                    </div>
+                  </div>
+                  <div style={{ background: "var(--hover-overlay)", border: "1px solid var(--border-subtle)", borderRadius: "12px", padding: "14px 16px" }}>
+                    <p style={{ fontSize: "0.72rem", fontWeight: 800, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 6px 0" }}>🤖 Copilot Suggestion</p>
+                    <p style={{ fontSize: "0.82rem", color: "var(--text-secondary)", lineHeight: "1.45", margin: 0 }}>{analytics.advice}</p>
+                  </div>
+                </div>
+
+                {/* Risk Parameters Grid */}
+                <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "18px", padding: "24px" }}>
+                  <p style={{ fontSize: "0.68rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "18px" }}>Risk & Volatility Parameters</p>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
+                    <div>
+                      <p style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "4px", margin: 0 }}>Portfolio Beta</p>
+                      <p style={{ fontSize: "1.2rem", fontWeight: 800, color: "var(--text-primary)", fontFamily: "'Space Grotesk', sans-serif", margin: 0 }}>{analytics.metrics.portfolio_beta}</p>
+                      <span style={{ fontSize: "0.65rem", color: "var(--text-muted)" }}>Market avg is 1.0</span>
+                    </div>
+                    <div>
+                      <p style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "4px", margin: 0 }}>Sharpe Ratio</p>
+                      <p style={{ fontSize: "1.2rem", fontWeight: 800, color: "var(--green)", fontFamily: "'Space Grotesk', sans-serif", margin: 0 }}>{analytics.metrics.sharpe_ratio}</p>
+                      <span style={{ fontSize: "0.65rem", color: "var(--text-muted)" }}>Risk-adjusted return</span>
+                    </div>
+                    <div>
+                      <p style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "4px", margin: 0 }}>Annual Volatility</p>
+                      <p style={{ fontSize: "1.2rem", fontWeight: 800, color: "var(--text-primary)", fontFamily: "'Space Grotesk', sans-serif", margin: 0 }}>{analytics.metrics.portfolio_volatility_annual}%</p>
+                      <span style={{ fontSize: "0.65rem", color: "var(--text-muted)" }}>Standard deviation</span>
+                    </div>
+                    <div>
+                      <p style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "4px", margin: 0 }}>Value at Risk (1D)</p>
+                      <p style={{ fontSize: "1.2rem", fontWeight: 800, color: "var(--red)", fontFamily: "'Space Grotesk', sans-serif", margin: 0 }}>₹{analytics.metrics.value_at_risk_95.toLocaleString("en-IN")}</p>
+                      <span style={{ fontSize: "0.65rem", color: "var(--text-muted)" }}>95% Confidence VaR</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── AI Copilot Floating FAB & Slider Drawer ───────────────────────────── */}
+          {/* Floating Action Button */}
+          <button
+            onClick={() => setShowCopilot(true)}
+            aria-label="Open AI Copilot Chat"
+            style={{
+              position: "fixed",
+              bottom: "24px",
+              right: "24px",
+              zIndex: 1000,
+              background: "linear-gradient(135deg, var(--accent) 0%, var(--purple) 100%)",
+              color: "var(--bg-primary)",
+              border: "none",
+              borderRadius: "50px",
+              padding: "14px 22px",
+              fontSize: "0.9rem",
+              fontWeight: 800,
+              cursor: "pointer",
+              boxShadow: "0 8px 32px var(--accent-glow)",
+              display: "flex",
+              alignItems: "center",
+              gap: "8px",
+              transition: "transform 0.2s, box-shadow 0.2s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.04)"; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
+          >
+            <span style={{ fontSize: "1.1rem" }}>💬</span> Invexo Copilot
+          </button>
+
+          {/* Copilot Drawer Panel */}
+          {showCopilot && (
+            <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }} onClick={() => setShowCopilot(false)}>
+              <div
+                onClick={e => e.stopPropagation()}
+                style={{
+                  position: "absolute",
+                  top: 0,
+                  right: 0,
+                  width: "min(420px, 90vw)",
+                  height: "100%",
+                  background: "var(--bg-card)",
+                  borderLeft: "1px solid var(--border-subtle)",
+                  boxShadow: "-16px 0 48px rgba(0,0,0,0.5)",
+                  display: "flex",
+                  flexDirection: "column",
+                  animation: "slideIn 0.3s ease-out forwards",
+                }}
+              >
+                {/* Drawer Header */}
+                <div style={{ padding: "18px 24px", borderBottom: "1px solid var(--border-subtle)", display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--hover-overlay)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ fontSize: "1.2rem" }}>🤖</span>
+                    <div>
+                      <h3 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: "1.1rem", fontWeight: 800, margin: 0, color: "var(--text-primary)" }}>Invexo Copilot</h3>
+                      <span style={{ fontSize: "0.65rem", color: "var(--green)", fontWeight: 700, textTransform: "uppercase" }}>● Active Assistant</span>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowCopilot(false)}
+                    aria-label="Close Copilot"
+                    style={{ background: "transparent", border: "none", color: "var(--text-muted)", fontSize: "1.1rem", cursor: "pointer", padding: "4px" }}
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                {/* Chat Message History */}
+                <div style={{ flex: 1, padding: "20px", overflowY: "auto", display: "flex", flexDirection: "column", gap: "16px" }}>
+                  {chatHistory.map((chat, idx) => {
+                    const isCopilot = chat.sender === "copilot";
+                    return (
+                      <div
+                        key={idx}
+                        style={{
+                          alignSelf: isCopilot ? "flex-start" : "flex-end",
+                          maxWidth: "85%",
+                          background: isCopilot ? "var(--hover-overlay)" : "linear-gradient(135deg, var(--accent) 0%, var(--purple) 100%)",
+                          color: isCopilot ? "var(--text-primary)" : "var(--bg-primary)",
+                          borderRadius: isCopilot ? "16px 16px 16px 4px" : "16px 16px 4px 16px",
+                          border: isCopilot ? "1px solid var(--border-subtle)" : "none",
+                          padding: "12px 16px",
+                          boxShadow: "0 2px 8px rgba(0,0,0,0.1)"
+                        }}
+                      >
+                        {isCopilot ? formatCopilotText(chat.text) : <p style={{ fontSize: "0.85rem", margin: 0, lineHeight: "1.5", fontWeight: 500 }}>{chat.text}</p>}
+                      </div>
+                    );
+                  })}
+                  
+                  {chatLoading && (
+                    <div style={{ alignSelf: "flex-start", background: "var(--hover-overlay)", border: "1px solid var(--border-subtle)", borderRadius: "16px 16px 16px 4px", padding: "12px 16px", display: "flex", gap: "4px" }}>
+                      <span className="dot-blink" style={{ width: "6px", height: "6px", background: "var(--text-muted)", borderRadius: "50%" }} />
+                      <span className="dot-blink" style={{ width: "6px", height: "6px", background: "var(--text-muted)", borderRadius: "50%", animationDelay: "0.2s" }} />
+                      <span className="dot-blink" style={{ width: "6px", height: "6px", background: "var(--text-muted)", borderRadius: "50%", animationDelay: "0.4s" }} />
+                    </div>
+                  )}
+                </div>
+
+                {/* Input Panel */}
+                <div style={{ padding: "16px 20px", borderTop: "1px solid var(--border-subtle)", display: "flex", gap: "10px", alignItems: "center", background: "var(--hover-overlay)" }}>
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={e => setChatInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === "Enter") sendCopilotMessage(); }}
+                    placeholder="Ask about your holdings, risk, or stocks..."
+                    style={{
+                      flex: 1,
+                      background: "var(--bg-primary)",
+                      border: "1px solid var(--border-subtle)",
+                      borderRadius: "10px",
+                      padding: "11px 14px",
+                      color: "var(--text-primary)",
+                      fontSize: "0.875rem",
+                      fontFamily: "inherit",
+                      outline: "none"
+                    }}
+                  />
+                  <button
+                    onClick={sendCopilotMessage}
+                    disabled={chatLoading}
+                    style={{
+                      background: "linear-gradient(135deg, var(--accent) 0%, var(--purple) 100%)",
+                      color: "var(--bg-primary)",
+                      border: "none",
+                      borderRadius: "10px",
+                      width: "38px",
+                      height: "38px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      fontSize: "1rem"
+                    }}
+                  >
+                    ➢
+                  </button>
+                </div>
               </div>
             </div>
           )}

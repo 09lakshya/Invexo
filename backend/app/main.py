@@ -76,8 +76,18 @@ else:
 
 # Include versioned API routers
 app.include_router(api_router, prefix="/api/v1")
+app.include_router(api_router) # Backwards-compatible root mount
+
+@app.get("/")
+def read_root():
+    return {"message": "Invexo API is running", "env": ENV}
+
+@app.get("/health")
+def health_check():
+    return {"status": "healthy"}
 
 scheduler = BackgroundScheduler()
+
 
 @app.on_event("startup")
 def startup_event():
@@ -85,12 +95,16 @@ def startup_event():
     from app.repositories.user_repository import UserRepository
     from app.repositories.picks_repository import PicksRepository
     from app.repositories.portfolio_repository import PortfolioRepository
+    from app.repositories.watchlist_repository import WatchlistRepository
+    from app.repositories.alert_repository import AlertRepository
     
     try:
         logger.info("Initializing database schemas...")
         UserRepository.init_users_db()
         PicksRepository.init_daily_picks_db()
         PortfolioRepository.init_portfolio_db()
+        WatchlistRepository.init_watchlist_db()
+        AlertRepository.init_alert_db()
         logger.info("Database schemas initialized successfully.")
     except Exception as e:
         logger.error(f"Failed to initialize database tables: {e}")
@@ -99,15 +113,20 @@ def startup_event():
     from app.services.ai.model_loader import load_all_models_async
     load_all_models_async()
 
-    # 3. Setup Scheduler Job for daily recommendations
+    # 3. Setup Scheduler Job for daily recommendations and price alerts
     from app.services.market.market_service import MarketService
+    from app.services.market.alert_service import AlertService
     scheduler.add_job(MarketService.generate_daily_picks, 'cron', hour=0, minute=0)
+    scheduler.add_job(AlertService.check_alerts, 'interval', minutes=1)
     scheduler.start()
     
-    # 4. Trigger initial picks calculation in the background
-    thread = threading.Thread(target=MarketService.generate_daily_picks, kwargs={"force": True})
-    thread.daemon = True
-    thread.start()
+    # 4. Trigger initial picks calculation in the background (skip on Render to save memory on startup)
+    if not os.environ.get("RENDER"):
+        thread = threading.Thread(target=MarketService.generate_daily_picks, kwargs={"force": True})
+        thread.daemon = True
+        thread.start()
+    else:
+        logger.info("Skipping initial picks calculation on Render startup to prevent memory spikes.")
 
 @app.on_event("shutdown")
 def shutdown_event():

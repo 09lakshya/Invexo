@@ -1,3 +1,5 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useEffect } from 'react';
@@ -52,58 +54,69 @@ function AuthGuard({ children }) {
 }
 
 export default function App({ Component, pageProps }) {
+  const [queryClient] = useState(() => new QueryClient({
+    defaultOptions: {
+      queries: {
+        refetchOnWindowFocus: false,
+        retry: 1,
+      },
+    },
+  }));
+
   return (
     <>
       <Head>
         <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no, viewport-fit=cover" />
       </Head>
-      <ThemeProvider>
-        <AuthProvider>
-          <WebSocketProvider>
-            <AuthGuard>
-              <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
-                <div style={{ flex: 1 }}>
-                  <Component {...pageProps} />
-                </div>
-                <footer style={{
-                  padding: '20px 16px',
-                  textAlign: 'center',
-                  borderTop: '1px solid var(--border-subtle)',
-                  fontSize: '0.72rem',
-                  color: 'var(--text-muted)',
-                  fontFamily: "'Inter', sans-serif",
-                  lineHeight: '1.4',
-                }}>
-                  Invexo is for educational purposes only. Developed by Lakshya Hindocha.
-                </footer>
-                <div
-                  id="global-legal-disclaimer"
-                  style={{
-                    background: 'var(--bg-secondary)',
-                    borderTop: '1px solid rgba(255, 23, 68, 0.2)',
-                    color: 'var(--text-primary)',
-                    padding: '16px 24px',
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider>
+          <AuthProvider>
+            <WebSocketProvider>
+              <AuthGuard>
+                <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', boxSizing: 'border-box' }}>
+                  <div style={{ flex: 1 }}>
+                    <Component {...pageProps} />
+                  </div>
+                  <footer style={{
+                    padding: '20px 16px',
                     textAlign: 'center',
+                    borderTop: '1px solid var(--border-subtle)',
                     fontSize: '0.72rem',
-                    fontWeight: '500',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
+                    color: 'var(--text-muted)',
                     fontFamily: "'Inter', sans-serif",
                     lineHeight: '1.4',
-                  }}
-                >
-                  <span style={{ color: 'var(--red)', fontWeight: 'bold', fontSize: '0.85rem' }}>⚠️</span>
-                  <span style={{ color: 'var(--text-secondary)' }}>
-                    <strong style={{ color: 'var(--text-primary)', fontWeight: '700' }}>Legal Disclaimer:</strong> Invexo is not SEBI registered. All content is for educational purposes only and does not constitute investment advice.
-                  </span>
+                  }}>
+                    Invexo is for educational purposes only. Developed by Lakshya Hindocha.
+                  </footer>
+                  <div
+                    id="global-legal-disclaimer"
+                    style={{
+                      background: 'var(--bg-secondary)',
+                      borderTop: '1px solid rgba(255, 23, 68, 0.2)',
+                      color: 'var(--text-primary)',
+                      padding: '16px 24px',
+                      textAlign: 'center',
+                      fontSize: '0.72rem',
+                      fontWeight: '500',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      fontFamily: "'Inter', sans-serif",
+                      lineHeight: '1.4',
+                    }}
+                  >
+                    <span style={{ color: 'var(--red)', fontWeight: 'bold', fontSize: '0.85rem' }}>⚠️</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>
+                      <strong style={{ color: 'var(--text-primary)', fontWeight: '700' }}>Legal Disclaimer:</strong> Invexo is not SEBI registered. All content is for educational purposes only and does not constitute investment advice.
+                    </span>
+                  </div>
                 </div>
-              </div>
-            </AuthGuard>
-          </WebSocketProvider>
-        </AuthProvider>
-      </ThemeProvider>
+              </AuthGuard>
+            </WebSocketProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </QueryClientProvider>
     </>
   );
 }

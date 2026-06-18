@@ -2,14 +2,21 @@ import os
 import time
 import json
 import xgboost as xgb
+from collections import OrderedDict
 from app.utils.logger import get_logger
 
 logger = get_logger("model_loader")
 
-_loaded_models = {}
+MAX_CACHED_MODELS = 5
+_loaded_models = OrderedDict()
 
 def load_all_models():
     """Loads all XGBoost models from the models directory into memory."""
+    # Skip preloading on Render to avoid OOM
+    if os.environ.get("RENDER"):
+        logger.info("Running on Render. Skipping bulk model pre-load to prevent OOM.")
+        return
+        
     global _loaded_models
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
     models_dir = os.environ.get("RENDER_DISK_PATH", os.path.join(base_dir, "models"))
@@ -36,6 +43,9 @@ def load_all_models():
                 if r2_good:
                     model = xgb.XGBRegressor()
                     model.load_model(model_path)
+                    
+                    if len(_loaded_models) >= MAX_CACHED_MODELS:
+                        _loaded_models.popitem(last=False)
                     _loaded_models[symbol] = model
                     count += 1
             except Exception as e:
@@ -54,8 +64,11 @@ def get_model(symbol: str):
     """Retrieve preloaded model or load it dynamically if not cached."""
     global _loaded_models
     model_base_name = symbol.replace('.NS', '').replace('.BO', '')
-    model = _loaded_models.get(model_base_name)
-    if model is not None:
+    
+    # Implement LRU logic
+    if model_base_name in _loaded_models:
+        model = _loaded_models.pop(model_base_name)
+        _loaded_models[model_base_name] = model # Move to end (most recently used)
         return model
         
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
@@ -77,7 +90,12 @@ def get_model(symbol: str):
         try:
             model = xgb.XGBRegressor()
             model.load_model(model_path)
+            
+            # Add to LRU Cache
+            if len(_loaded_models) >= MAX_CACHED_MODELS:
+                _loaded_models.popitem(last=False)
             _loaded_models[model_base_name] = model
+            
             return model
         except Exception as e:
             logger.error(f"Error loading model dynamically for {symbol}: {e}")

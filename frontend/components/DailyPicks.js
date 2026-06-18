@@ -1,40 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import API from '../services/api';
 
 export default function DailyPicks() {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('large_cap');
 
-  useEffect(() => {
-    let interval;
-    
-    const fetchPicks = async () => {
-      try {
-        const res = await API.get('/predict/daily-picks');
-        setData(res.data);
-        if (res.data.status === "ready") {
-          setLoading(false);
-          clearInterval(interval);
-        }
-      } catch (err) {
-        console.error("Failed to fetch daily picks:", err);
-      }
-    };
+  const { data, isLoading } = useQuery({
+    queryKey: ['daily-picks'],
+    queryFn: async () => {
+      const res = await API.get('/predict/daily-picks');
+      return res.data;
+    },
+    refetchInterval: (query) => {
+      return query.state.data?.status !== "ready" ? 5000 : false;
+    }
+  });
 
-    fetchPicks();
-    
-    // Poll every 5 seconds if still generating
-    interval = setInterval(() => {
-      if (data?.status !== "ready") {
-        fetchPicks();
-      }
-    }, 5000);
-    
-    return () => clearInterval(interval);
-  }, [data?.status]);
-
-  if (loading || data?.status === "updating") {
+  const loading = isLoading || data?.status === "updating";
+  if (loading) {
     return (
       <div style={{
         background: "var(--surface)",
