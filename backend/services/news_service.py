@@ -2,6 +2,9 @@ import yfinance as yf
 from datetime import datetime
 from curl_cffi.requests import Session as curl_Session
 from services.ticker_utils import ttl_cache
+from services.logger import get_logger
+
+logger = get_logger("news_service")
 
 _yf_session = curl_Session(impersonate="chrome120")
 
@@ -64,5 +67,5 @@ def get_stock_news(symbol: str):
         return result
 
     except Exception as e:
-        print(f"News Error for {symbol}: {e}")
+        logger.error(f"News Error for {symbol}: {e}")
         return []

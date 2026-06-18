@@ -8,6 +8,10 @@ import time
 import gc
 from functools import wraps
 import json
+from services.logger import get_logger
+
+logger = get_logger("ai_service")
+
 
 from services.ticker_utils import (
     _yf_session,
@@ -24,6 +28,49 @@ except Exception:
     pass
 
 _loaded_models = {}
+
+def load_all_models():
+    """Loads all XGBoost models from the models directory into memory."""
+    global _loaded_models
+    import xgboost as xgb
+    base_dir = os.path.dirname(os.path.dirname(__file__))
+    models_dir = os.environ.get("RENDER_DISK_PATH", os.path.join(base_dir, "models"))
+    
+    if not os.path.exists(models_dir):
+        logger.warning(f"Models directory not found at {models_dir}")
+        return
+        
+    start_time = time.time()
+    count = 0
+    for filename in os.listdir(models_dir):
+        if filename.endswith("_xgb.json"):
+            symbol = filename.replace("_xgb.json", "")
+            model_path = os.path.join(models_dir, filename)
+            try:
+                meta_path = os.path.join(models_dir, f"{symbol}_meta.json")
+                r2_good = True
+                if os.path.exists(meta_path):
+                    with open(meta_path, 'r') as f:
+                        meta_meta = json.load(f)
+                        if meta_meta.get("r2", 1.0) < -0.5:
+                            r2_good = False
+                
+                if r2_good:
+                    model = xgb.XGBRegressor()
+                    model.load_model(model_path)
+                    _loaded_models[symbol] = model
+                    count += 1
+            except Exception as e:
+                logger.error(f"Error pre-loading model for {symbol}: {e}")
+                
+    duration = time.time() - start_time
+    logger.info(f"Successfully pre-loaded {count} XGBoost models in {duration:.2f} seconds.")
+
+def load_all_models_async():
+    import threading
+    thread = threading.Thread(target=load_all_models)
+    thread.daemon = True
+    thread.start()
 
 
 def calculate_rsi(prices, period=14):
@@ -141,9 +188,10 @@ def analyze_financial_sentiment(text):
                 else:
                     return 50.0
             else:
-                print(f"HF API Error {response.status_code}: {response.text}")
+                logger.error(f"HF API Error {response.status_code}: {response.text}")
         except Exception as e:
-            print(f"HF API Exception: {e}")
+            logger.error(f"HF API Exception: {e}")
+
             
     # Fallback to TextBlob if HF_API_KEY is missing, rate-limited, or fails
     try:
@@ -153,8 +201,9 @@ def analyze_financial_sentiment(text):
         # Convert -1.0 to 1.0 scale to 0-100 scale
         return ((polarity + 1.0) / 2.0) * 100.0
     except Exception as e:
-        print(f"TextBlob error: {e}")
+        logger.error(f"TextBlob error: {e}")
         return 50.0
+
 
 
 def analyze_sentiment(text):
@@ -262,8 +311,9 @@ def fetch_news_sentiment(symbol: str):
             # Fallback if news not available
             return _market_sentiment_proxy(symbol)
     except Exception as e:
-        print(f"News sentiment error: {e}")
+        logger.error(f"News sentiment error: {e}")
         return _market_sentiment_proxy(symbol)
+
 
 
 @ttl_cache(maxsize=100, ttl=86400)
@@ -299,8 +349,9 @@ def get_fundamental_data(symbol: str):
         
         return fundamentals
     except Exception as e:
-        print(f"Fundamental data error: {e}")
+        logger.error(f"Fundamental data error: {e}")
         return {}
+
 
 
 def calculate_fundamental_score(fundamentals: dict):
@@ -358,7 +409,7 @@ def calculate_fundamental_score(fundamentals: dict):
             factors += 1
         
     except Exception as e:
-        print(f"Fundamental scoring error: {e}")
+        logger.error(f"Fundamental scoring error: {e}")
     
     if factors == 0:
         return None
@@ -421,7 +472,8 @@ def predict_stock(symbol: str):
                             # Update today's row
                             df.iloc[-1, df.columns.get_loc('Close')] = float(last_price)
         except Exception as e:
-            print("Error patching last price:", e)
+            logger.error(f"Error patching last price: {e}")
+
 
         df = df.dropna(subset=["Close"])
         
@@ -674,10 +726,16 @@ def predict_stock(symbol: str):
                     if meta_meta.get("r2", 1.0) < -0.5:
                         r2_good = False
             
-            if os.path.exists(model_path) and r2_good:
-                # Do not cache models globally to avoid OOM on memory-constrained servers
-                model = xgb.XGBRegressor()
-                model.load_model(model_path)
+            model = None
+            if r2_good:
+                model = _loaded_models.get(model_base_name)
+                if model is None and os.path.exists(model_path):
+                    model = xgb.XGBRegressor()
+                    model.load_model(model_path)
+                    _loaded_models[model_base_name] = model
+            
+            if model is not None:
+
                 
                 # We need to construct the feature row precisely as it was during training
                 roc_5 = float(ta.momentum.ROCIndicator(close=close, window=5).roc().iloc[-1])
@@ -710,8 +768,9 @@ def predict_stock(symbol: str):
                 # If predicted change is > 15%, we treat it as an extrapolation outlier and fall back.
                 xgb_change_pct = (xgb_prediction - current_price) / current_price
                 if abs(xgb_change_pct) > 0.15:
-                    print(f"[AI Service] XGBoost prediction for {symbol} is unrealistic ({xgb_prediction:.2f} vs {current_price:.2f}). Discarding.")
+                    logger.warning(f"XGBoost prediction for {symbol} is unrealistic ({xgb_prediction:.2f} vs {current_price:.2f}). Discarding.")
                     xgb_prediction = None
+
                 else:
                     # Clip the prediction to realistic daily boundaries based on market cap universe
                     symbol_clean = symbol.upper()
@@ -744,7 +803,8 @@ def predict_stock(symbol: str):
                         clipped_change = np.clip(xgb_change_pct, -max_xgb_change, max_xgb_change)
                         xgb_prediction = current_price * (1 + clipped_change)
         except Exception as e:
-            print(f"XGB inference error for {symbol}: {e}")
+            logger.error(f"XGB inference error for {symbol}: {e}")
+
 
         result = {
             "current_price": round(current_price, 2),
@@ -780,5 +840,6 @@ def predict_stock(symbol: str):
         return result
 
     except Exception as e:
-        print("Prediction Error:", e)
+        logger.error(f"Prediction Error: {e}")
         return {"error": "Prediction failed"}
+

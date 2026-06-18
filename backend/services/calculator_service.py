@@ -2,6 +2,10 @@
 Investment Calculator Service
 Handles compound interest, real returns, and financial projections
 """
+from services.logger import get_logger
+
+logger = get_logger("calculator_service")
+
 
 def calculate_investment(principal: float, annual_rate: float, years: int, inflation_rate: float = 0.06):
     """
@@ -48,7 +52,7 @@ def calculate_investment(principal: float, annual_rate: float, years: int, infla
             "inflation_rate": inflation_rate * 100,
         }
     except Exception as e:
-        print(f"Calculator error: {e}")
+        logger.error(f"Calculator error: {e}")
         return {"error": str(e)}
 
 
@@ -98,7 +102,7 @@ def calculate_portfolio_metrics(stocks: list, budget: float):
             "average_confidence": round(avg_confidence, 1),
         }
     except Exception as e:
-        print(f"Portfolio metrics error: {e}")
+        logger.error(f"Portfolio metrics error: {e}")
         return {"error": str(e)}
 
 
@@ -154,5 +158,5 @@ def estimate_returns(stocks: list, annual_growth_rate: float = 0.12, years: int 
             "years": years,
         }
     except Exception as e:
-        print(f"Returns estimation error: {e}")
+        logger.error(f"Returns estimation error: {e}")
         return {"error": str(e)}

@@ -75,6 +75,9 @@ scheduler = BackgroundScheduler()
 
 @app.on_event("startup")
 def startup_event():
+    # Pre-load XGBoost models asynchronously
+    from services.ai_service import load_all_models_async
+    load_all_models_async()
 
     from services.daily_picks_service import generate_daily_picks
     scheduler.add_job(generate_daily_picks, 'cron', hour=0, minute=0)
@@ -84,6 +87,7 @@ def startup_event():
     thread = threading.Thread(target=generate_daily_picks, kwargs={"force": True})
     thread.daemon = True
     thread.start()
+
 
 @app.on_event("shutdown")
 def shutdown_event():

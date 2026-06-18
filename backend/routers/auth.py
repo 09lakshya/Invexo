@@ -14,6 +14,9 @@ from services.auth_service import (
     initiate_signup_otp,
     verify_signup_otp,
 )
+from services.logger import get_logger
+
+logger = get_logger("auth_router")
 
 router = APIRouter(prefix="/auth")
 
@@ -121,7 +124,7 @@ def handle_signup(payload: SignupInput):
         from services.auth_service import send_welcome_email
         send_welcome_email(user["email"], user["name"])
     except Exception as e:
-        print(f"[Welcome Email Warning] Failed to send welcome email: {e}")
+        logger.warning(f"Failed to send welcome email: {e}")
 
     token = create_token(user["id"])
     return {"token": token, "user": user}
@@ -176,7 +179,7 @@ def handle_signup_verify(payload: VerifySignupInput):
         from services.auth_service import send_welcome_email
         send_welcome_email(user["email"], user["name"])
     except Exception as e:
-        print(f"[Welcome Email Warning] Failed to send welcome email: {e}")
+        logger.warning(f"Failed to send welcome email: {e}")
 
     token = create_token(user["id"])
     return {"token": token, "user": user}
@@ -216,7 +219,7 @@ def handle_forgot_password_initiate(payload: ForgotPasswordInitiateInput):
     try:
         initiate_forgot_password_otp(payload.email)
     except Exception as e:
-        print(f"Error initiating forgot password: {e}")
+        logger.error(f"Error initiating forgot password: {e}")
         # Still return success to prevent enumeration, or we could return 500
     
     return {"message": "If this email is registered, a password reset code has been sent."}

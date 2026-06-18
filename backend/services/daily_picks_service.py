@@ -5,6 +5,10 @@ import concurrent.futures
 from datetime import datetime
 from services.db import get_db_connection, get_cursor, execute_query
 from services.ai_service import predict_stock
+from services.logger import get_logger
+
+logger = get_logger("daily_picks_service")
+
 
 # Universes for different market caps
 LARGE_CAP_UNIVERSE = [
@@ -74,7 +78,7 @@ def get_daily_picks():
 
 def score_and_rank_universe(universe_name, symbols):
     """Evaluates a list of symbols and returns the top 5 to 10 sorted by AI score."""
-    print(f"[Daily Picks] Evaluating universe: {universe_name}...")
+    logger.info(f"Evaluating universe: {universe_name}...")
     results = []
     
     def process_symbol(symbol):
@@ -113,7 +117,7 @@ def score_and_rank_universe(universe_name, symbols):
                 "reasoning": f"AI model projects {round(upside_pct, 2)}% upside. Technical trend is {res.get('trend', 'neutral')}."
             }
         except Exception as e:
-            print(f"[Daily Picks] Error evaluating {symbol}: {e}")
+            logger.error(f"Error evaluating {symbol}: {e}")
             return None
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
@@ -139,13 +143,13 @@ def generate_daily_picks(force=False):
             os.write(fd, b"locked")
             os.close(fd)
         except FileExistsError:
-            print(f"[Daily Picks] Another worker process is already generating picks for {today}. Skipping duplicate execution.")
+            logger.warning(f"Another worker process is already generating picks for {today}. Skipping duplicate execution.")
             return
             
     picks = get_daily_picks()
     if picks is not None and not force:
         if isinstance(picks, list):
-            print(f"[Daily Picks] Found legacy array format for {today}. Forcing regeneration to multi-cap format.")
+            logger.info(f"Found legacy array format for {today}. Forcing regeneration to multi-cap format.")
         else:
             # Check for legacy abnormal predictions (e.g. >3% for large caps, >5% for mid caps, >8% for small caps)
             # and auto-trigger regeneration if found.
@@ -178,12 +182,12 @@ def generate_daily_picks(force=False):
                             break
             
             if not has_anomaly:
-                print(f"[Daily Picks] Already generated valid multi-cap picks for {today}. Skipping.")
+                logger.info(f"Already generated valid multi-cap picks for {today}. Skipping.")
                 return
             else:
-                print(f"[Daily Picks] Detected abnormal predictions for {today}. Forcing auto-regeneration.")
+                logger.info(f"Detected abnormal predictions for {today}. Forcing auto-regeneration.")
         
-    print(f"[Daily Picks] Starting comprehensive daily AI screening for {today}...")
+    logger.info(f"Starting comprehensive daily AI screening for {today}...")
     
     large_cap_picks = score_and_rank_universe("Large Cap", LARGE_CAP_UNIVERSE)
     mid_cap_picks = score_and_rank_universe("Mid Cap", MID_CAP_UNIVERSE)
@@ -216,4 +220,4 @@ def generate_daily_picks(force=False):
     conn.commit()
     conn.close()
     
-    print(f"[Daily Picks] Successfully saved multi-cap picks for {today}.")
+    logger.info(f"Successfully saved multi-cap picks for {today}.")

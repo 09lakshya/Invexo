@@ -7,6 +7,11 @@ from contextlib import redirect_stdout, redirect_stderr
 import gc
 from services.data_service import get_stock_price, get_history
 
+from services.redis_client import redis_client
+from services.logger import get_logger
+
+logger = get_logger("market_router")
+
 router = APIRouter(prefix="/market")
 
 # =========================
@@ -50,15 +55,15 @@ GLOBAL_CACHE = {
     "SENSEX": {"price": 0, "change": 0, "percent": 0}
 }
 
-CACHE_FILE_PATH = os.path.join(os.path.dirname(__file__), "..", "services", "market_cache.json")
 try:
-    if os.path.exists(CACHE_FILE_PATH):
-        with open(CACHE_FILE_PATH, "r", encoding="utf-8") as f:
-            cached_data = json.load(f)
-            if isinstance(cached_data, dict) and len(cached_data) > 0:
-                GLOBAL_CACHE.update(cached_data)
+    cached_val = redis_client.get("market:global_cache")
+    if cached_val:
+        cached_data = json.loads(cached_val)
+        if isinstance(cached_data, dict) and len(cached_data) > 0:
+            GLOBAL_CACHE.update(cached_data)
 except Exception as e:
-    print(f"Error loading market cache from file: {e}")
+    logger.error(f"Error loading market cache from Redis: {e}")
+
 
 _background_task = None
 _active_connections = set()
@@ -110,7 +115,7 @@ async def update_market_cache():
                             "percent": round(percent, 2)
                         }
                     except Exception as ex:
-                        print(f"Error parsing {sym}: {ex}")
+                        logger.error(f"Error parsing {sym}: {ex}")
 
             # Fallback for indices if something goes wrong
             new_data.setdefault("NIFTY50", GLOBAL_CACHE.get("NIFTY50", {"price": 0, "change": 0, "percent": 0}))
@@ -119,10 +124,10 @@ async def update_market_cache():
             if new_data:
                 GLOBAL_CACHE.update(new_data)
                 try:
-                    with open(CACHE_FILE_PATH, "w", encoding="utf-8") as f:
-                        json.dump(GLOBAL_CACHE, f, indent=2, ensure_ascii=False)
+                    redis_client.set("market:global_cache", json.dumps(GLOBAL_CACHE))
                 except Exception as ex:
-                    print(f"Error saving market cache to file: {ex}")
+                    logger.error(f"Error saving market cache to Redis: {ex}")
+
                 
             # Broadcast to all connected clients
             for connection in list(_active_connections):
@@ -137,7 +142,7 @@ async def update_market_cache():
             gc.collect()
                     
         except Exception as e:
-            print(f"[Background Fetch] Failed to bulk fetch market data: {e}")
+            logger.error(f"Failed to bulk fetch market data: {e}")
             
         await asyncio.sleep(15)  # 15s refresh interval to avoid rate limiting
 

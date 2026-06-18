@@ -6,9 +6,11 @@ from bs4 import BeautifulSoup
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from services.ticker_utils import ttl_cache
+from services.redis_client import redis_client
+from services.logger import get_logger
 
-CACHE_FILE = os.path.join(os.path.dirname(__file__), "general_news_cache.json")
-SEARCH_CACHE_FILE = os.path.join(os.path.dirname(__file__), "general_news_search_cache.json")
+logger = get_logger("general_news_service")
+
 
 headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -29,7 +31,7 @@ def _parse_xml(content: bytes) -> BeautifulSoup:
     try:
         return BeautifulSoup(content, "xml")
     except Exception as e:
-        print(f"XML parser warning: {e}. Falling back to html.parser")
+        logger.warning(f"XML parser warning: {e}. Falling back to html.parser")
         return BeautifulSoup(content, "html.parser")
 
 def _scrape_article_text(link: str) -> str:
@@ -39,15 +41,14 @@ def _scrape_article_text(link: str) -> str:
 def get_general_news():
     today = datetime.now().strftime("%Y-%m-%d")
     
-    # 1. Check local daily cache
-    if os.path.exists(CACHE_FILE):
+    # 1. Check daily cache in Redis
+    redis_key = f"news:general:{today}"
+    cached_val = redis_client.get(redis_key)
+    if cached_val:
         try:
-            with open(CACHE_FILE, "r", encoding="utf-8") as f:
-                cache_data = json.load(f)
-                if cache_data.get("date") == today and cache_data.get("news"):
-                    return cache_data["news"]
+            return json.loads(cached_val)
         except Exception as e:
-            print(f"Cache read error: {e}")
+            logger.error(f"Cache read error: {e}")
             
     # 2. Fetch fresh news from Livemint Companies & Markets feeds
     feeds = [
@@ -81,7 +82,7 @@ def get_general_news():
                         "fallback_desc": BeautifulSoup(desc, "html.parser").get_text().strip()
                     })
         except Exception as e:
-            print(f"Error reading feed {feed_url}: {e}")
+            logger.error(f"Error reading feed {feed_url}: {e}")
             
     # Target top 10 unique business articles
     target_items = raw_items[:10]
@@ -115,18 +116,17 @@ def get_general_news():
                     "summary": summary
                 })
             except Exception as e:
-                print(f"Error processing news item: {e}")
+                logger.error(f"Error processing news item: {e}")
                 
     # Sort for deterministic output
     news_list.sort(key=lambda x: x["title"])
     
-    # Save today's news to cache
+    # Save today's news to cache in Redis
     if news_list:
         try:
-            with open(CACHE_FILE, "w", encoding="utf-8") as f:
-                json.dump({"date": today, "news": news_list}, f, indent=2, ensure_ascii=False)
+            redis_client.set(redis_key, json.dumps(news_list), ex=86400)
         except Exception as e:
-            print(f"Cache write error: {e}")
+            logger.error(f"Cache write error: {e}")
             
     return news_list
 
@@ -138,18 +138,14 @@ def search_general_news(query: str):
     query_key = query.lower()
     now = time.time()
     
-    # 1. Check search cache
-    if os.path.exists(SEARCH_CACHE_FILE):
+    # 1. Check search cache in Redis
+    redis_key = f"news:search:{query_key}"
+    cached_val = redis_client.get(redis_key)
+    if cached_val:
         try:
-            with open(SEARCH_CACHE_FILE, "r", encoding="utf-8") as f:
-                cache_data = json.load(f)
-                # Cache validity: 4 hours
-                if query_key in cache_data:
-                    record = cache_data[query_key]
-                    if now - record.get("time", 0) < 14400: # 4 hours
-                        return record.get("news", [])
+            return json.loads(cached_val)
         except Exception as e:
-            print(f"Search cache read error: {e}")
+            logger.error(f"Search cache read error: {e}")
             
     # 2. Fetch search results from Google News search feed
     import urllib.parse
@@ -187,7 +183,7 @@ def search_general_news(query: str):
                     "fallback_desc": fallback_txt
                 })
     except Exception as e:
-        print(f"Error searching Google News for '{query}': {e}")
+        logger.error(f"Error searching Google News for '{query}': {e}")
         
     # Take top 8 search results
     target_items = raw_items[:8]
@@ -221,32 +217,16 @@ def search_general_news(query: str):
                     "summary": summary
                 })
             except Exception as e:
-                print(f"Error processing search item: {e}")
+                logger.error(f"Error processing search item: {e}")
                 
     # Sort for deterministic output
     news_list.sort(key=lambda x: x["title"])
     
-    # Save search result to cache
+    # Save search result to cache in Redis
     try:
-        cache_data = {}
-        if os.path.exists(SEARCH_CACHE_FILE):
-            with open(SEARCH_CACHE_FILE, "r", encoding="utf-8") as f:
-                cache_data = json.load(f)
-        
-        # Keep cache size small, delete old entries if > 50 queries cached
-        if len(cache_data) > 50:
-            oldest_key = min(cache_data.keys(), key=lambda k: cache_data[k].get("time", 0))
-            cache_data.pop(oldest_key, None)
-            
-        cache_data[query_key] = {
-            "time": now,
-            "news": news_list
-        }
-        
-        with open(SEARCH_CACHE_FILE, "w", encoding="utf-8") as f:
-            json.dump(cache_data, f, indent=2, ensure_ascii=False)
+        redis_client.set(redis_key, json.dumps(news_list), ex=14400)
     except Exception as e:
-        print(f"Search cache write error: {e}")
+        logger.error(f"Search cache write error: {e}")
         
     return news_list
 
@@ -278,5 +258,5 @@ def suggest_general_news(query: str):
                     })
             return suggestions
     except Exception as e:
-        print(f"Error fetching suggestions for '{query}': {e}")
+        logger.error(f"Error fetching suggestions for '{query}': {e}")
     return []

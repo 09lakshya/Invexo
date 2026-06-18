@@ -3,19 +3,21 @@ import bcrypt
 import jwt
 import warnings
 import random
+import json
 from datetime import datetime, timedelta, timezone
 from email.mime.text import MIMEText
 from services.db import DB_PATH, get_db_connection, get_cursor, execute_query
+from services.redis_client import redis_client
+from services.logger import get_logger
 
-# Global in-memory OTP store. Format: { email: { "otp": str, "expires": datetime, "payload": dict } }
-otp_store = {}
+logger = get_logger("auth_service")
+
 
 def send_otp_email(email_addr: str, otp: str):
     """Prints OTP to console. If SMTP variables or RESEND_API_KEY are present, sends it."""
     # Build clean console banner
-    print("\n" + "="*50)
-    print(f"[OTP DEBUG] OTP for {email_addr}: {otp}")
-    print("="*50 + "\n")
+    logger.info(f"[OTP DEBUG] OTP for {email_addr}: {otp}")
+
 
     # 1. Try Resend HTTP API if configured (Bypasses SMTP port blocks)
     resend_key = os.environ.get("RESEND_API_KEY", "")
@@ -39,13 +41,15 @@ def send_otp_email(email_addr: str, otp: str):
                 timeout=10
             )
             if res.status_code in [200, 201]:
-                print(f"[Resend] Successfully sent OTP email to {email_addr}")
+                logger.info(f"[Resend] Successfully sent OTP email to {email_addr}")
                 return
+
             else:
                 raise RuntimeError(f"Resend API error (status {res.status_code}): {res.text}")
         except Exception as e:
-            print(f"[Resend ERROR] Failed to send email to {email_addr}: {e}")
+            logger.error(f"[Resend ERROR] Failed to send email to {email_addr}: {e}")
             raise RuntimeError(f"Email delivery failed via Resend API: {str(e)}")
+
 
     # 2. Try SMTP credentials if configured
     host = os.environ.get("SMTP_HOST", "")
@@ -76,17 +80,17 @@ def send_otp_email(email_addr: str, otp: str):
             server.login(user, password)
             server.sendmail(sender, [email_addr], msg.as_string())
             server.quit()
-            print(f"[SMTP] Successfully sent OTP email to {email_addr}")
+            logger.info(f"[SMTP] Successfully sent OTP email to {email_addr}")
         except Exception as e:
-            print(f"[SMTP ERROR] Failed to send email to {email_addr}: {e}")
+            logger.error(f"[SMTP ERROR] Failed to send email to {email_addr}: {e}")
             raise RuntimeError(f"Email delivery failed: {str(e)}")
+
 
 
 def send_welcome_email(email_addr: str, name: str):
     """Sends a premium, branded HTML welcome email to the user upon successful signup."""
-    print("\n" + "="*50)
-    print(f"[WELCOME DEBUG] Sending welcome email to {email_addr}")
-    print("="*50 + "\n")
+    logger.info(f"[WELCOME DEBUG] Sending welcome email to {email_addr}")
+
 
     subject = "Welcome to Invexo - Your Financial Journey Starts Here!"
     
@@ -226,12 +230,14 @@ def send_welcome_email(email_addr: str, name: str):
                 timeout=10
             )
             if res.status_code in [200, 201]:
-                print(f"[Resend] Successfully sent welcome email to {email_addr}")
+                logger.info(f"[Resend] Successfully sent welcome email to {email_addr}")
                 return
+
             else:
                 raise RuntimeError(f"Resend API error (status {res.status_code}): {res.text}")
         except Exception as e:
-            print(f"[Resend ERROR] Failed to send welcome email to {email_addr}: {e}")
+            logger.error(f"[Resend ERROR] Failed to send welcome email to {email_addr}: {e}")
+
 
     # 2. Try SMTP if configured
     host = os.environ.get("SMTP_HOST", "")
@@ -261,49 +267,51 @@ def send_welcome_email(email_addr: str, name: str):
             server.login(user, password)
             server.sendmail(sender, [email_addr], msg.as_string())
             server.quit()
-            print(f"[SMTP] Successfully sent welcome email to {email_addr}")
+            logger.info(f"[SMTP] Successfully sent welcome email to {email_addr}")
         except Exception as e:
-            print(f"[SMTP ERROR] Failed to send welcome email to {email_addr}: {e}")
+            logger.error(f"[SMTP ERROR] Failed to send welcome email to {email_addr}: {e}")
+
 
 
 def initiate_signup_otp(email_addr: str, payload: dict) -> str:
     """Generates 6-digit OTP, stores signup payload, and triggers send."""
     otp = f"{random.randint(100000, 999999)}"
-    expiry = datetime.now() + timedelta(minutes=5)
-    otp_store[email_addr.lower()] = {
+    key = f"otp:{email_addr.lower()}"
+    record = {
         "otp": otp,
-        "expires": expiry,
         "payload": payload,
-        "attempts": 0
+        "attempts": 0,
+        "verified": False
     }
+    redis_client.setex(key, 300, json.dumps(record))
     send_otp_email(email_addr, otp)
     return otp
 
 
 def verify_signup_otp(email_addr: str, otp: str) -> dict | None:
     """Verifies OTP. Returns stored user payload on success, None on invalid/expired."""
-    key = email_addr.lower()
-    if key not in otp_store:
+    key = f"otp:{email_addr.lower()}"
+    val = redis_client.get(key)
+    if not val:
         return None
     
-    record = otp_store[key]
-    if datetime.now() > record["expires"]:
-        del otp_store[key]
-        return None
-        
+    record = json.loads(val)
     record["attempts"] = record.get("attempts", 0) + 1
     if record["attempts"] > 5:
-        del otp_store[key]
+        redis_client.delete(key)
         return None
         
     if record["otp"] != otp:
         if record["attempts"] >= 5:
-            del otp_store[key]
+            redis_client.delete(key)
+        else:
+            redis_client.setex(key, 300, json.dumps(record))
         return None
         
     payload = record["payload"]
-    del otp_store[key]
+    redis_client.delete(key)
     return payload
+
 
 def user_exists(email: str) -> bool:
     """Check if email already exists in users table."""
@@ -316,9 +324,8 @@ def user_exists(email: str) -> bool:
 
 def send_reset_otp_email(email_addr: str, otp: str):
     """Sends a password reset OTP to the user."""
-    print("\n" + "="*50)
-    print(f"[RESET OTP DEBUG] Reset OTP for {email_addr}: {otp}")
-    print("="*50 + "\n")
+    logger.info(f"[RESET OTP DEBUG] Reset OTP for {email_addr}: {otp}")
+
 
     subject = "Invexo - Password Reset Verification Code"
     text_content = (
@@ -341,7 +348,8 @@ def send_reset_otp_email(email_addr: str, otp: str):
             )
             return
         except Exception as e:
-            print(f"[Resend ERROR] Failed to send reset email: {e}")
+            logger.error(f"[Resend ERROR] Failed to send reset email: {e}")
+
 
     # 2. Try SMTP
     host = os.environ.get("SMTP_HOST", "")
@@ -368,28 +376,30 @@ def send_reset_otp_email(email_addr: str, otp: str):
             server.sendmail(sender, [email_addr], msg.as_string())
             server.quit()
         except Exception as e:
-            print(f"[SMTP ERROR] Failed to send reset email: {e}")
+            logger.error(f"[SMTP ERROR] Failed to send reset email: {e}")
+
 
 def initiate_forgot_password_otp(email_addr: str) -> str:
     """Generates 6-digit OTP for password reset and stores it."""
     otp = f"{random.randint(100000, 999999)}"
-    expiry = datetime.now() + timedelta(minutes=5)
+    key = f"otp:{email_addr.lower()}"
     
-    # Store in the same dictionary but with a special payload marker
-    otp_store[email_addr.lower()] = {
+    # Store in the same Redis key format but with a special payload marker
+    record = {
         "otp": otp,
-        "expires": expiry,
         "payload": {"type": "reset"},
-        "attempts": 0
+        "attempts": 0,
+        "verified": False
     }
+    redis_client.setex(key, 300, json.dumps(record))
     send_reset_otp_email(email_addr, otp)
     return otp
 
+
 def send_password_updated_email(email_addr: str):
     """Sends a confirmation email that the password was updated."""
-    print("\n" + "="*50)
-    print(f"[PASSWORD UPDATED DEBUG] Sending confirmation to {email_addr}")
-    print("="*50 + "\n")
+    logger.info(f"[PASSWORD UPDATED DEBUG] Sending confirmation to {email_addr}")
+
 
     subject = "Invexo - Password Updated Successfully"
     text_content = (
@@ -413,7 +423,8 @@ def send_password_updated_email(email_addr: str):
             )
             return
         except Exception as e:
-            print(f"[Resend ERROR] Failed to send password update email: {e}")
+            logger.error(f"[Resend ERROR] Failed to send password update email: {e}")
+
 
     # 2. Try SMTP
     host = os.environ.get("SMTP_HOST", "")
@@ -440,41 +451,46 @@ def send_password_updated_email(email_addr: str):
             server.sendmail(sender, [email_addr], msg.as_string())
             server.quit()
         except Exception as e:
-            print(f"[SMTP ERROR] Failed to send password update email: {e}")
+            logger.error(f"[SMTP ERROR] Failed to send password update email: {e}")
+
 
 
 def reset_password_with_otp(email_addr: str, otp: str, new_password: str) -> bool:
     """Verifies OTP and updates the password."""
-    key = email_addr.lower()
-    if key not in otp_store:
+    key = f"otp:{email_addr.lower()}"
+    val = redis_client.get(key)
+    if not val:
         return False
         
-    record = otp_store[key]
-    if datetime.now() > record["expires"]:
-        del otp_store[key]
-        return False
-        
-    record["attempts"] = record.get("attempts", 0) + 1
-    if record["attempts"] > 5:
-        del otp_store[key]
-        return False
-        
-    if record["otp"] != otp:
-        if record["attempts"] >= 5:
-            del otp_store[key]
-        return False
-        
+    record = json.loads(val)
+    is_verified = record.get("verified", False)
+    
+    if not is_verified:
+        record["attempts"] = record.get("attempts", 0) + 1
+        if record["attempts"] > 5:
+            redis_client.delete(key)
+            return False
+            
+        if record["otp"] != otp:
+            if record["attempts"] >= 5:
+                redis_client.delete(key)
+            else:
+                ttl = redis_client.ttl(key)
+                if ttl > 0:
+                    redis_client.setex(key, ttl, json.dumps(record))
+            return False
+            
     if record.get("payload", {}).get("type") != "reset":
         return False
         
-    del otp_store[key]
+    redis_client.delete(key)
     
     # Hash the new password and update the database
     new_hash = bcrypt.hashpw(new_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
     
     conn, is_postgres = get_db_connection()
     c = conn.cursor()
-    execute_query(c, "UPDATE users SET password_hash = ? WHERE email = ?", (new_hash, key), is_postgres)
+    execute_query(c, "UPDATE users SET password_hash = ? WHERE email = ?", (new_hash, email_addr.lower()), is_postgres)
     conn.commit()
     updated = c.rowcount > 0
     conn.close()
@@ -484,30 +500,40 @@ def reset_password_with_otp(email_addr: str, otp: str, new_password: str) -> boo
     
     return updated
 
+
 def verify_forgot_password_otp_only(email_addr: str, otp: str) -> bool:
     """Verifies the OTP but does not reset the password yet. Marks as verified."""
-    key = email_addr.lower()
-    if key not in otp_store:
+    key = f"otp:{email_addr.lower()}"
+    val = redis_client.get(key)
+    if not val:
         return False
         
-    record = otp_store[key]
-    if datetime.now() > record["expires"]:
-        del otp_store[key]
-        return False
-        
+    record = json.loads(val)
     if record.get("payload", {}).get("type") != "reset":
-        del otp_store[key]
+        redis_client.delete(key)
         return False
         
     record["attempts"] = record.get("attempts", 0) + 1
+    if record["attempts"] > 5:
+        redis_client.delete(key)
+        return False
+        
     if record["otp"] != otp:
         if record["attempts"] >= 5:
-            del otp_store[key]
+            redis_client.delete(key)
+        else:
+            ttl = redis_client.ttl(key)
+            if ttl > 0:
+                redis_client.setex(key, ttl, json.dumps(record))
         return False
         
     # Mark as verified, keep it in store so they can submit the new password next
     record["verified"] = True
+    ttl = redis_client.ttl(key)
+    if ttl > 0:
+        redis_client.setex(key, ttl, json.dumps(record))
     return True
+
 
 JWT_SECRET = os.environ.get("JWT_SECRET", "")
 JWT_ALGORITHM = "HS256"
