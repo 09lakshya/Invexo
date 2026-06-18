@@ -23,3 +23,4 @@ xgboost
 scikit-learn
 apscheduler
 slowapi
+email-validator
