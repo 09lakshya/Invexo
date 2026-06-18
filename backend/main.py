@@ -75,6 +75,16 @@ scheduler = BackgroundScheduler()
 
 @app.on_event("startup")
 def startup_event():
+    from services.logger import get_logger
+    logger = get_logger("main")
+
+    # Initialize daily picks database table safely
+    from services.daily_picks_service import init_daily_picks_db
+    try:
+        init_daily_picks_db()
+    except Exception as e:
+        logger.error(f"Failed to initialize database during startup: {e}")
+
     # Pre-load XGBoost models asynchronously
     from services.ai_service import load_all_models_async
     load_all_models_async()

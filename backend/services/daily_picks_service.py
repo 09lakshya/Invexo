@@ -54,7 +54,7 @@ def init_daily_picks_db():
     conn.commit()
     conn.close()
 
-init_daily_picks_db()
+
 
 def get_today_date_str():
     return datetime.now().strftime("%Y-%m-%d")
