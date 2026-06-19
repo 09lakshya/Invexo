@@ -1,1 +1,0 @@
-{"features": ["Close", "Volume", "rsi", "macd", "macd_signal", "macd_diff", "bb_upper", "bb_middle", "bb_lower", "bb_width", "ema9", "ema21", "adx", "plus_di", "minus_di", "stoch_k", "stoch_d", "roc_5", "roc_20", "vol_ema_20"], "mae": 0.024006572924832496, "r2": -2.0350449123248806, "last_trained": "2026-06-18T09:31:24.040029"}
