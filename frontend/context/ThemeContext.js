@@ -11,7 +11,7 @@ export function ThemeProvider({ children }) {
 
   // On mount — restore theme preference
   useEffect(() => {
-    const stored = localStorage.getItem("ntrade_theme");
+    const stored = localStorage.getItem("invexo_theme");
     if (stored) {
       setTheme(stored);
       document.documentElement.setAttribute("data-theme", stored);
@@ -25,7 +25,7 @@ export function ThemeProvider({ children }) {
   const setThemeMode = (mode) => {
     const next = mode === "light" ? "light" : "dark";
     setTheme(next);
-    localStorage.setItem("ntrade_theme", next);
+    localStorage.setItem("invexo_theme", next);
     document.documentElement.setAttribute("data-theme", next);
   };
 

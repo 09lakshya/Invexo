@@ -85,9 +85,9 @@ export function AuthProvider({ children }) {
 
   const refreshUser = async () => {
     const stored =
-      localStorage.getItem("ntrade_token") ||
-      sessionStorage.getItem("ntrade_token") ||
-      getCookie("ntrade_token");
+      localStorage.getItem("invexo_token") ||
+      sessionStorage.getItem("invexo_token") ||
+      getCookie("invexo_token");
 
     if (!stored) return null;
 
@@ -101,10 +101,44 @@ export function AuthProvider({ children }) {
 
   // On mount, restore session from localStorage, sessionStorage, or cookie
   useEffect(() => {
+    // --- ONE-TIME MIGRATION FOR RENAMING ntrade_ TO invexo_ ---
+    if (typeof window !== "undefined") {
+      try {
+        const keysToMigrate = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith("ntrade_")) {
+            keysToMigrate.push(key);
+          }
+        }
+        keysToMigrate.forEach(key => {
+          const val = localStorage.getItem(key);
+          const newKey = key.replace("ntrade_", "invexo_");
+          localStorage.setItem(newKey, val);
+          localStorage.removeItem(key);
+        });
+        
+        const ssToken = sessionStorage.getItem("ntrade_token");
+        if (ssToken !== null) {
+            sessionStorage.setItem("invexo_token", ssToken);
+            sessionStorage.removeItem("ntrade_token");
+        }
+
+        const cookieToken = getCookie("ntrade_token");
+        if (cookieToken) {
+            setCookie("invexo_token", cookieToken, 30);
+            eraseCookie("ntrade_token");
+        }
+      } catch (err) {
+        console.error("Migration failed:", err);
+      }
+    }
+    // --- END MIGRATION ---
+
     const stored =
-      localStorage.getItem("ntrade_token") ||
-      sessionStorage.getItem("ntrade_token") ||
-      getCookie("ntrade_token");
+      localStorage.getItem("invexo_token") ||
+      sessionStorage.getItem("invexo_token") ||
+      getCookie("invexo_token");
 
     if (!stored) {
       setLoading(false);
@@ -121,9 +155,9 @@ export function AuthProvider({ children }) {
       })
       .catch(() => {
         // Token invalid or expired; clear it
-        localStorage.removeItem("ntrade_token");
-        sessionStorage.removeItem("ntrade_token");
-        eraseCookie("ntrade_token");
+        localStorage.removeItem("invexo_token");
+        sessionStorage.removeItem("invexo_token");
+        eraseCookie("invexo_token");
       })
       .finally(() => setLoading(false));
   }, []);
@@ -134,11 +168,11 @@ export function AuthProvider({ children }) {
     setToken(tk);
     setUser(u);
     if (rememberMe) {
-      localStorage.setItem("ntrade_token", tk);
-      setCookie("ntrade_token", tk, 30); // 30 days
+      localStorage.setItem("invexo_token", tk);
+      setCookie("invexo_token", tk, 30); // 30 days
     } else {
-      sessionStorage.setItem("ntrade_token", tk);
-      setCookie("ntrade_token", tk, null); // session cookie
+      sessionStorage.setItem("invexo_token", tk);
+      setCookie("invexo_token", tk, null); // session cookie
     }
     return u;
   };
@@ -149,11 +183,11 @@ export function AuthProvider({ children }) {
     setToken(tk);
     setUser(u);
     if (rememberMe) {
-      localStorage.setItem("ntrade_token", tk);
-      setCookie("ntrade_token", tk, 30);
+      localStorage.setItem("invexo_token", tk);
+      setCookie("invexo_token", tk, 30);
     } else {
-      sessionStorage.setItem("ntrade_token", tk);
-      setCookie("ntrade_token", tk, null);
+      sessionStorage.setItem("invexo_token", tk);
+      setCookie("invexo_token", tk, null);
     }
     return u;
   };
@@ -169,11 +203,11 @@ export function AuthProvider({ children }) {
     setToken(tk);
     setUser(u);
     if (rememberMe) {
-      localStorage.setItem("ntrade_token", tk);
-      setCookie("ntrade_token", tk, 30);
+      localStorage.setItem("invexo_token", tk);
+      setCookie("invexo_token", tk, 30);
     } else {
-      sessionStorage.setItem("ntrade_token", tk);
-      setCookie("ntrade_token", tk, null);
+      sessionStorage.setItem("invexo_token", tk);
+      setCookie("invexo_token", tk, null);
     }
     return u;
   };
@@ -196,11 +230,11 @@ export function AuthProvider({ children }) {
   const logout = () => {
     setUser(null);
     setToken(null);
-    localStorage.removeItem("ntrade_token");
-    sessionStorage.removeItem("ntrade_token");
-    eraseCookie("ntrade_token");
+    localStorage.removeItem("invexo_token");
+    sessionStorage.removeItem("invexo_token");
+    eraseCookie("invexo_token");
     // Also clear old portfolio uid if present
-    localStorage.removeItem("ntrade_uid");
+    localStorage.removeItem("invexo_uid");
   };
 
   const [avatar, setAvatar] = useState("");
@@ -209,9 +243,9 @@ export function AuthProvider({ children }) {
     if (user?.id) {
       if (user.profile_photo) {
         setAvatar(user.profile_photo);
-        localStorage.setItem(`ntrade_profile_photo_${user.id}`, user.profile_photo);
+        localStorage.setItem(`invexo_profile_photo_${user.id}`, user.profile_photo);
       } else {
-        const savedAvatar = localStorage.getItem(`ntrade_profile_photo_${user.id}`) || localStorage.getItem("ntrade_profile_photo");
+        const savedAvatar = localStorage.getItem(`invexo_profile_photo_${user.id}`) || localStorage.getItem("invexo_profile_photo");
         setAvatar(savedAvatar || "");
       }
     } else {
@@ -223,7 +257,7 @@ export function AuthProvider({ children }) {
     if (!data) {
       setAvatar("");
       if (user?.id) {
-        localStorage.removeItem(`ntrade_profile_photo_${user.id}`);
+        localStorage.removeItem(`invexo_profile_photo_${user.id}`);
         try {
           const res = await API.patch("/auth/profile", { profile_photo: "" });
           setUser(res.data);
@@ -231,7 +265,7 @@ export function AuthProvider({ children }) {
           console.error("Failed to clear profile photo on backend:", err);
         }
       }
-      localStorage.removeItem("ntrade_profile_photo");
+      localStorage.removeItem("invexo_profile_photo");
       return;
     }
 
@@ -239,11 +273,11 @@ export function AuthProvider({ children }) {
       const compressed = await resizeImage(data);
       setAvatar(compressed);
       if (user?.id) {
-        localStorage.setItem(`ntrade_profile_photo_${user.id}`, compressed);
+        localStorage.setItem(`invexo_profile_photo_${user.id}`, compressed);
         const res = await API.patch("/auth/profile", { profile_photo: compressed });
         setUser(res.data);
       }
-      localStorage.setItem("ntrade_profile_photo", compressed);
+      localStorage.setItem("invexo_profile_photo", compressed);
     } catch (err) {
       console.error("Failed to sync profile photo to backend:", err);
       setAvatar(data);

@@ -6,8 +6,8 @@ import API from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 
-const SETTINGS_KEY = "ntrade_settings_v1";
-const AVATAR_KEY = "ntrade_profile_photo";
+const SETTINGS_KEY = "invexo_settings_v1";
+const AVATAR_KEY = "invexo_profile_photo";
 
 const defaultSettings = {
   trading: {

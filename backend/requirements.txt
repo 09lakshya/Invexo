@@ -1,26 +1,33 @@
-fastapi
-uvicorn
-yfinance
-pandas
-numpy
-redis
-websockets
-textblob
-requests
-beautifulsoup4
-lxml
-python-dateutil
-python-dotenv
-python-multipart
-sqlalchemy
-psycopg2-binary
-alembic
-bcrypt
-PyJWT
-curl_cffi
-ta
-xgboost
-scikit-learn
-apscheduler
-slowapi
-email-validator
+# -------------------------------------------------------------
+# Python Version Requirement:
+# This project is tested and verified to run on Python 3.13.
+# Deployments should use Python 3.13 or newer compatible 
+# environments to ensure smooth operation. 
+# -------------------------------------------------------------
+
+fastapi==0.137.2
+uvicorn==0.49.0
+yfinance==1.4.1
+pandas==3.0.3
+numpy==2.4.6
+redis==8.0.0
+websockets==16.0
+textblob==0.20.0
+requests==2.34.2
+beautifulsoup4==4.15.0
+lxml==6.1.1
+python-dateutil==2.9.0.post0
+python-dotenv==1.2.2
+python-multipart==0.0.32
+sqlalchemy==2.0.51
+psycopg2-binary==2.9.12
+alembic==1.18.4
+bcrypt==5.0.0
+PyJWT==2.13.0
+curl_cffi==0.15.0
+ta==0.11.0
+xgboost==3.3.0
+scikit-learn==1.9.0
+apscheduler==3.11.2
+slowapi==0.1.9
+email-validator==2.2.0

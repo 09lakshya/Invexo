@@ -18,9 +18,9 @@ api.interceptors.request.use((config) => {
     };
     
     const token =
-      localStorage.getItem("ntrade_token") ||
-      sessionStorage.getItem("ntrade_token") ||
-      getCookie("ntrade_token");
+      localStorage.getItem("invexo_token") ||
+      sessionStorage.getItem("invexo_token") ||
+      getCookie("invexo_token");
       
     if (token) {
       config.headers = config.headers || {};

@@ -480,7 +480,7 @@ export default function Home() {
   // Load recent searches from localStorage
   useEffect(() => {
     try {
-      const stored = JSON.parse(localStorage.getItem("ntrade_recent_searches") || "[]");
+      const stored = JSON.parse(localStorage.getItem("invexo_recent_searches") || "[]");
       setRecentSearches(stored.slice(0, 5));
     } catch { setRecentSearches([]); }
   }, []);
@@ -513,9 +513,9 @@ export default function Home() {
     setQuery(""); setResults([]); setShowRecents(false);
     // Save to recent searches
     try {
-      const stored = JSON.parse(localStorage.getItem("ntrade_recent_searches") || "[]");
+      const stored = JSON.parse(localStorage.getItem("invexo_recent_searches") || "[]");
       const updated = [sym, ...stored.filter(s => s !== sym)].slice(0, 5);
-      localStorage.setItem("ntrade_recent_searches", JSON.stringify(updated));
+      localStorage.setItem("invexo_recent_searches", JSON.stringify(updated));
       setRecentSearches(updated);
     } catch {}
     router.push(`/stock/${sym}`);
@@ -775,7 +775,7 @@ export default function Home() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      localStorage.removeItem("ntrade_recent_searches");
+                      localStorage.removeItem("invexo_recent_searches");
                       setRecentSearches([]);
                       setShowRecents(false);
                     }}
