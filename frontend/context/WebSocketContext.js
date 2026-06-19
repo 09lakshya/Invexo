@@ -44,6 +44,9 @@ export function WebSocketProvider({ children }) {
         if (!active) return;
         try {
           const data = JSON.parse(e.data);
+          if (data && data.type === "ping") {
+            return;
+          }
           setStocks((prev) => {
             setPrevStocks(prev);
             return data;
