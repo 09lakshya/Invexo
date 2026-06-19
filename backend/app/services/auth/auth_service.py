@@ -13,7 +13,9 @@ logger = get_logger("auth_service")
 class AuthService:
     @staticmethod
     def send_otp_email(email_addr: str, otp: str):
-        logger.info(f"[OTP DEBUG] OTP for {email_addr}: {otp}")
+        if os.environ.get("ENV") != "production":
+            logger.info(f"[OTP DEBUG] OTP for {email_addr}: {otp}")
+        logger.info(f"Sending signup OTP email to {email_addr}")
         
         # 1. Try Resend HTTP API
         resend_key = os.environ.get("RESEND_API_KEY", "")
@@ -318,6 +320,14 @@ class AuthService:
             "verified": False
         }
         redis_client.setex(key, 300, json.dumps(record))
+        AuthService.send_reset_otp_email(email_addr, otp)
+        return otp
+
+    @staticmethod
+    def send_reset_otp_email(email_addr: str, otp: str):
+        if os.environ.get("ENV") != "production":
+            logger.info(f"[RESET OTP DEBUG] Reset OTP for {email_addr}: {otp}")
+        logger.info(f"Sending reset OTP email to {email_addr}")
         
         subject = "Invexo - Password Reset Verification Code"
         text_content = (
@@ -364,8 +374,6 @@ class AuthService:
                 server.quit()
             except Exception as e:
                 logger.error(f"[SMTP ERROR] Failed to send reset email: {e}")
-                
-        return otp
 
     @staticmethod
     def verify_forgot_password_otp_only(email_addr: str, otp: str) -> bool:
