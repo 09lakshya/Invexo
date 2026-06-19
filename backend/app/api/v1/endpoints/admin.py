@@ -5,7 +5,9 @@ from app.core.limiter import limiter
 
 router = APIRouter(prefix="/admin", tags=["Admin Tools"])
 
-ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN", "invexo-nightly-ml")
+ADMIN_TOKEN = os.environ.get("ADMIN_TOKEN")
+if not ADMIN_TOKEN:
+    raise ValueError("ADMIN_TOKEN is not set in environment variables")
 api_key_header = APIKeyHeader(name="X-Admin-Token", auto_error=True)
 
 async def verify_admin_token(api_key: str = Security(api_key_header)):
