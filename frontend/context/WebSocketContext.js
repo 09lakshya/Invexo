@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from "react";
+import { useAuth } from "./AuthContext";
 
 const WebSocketContext = createContext(null);
 
@@ -7,11 +8,17 @@ export function useWebSocket() {
 }
 
 export function WebSocketProvider({ children }) {
+  const { token } = useAuth();
   const [stocks, setStocks] = useState({});
   const [prevStocks, setPrevStocks] = useState({});
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
+    if (!token) {
+      setConnected(false);
+      return;
+    }
+
     let ws;
     let retryTimer;
     let active = true;
@@ -21,7 +28,11 @@ export function WebSocketProvider({ children }) {
       
       const defaultWsUrl = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000")
         .replace(/^http/, "ws") + "/market/ws";
-      const wsUrl = process.env.NEXT_PUBLIC_WS_URL || defaultWsUrl;
+      let wsUrl = process.env.NEXT_PUBLIC_WS_URL || defaultWsUrl;
+      
+      // Append token query parameter
+      const separator = wsUrl.includes("?") ? "&" : "?";
+      wsUrl = `${wsUrl}${separator}token=${encodeURIComponent(token)}`;
       
       ws = new WebSocket(wsUrl);
 
@@ -60,7 +71,7 @@ export function WebSocketProvider({ children }) {
       clearTimeout(retryTimer);
       if (ws) ws.close();
     };
-  }, []);
+  }, [token]);
 
   return (
     <WebSocketContext.Provider value={{ stocks, prevStocks, connected }}>
