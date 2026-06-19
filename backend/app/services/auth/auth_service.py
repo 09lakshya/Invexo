@@ -12,42 +12,38 @@ logger = get_logger("auth_service")
 
 class AuthService:
     @staticmethod
-    def send_otp_email(email_addr: str, otp: str):
-        if os.environ.get("ENV") != "production":
-            logger.info(f"[OTP DEBUG] OTP for {email_addr}: {otp}")
-        logger.info(f"Sending signup OTP email to {email_addr}")
-        
-        # 1. Try Resend HTTP API
+    def _send_email(to: str, subject: str, text: str, html: str = None) -> bool:
+        """Sends an email via Resend API with SMTP fallback. Returns True on success."""
         resend_key = os.environ.get("RESEND_API_KEY", "")
         if resend_key:
             try:
                 import requests
                 sender = os.environ.get("RESEND_FROM", "onboarding@resend.dev")
+                payload = {
+                    "from": sender,
+                    "to": [to],
+                    "subject": subject
+                }
+                if html:
+                    payload["html"] = html
+                else:
+                    payload["text"] = text
+                    
                 res = requests.post(
                     "https://api.resend.com/emails",
                     headers={"Authorization": f"Bearer {resend_key}"},
-                    json={
-                        "from": sender,
-                        "to": [email_addr],
-                        "subject": "Invexo - Verify Your Email",
-                        "text": (
-                            f"Thank you for signing up for Invexo!\n\n"
-                            f"Your 6-digit verification code (OTP) is: {otp}\n\n"
-                            f"This code will expire in 5 minutes. Please do not share it with anyone."
-                        )
-                    },
+                    json=payload,
                     timeout=10
                 )
                 if res.status_code in [200, 201]:
-                    logger.info(f"[Resend] Successfully sent OTP email to {email_addr}")
-                    return
+                    logger.info(f"[Resend] Successfully sent email to {to}")
+                    return True
                 else:
-                    raise RuntimeError(f"Resend API error (status {res.status_code}): {res.text}")
+                    logger.error(f"[Resend ERROR] Failed to send email to {to}: {res.text}")
             except Exception as e:
-                logger.error(f"[Resend ERROR] Failed to send email to {email_addr}: {e}")
-                raise RuntimeError(f"Email delivery failed via Resend API: {str(e)}")
+                logger.error(f"[Resend ERROR] Failed to send email to {to}: {e}")
 
-        # 2. Try SMTP
+        # Try SMTP if Resend fails or is not configured
         host = os.environ.get("SMTP_HOST", "")
         port_str = os.environ.get("SMTP_PORT", "")
         user = os.environ.get("SMTP_USER", "")
@@ -57,15 +53,18 @@ class AuthService:
         if host and port_str and user and password:
             try:
                 import smtplib
+                from email.mime.multipart import MIMEMultipart
+                
                 port = int(port_str)
-                msg = MIMEText(
-                    f"Thank you for signing up for Invexo!\n\n"
-                    f"Your 6-digit verification code (OTP) is: {otp}\n\n"
-                    f"This code will expire in 5 minutes. Please do not share it with anyone."
-                )
-                msg["Subject"] = "Invexo - Verify Your Email"
+                if html:
+                    msg = MIMEMultipart("alternative")
+                    msg.attach(MIMEText(html, "html"))
+                else:
+                    msg = MIMEText(text)
+                    
+                msg["Subject"] = subject
                 msg["From"] = sender
-                msg["To"] = email_addr
+                msg["To"] = to
 
                 if port == 465:
                     server = smtplib.SMTP_SSL(host, port, timeout=10)
@@ -73,12 +72,28 @@ class AuthService:
                     server = smtplib.SMTP(host, port, timeout=10)
                     server.starttls()
                 server.login(user, password)
-                server.sendmail(sender, [email_addr], msg.as_string())
+                server.sendmail(sender, [to], msg.as_string())
                 server.quit()
-                logger.info(f"[SMTP] Successfully sent OTP email to {email_addr}")
+                logger.info(f"[SMTP] Successfully sent email to {to}")
+                return True
             except Exception as e:
-                logger.error(f"[SMTP ERROR] Failed to send email to {email_addr}: {e}")
-                raise RuntimeError(f"Email delivery failed: {str(e)}")
+                logger.error(f"[SMTP ERROR] Failed to send email to {to}: {e}")
+                
+        return False
+
+    @staticmethod
+    def send_otp_email(email_addr: str, otp: str):
+        if os.environ.get("ENV") != "production":
+            logger.info(f"[OTP DEBUG] OTP for {email_addr}: {otp}")
+        logger.info(f"Sending signup OTP email to {email_addr}")
+        
+        subject = "Invexo - Verify Your Email"
+        text_content = (
+            f"Thank you for signing up for Invexo!\n\n"
+            f"Your 6-digit verification code (OTP) is: {otp}\n\n"
+            f"This code will expire in 5 minutes. Please do not share it with anyone."
+        )
+        AuthService._send_email(email_addr, subject, text_content)
 
     @staticmethod
     def send_welcome_email(email_addr: str, name: str):
@@ -203,49 +218,7 @@ class AuthService:
 </body>
 </html>"""
 
-        resend_key = os.environ.get("RESEND_API_KEY", "")
-        if resend_key:
-            try:
-                import requests
-                sender = os.environ.get("RESEND_FROM", "onboarding@resend.dev")
-                requests.post(
-                    "https://api.resend.com/emails",
-                    headers={"Authorization": f"Bearer {resend_key}"},
-                    json={"from": sender, "to": [email_addr], "subject": subject, "html": html_content},
-                    timeout=10
-                )
-                return
-            except Exception as e:
-                logger.error(f"[Resend ERROR] Failed to send welcome email: {e}")
-
-        host = os.environ.get("SMTP_HOST", "")
-        port_str = os.environ.get("SMTP_PORT", "")
-        user = os.environ.get("SMTP_USER", "")
-        password = os.environ.get("SMTP_PASSWORD", "")
-        sender = os.environ.get("SMTP_FROM", user)
-
-        if host and port_str and user and password:
-            try:
-                from email.mime.multipart import MIMEMultipart
-                port = int(port_str)
-                msg = MIMEMultipart("alternative")
-                msg["Subject"] = subject
-                msg["From"] = sender
-                msg["To"] = email_addr
-                msg.attach(MIMEText(html_content, "html"))
-
-                import smtplib
-                if port == 465:
-                    server = smtplib.SMTP_SSL(host, port, timeout=10)
-                else:
-                    server = smtplib.SMTP(host, port, timeout=10)
-                    server.starttls()
-                server.login(user, password)
-                server.sendmail(sender, [email_addr], msg.as_string())
-                server.quit()
-                logger.info(f"[SMTP] Successfully sent welcome email to {email_addr}")
-            except Exception as e:
-                logger.error(f"[SMTP ERROR] Failed to send welcome email: {e}")
+        AuthService._send_email(email_addr, subject, "", html_content)
 
     @staticmethod
     def initiate_signup_otp(email_addr: str, payload: dict) -> str:
@@ -335,45 +308,7 @@ class AuthService:
             f"Your 6-digit verification code (OTP) is: {otp}\n\n"
             f"This code will expire in 5 minutes. If you did not request this, please ignore this email."
         )
-        
-        resend_key = os.environ.get("RESEND_API_KEY", "")
-        if resend_key:
-            try:
-                import requests
-                sender = os.environ.get("RESEND_FROM", "onboarding@resend.dev")
-                requests.post(
-                    "https://api.resend.com/emails",
-                    headers={"Authorization": f"Bearer {resend_key}"},
-                    json={"from": sender, "to": [email_addr], "subject": subject, "text": text_content},
-                    timeout=10
-                )
-            except Exception as e:
-                logger.error(f"[Resend ERROR] Failed to send reset email: {e}")
-
-        host = os.environ.get("SMTP_HOST", "")
-        port_str = os.environ.get("SMTP_PORT", "")
-        user = os.environ.get("SMTP_USER", "")
-        password = os.environ.get("SMTP_PASSWORD", "")
-        sender = os.environ.get("SMTP_FROM", user)
-
-        if host and port_str and user and password:
-            try:
-                port = int(port_str)
-                msg = MIMEText(text_content)
-                msg["Subject"] = subject
-                msg["From"] = sender
-                msg["To"] = email_addr
-                import smtplib
-                if port == 465:
-                    server = smtplib.SMTP_SSL(host, port, timeout=10)
-                else:
-                    server = smtplib.SMTP(host, port, timeout=10)
-                    server.starttls()
-                server.login(user, password)
-                server.sendmail(sender, [email_addr], msg.as_string())
-                server.quit()
-            except Exception as e:
-                logger.error(f"[SMTP ERROR] Failed to send reset email: {e}")
+        AuthService._send_email(email_addr, subject, text_content)
 
     @staticmethod
     def verify_forgot_password_otp_only(email_addr: str, otp: str) -> bool:
@@ -456,42 +391,4 @@ class AuthService:
             f"If you did not make this change, please contact our support team immediately.\n\n"
             f"Best regards,\nThe Invexo Team"
         )
-        resend_key = os.environ.get("RESEND_API_KEY", "")
-        if resend_key:
-            try:
-                import requests
-                sender = os.environ.get("RESEND_FROM", "onboarding@resend.dev")
-                requests.post(
-                    "https://api.resend.com/emails",
-                    headers={"Authorization": f"Bearer {resend_key}"},
-                    json={"from": sender, "to": [email_addr], "subject": subject, "text": text_content},
-                    timeout=10
-                )
-                return
-            except Exception as e:
-                logger.error(f"[Resend ERROR] Failed to send password update email: {e}")
-
-        host = os.environ.get("SMTP_HOST", "")
-        port_str = os.environ.get("SMTP_PORT", "")
-        user = os.environ.get("SMTP_USER", "")
-        password = os.environ.get("SMTP_PASSWORD", "")
-        sender = os.environ.get("SMTP_FROM", user)
-
-        if host and port_str and user and password:
-            try:
-                port = int(port_str)
-                msg = MIMEText(text_content)
-                msg["Subject"] = subject
-                msg["From"] = sender
-                msg["To"] = email_addr
-                import smtplib
-                if port == 465:
-                    server = smtplib.SMTP_SSL(host, port, timeout=10)
-                else:
-                    server = smtplib.SMTP(host, port, timeout=10)
-                    server.starttls()
-                server.login(user, password)
-                server.sendmail(sender, [email_addr], msg.as_string())
-                server.quit()
-            except Exception as e:
-                logger.error(f"[SMTP ERROR] Failed to send password update email: {e}")
+        AuthService._send_email(email_addr, subject, text_content)
