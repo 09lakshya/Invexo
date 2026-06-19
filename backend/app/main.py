@@ -96,7 +96,7 @@ async def add_security_headers(request, call_next):
     return response
 
 # CORS Configuration
-default_origins = "https://invexo-one.vercel.app,http://localhost:3000,http://localhost:3001"
+default_origins = "https://invexo-one.vercel.app,https://invexo.co.in,https://www.invexo.co.in,http://localhost:3000,http://localhost:3001"
 raw_origins = os.getenv("CORS_ORIGINS", "")
 if raw_origins:
     allowed_origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
@@ -114,7 +114,7 @@ else:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=allowed_origins,
-        allow_origin_regex=r"https://(?:[a-zA-Z0-9-]+\.)?invexo-one\.vercel\.app",
+        allow_origin_regex=r"https://(?:[a-zA-Z0-9-]+\.)?(?:invexo-one\.vercel\.app|invexo\.co\.in)",
         allow_methods=["*"],
         allow_headers=["*"],
     )
