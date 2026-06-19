@@ -1,8 +1,10 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
 import os
+import traceback
 import threading
 from apscheduler.schedulers.background import BackgroundScheduler
 from contextlib import asynccontextmanager
@@ -67,6 +69,19 @@ app = FastAPI(
 # Register SlowAPI rate limiting handler
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# ── GLOBAL CATCH-ALL EXCEPTION HANDLER ──────
+# Ensures unhandled exceptions return a proper JSON response
+# that goes through the CORS middleware (instead of a raw 500
+# that bypasses middleware and has no CORS headers).
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Unhandled exception on {request.method} {request.url.path}: {exc}")
+    logger.error(traceback.format_exc())
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error. Please try again later."}
+    )
 
 # ── SECURITY HEADERS MIDDLEWARE ──────
 @app.middleware("http")

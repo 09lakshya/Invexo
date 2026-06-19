@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import { useAuth } from "../context/AuthContext";
@@ -7,6 +7,8 @@ import API from "../services/api";
 export default function LoginPage() {
   const router = useRouter();
   const { user, loading, login, signup, initiateSignupOtp, verifySignupOtp, setUser, initiateForgotPassword, verifyForgotPasswordOtp, resetPassword } = useAuth();
+
+  const submitLock = useRef(false);
 
   const [mode, setMode] = useState("login"); // "login" | "signup"
   const [flowMode, setFlowMode] = useState("credentials"); // "credentials" | "otp"
@@ -115,16 +117,23 @@ export default function LoginPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
+    if (submitLock.current) return;
 
-    if (!email.trim() || (mode !== "forgot-password" && !password)) {
+    // Read directly from DOM to bypass React state bugs with password managers
+    const emailNode = document.getElementById("email");
+    const passwordNode = document.getElementById("password");
+    
+    const currentEmail = (emailNode?.value || email).trim();
+    const currentPassword = passwordNode?.value || password;
+
+    if (!currentEmail || (mode !== "forgot-password" && !currentPassword)) {
       setError("Please fill in all fields.");
       return;
     }
 
     if (mode === "signup") {
       // Validate email domain
-      const domain = email.split("@")[1]?.toLowerCase();
+      const domain = currentEmail.split("@")[1]?.toLowerCase();
       const allowedDomains = [
         "gmail.com", "googlemail.com", "yahoo.com", "yahoo.in", "yahoo.co.in",
         "yahoo.co.uk", "outlook.com", "hotmail.com", "live.com", "msn.com",
@@ -146,11 +155,11 @@ export default function LoginPage() {
         return;
       }
 
-      if (password !== confirmPw) {
+      if (currentPassword !== confirmPw) {
         setError("Passwords do not match.");
         return;
       }
-      if (password.length < 6) {
+      if (currentPassword.length < 6) {
         setError("Password must be at least 6 characters.");
         return;
       }
@@ -164,14 +173,15 @@ export default function LoginPage() {
       }
     }
 
-    setSubmitting(true);
+    submitLock.current = true;
+    setError("");
     setSubmitting(true);
     try {
       if (mode === "login") {
-        await login(email, password, rememberMe);
+        await login(currentEmail, currentPassword, rememberMe);
         router.replace("/");
       } else if (mode === "forgot-password") {
-        await initiateForgotPassword(email);
+        await initiateForgotPassword(currentEmail);
         setFlowMode("otp");
         setPassword(""); // ensure new password field starts empty
         setConfirmPw(""); // clear confirm password as well
@@ -181,7 +191,7 @@ export default function LoginPage() {
           if (firstInput) firstInput.focus();
         }, 50);
       } else {
-        await initiateSignupOtp(email, password, name.trim(), parseInt(age));
+        await initiateSignupOtp(currentEmail, currentPassword, name.trim(), parseInt(age));
         setFlowMode("otp");
         setCooldown(60);
         setTimeout(() => {
@@ -190,8 +200,11 @@ export default function LoginPage() {
         }, 50);
       }
     } catch (err) {
-      const msg =
-        err?.response?.data?.detail || "Something went wrong. Please try again.";
+      let msg = err?.response?.data?.detail;
+      if (Array.isArray(msg)) {
+        msg = msg[0]?.msg || "Validation error";
+      }
+      msg = typeof msg === "string" ? msg : "Something went wrong. Please try again.";
       
       if (mode === "signup" && msg.toLowerCase().includes("already exists")) {
         setError(
@@ -247,6 +260,7 @@ export default function LoginPage() {
         setError(msg);
       }
     } finally {
+      submitLock.current = false;
       setSubmitting(false);
     }
   };
@@ -816,10 +830,12 @@ export default function LoginPage() {
                       <div style={{ marginBottom: "18px" }}>
                         <label style={labelStyle}>Email Address</label>
                         <input
+                          id="email"
+                          name="email"
                           type="email"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
-                          autoComplete="email"
+                          autoComplete="username email"
                           style={inputStyle}
                           onFocus={(e) =>
                             (e.target.style.borderColor = "var(--accent)")
@@ -836,6 +852,8 @@ export default function LoginPage() {
                         <label style={labelStyle}>Password</label>
                         <div style={{ position: "relative" }}>
                           <input
+                            id="password"
+                            name="password"
                             type={showPassword ? "text" : "password"}
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}

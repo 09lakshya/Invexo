@@ -56,7 +56,10 @@ def handle_signup_verify(payload: VerifySignupInput, request: Request):
 @router.post("/login")
 @limiter.limit("10/minute")
 def handle_login(payload: LoginInput, request: Request):
-    user = AuthService.login(payload.email, payload.password)
+    try:
+        user = AuthService.login(payload.email, payload.password)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Login service temporarily unavailable. Please try again.")
     if user is None:
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
