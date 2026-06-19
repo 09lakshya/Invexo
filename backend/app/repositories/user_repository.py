@@ -44,7 +44,7 @@ class UserRepository:
                 c.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}")
                 conn.commit()
             except Exception:
-                pass
+                conn.rollback()
         conn.close()
 
     @staticmethod

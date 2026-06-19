@@ -20,7 +20,7 @@ def test_signup_initiate_and_verify():
     # Get the OTP from Redis client fallback memory
     import json
     from app.core.redis import redis_client
-    otp_data = redis_client.get("otp:test@gmail.com")
+    otp_data = redis_client.get("signup_otp:test@gmail.com")
     assert otp_data is not None
     otp = json.loads(otp_data)["otp"]
     assert otp is not None

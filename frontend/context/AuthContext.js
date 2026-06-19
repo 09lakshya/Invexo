@@ -164,7 +164,8 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password, rememberMe = false) => {
     const res = await API.post("/auth/login", { email, password });
-    const { token: tk, user: u } = res.data;
+    const { token, access_token, user: u } = res.data;
+    const tk = token || access_token;
     setToken(tk);
     setUser(u);
     if (rememberMe) {
@@ -179,7 +180,8 @@ export function AuthProvider({ children }) {
 
   const signup = async (email, password, name, age, rememberMe = false) => {
     const res = await API.post("/auth/signup", { email, password, name, age });
-    const { token: tk, user: u } = res.data;
+    const { token, access_token, user: u } = res.data;
+    const tk = token || access_token;
     setToken(tk);
     setUser(u);
     if (rememberMe) {
@@ -199,7 +201,8 @@ export function AuthProvider({ children }) {
 
   const verifySignupOtp = async (email, otp, rememberMe = false) => {
     const res = await API.post("/auth/signup/verify", { email, otp });
-    const { token: tk, user: u } = res.data;
+    const { token, access_token, user: u } = res.data;
+    const tk = token || access_token;
     setToken(tk);
     setUser(u);
     if (rememberMe) {
