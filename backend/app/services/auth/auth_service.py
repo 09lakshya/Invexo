@@ -248,7 +248,7 @@ class AuthService:
     @staticmethod
     def initiate_signup_otp(email_addr: str, payload: dict) -> str:
         otp = f"{random.randint(100000, 999999)}"
-        key = f"otp:{email_addr.lower().strip()}"
+        key = f"signup_otp:{email_addr.lower().strip()}"
         record = {
             "otp": otp,
             "payload": payload,
@@ -261,7 +261,7 @@ class AuthService:
 
     @staticmethod
     def verify_signup_otp(email_addr: str, otp: str) -> dict | None:
-        key = f"otp:{email_addr.lower().strip()}"
+        key = f"signup_otp:{email_addr.lower().strip()}"
         val = redis_client.get(key)
         if not val:
             return None
@@ -310,7 +310,7 @@ class AuthService:
     @staticmethod
     def initiate_forgot_password_otp(email_addr: str) -> str:
         otp = f"{random.randint(100000, 999999)}"
-        key = f"otp:{email_addr.lower().strip()}"
+        key = f"reset_otp:{email_addr.lower().strip()}"
         record = {
             "otp": otp,
             "payload": {"type": "reset"},
@@ -369,7 +369,7 @@ class AuthService:
 
     @staticmethod
     def verify_forgot_password_otp_only(email_addr: str, otp: str) -> bool:
-        key = f"otp:{email_addr.lower().strip()}"
+        key = f"reset_otp:{email_addr.lower().strip()}"
         val = redis_client.get(key)
         if not val:
             return False
@@ -401,7 +401,7 @@ class AuthService:
 
     @staticmethod
     def reset_password_with_otp(email_addr: str, otp: str, new_password: str) -> bool:
-        key = f"otp:{email_addr.lower().strip()}"
+        key = f"reset_otp:{email_addr.lower().strip()}"
         val = redis_client.get(key)
         if not val:
             return False
