@@ -706,9 +706,9 @@ export default function Home() {
                   zIndex: 200,
                 }}
               >
-                {results.map((sym) => {
-                  const metadata = STOCK_METADATA[sym] || {};
-                  const companyName = metadata.name || sym;
+                {results.map((stock) => {
+                  const sym = stock.symbol;
+                  const companyName = stock.name;
                   return (
                     <div
                       key={sym}
@@ -741,11 +741,11 @@ export default function Home() {
                           flexShrink: 0,
                         }}
                       >
-                        {sym.slice(0, 2)}
+                        {sym ? sym.slice(0, 2) : "??"}
                       </div>
                       <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>
                         {companyName}
-                        {metadata.name ? ` — ${sym}` : ""}
+                        {sym ? ` — ${sym}` : ""}
                       </span>
                     </div>
                   );

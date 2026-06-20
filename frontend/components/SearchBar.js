@@ -54,16 +54,16 @@ export default function SearchBar() {
         <div className="absolute top-full left-0 w-full mt-3 bg-gray-950 border border-cyan-400 z-[9999] rounded-2xl overflow-hidden shadow-2xl">
           {results.map((stock) => (
             <div
-              key={stock}
+              key={stock.symbol}
               onClick={() => {
                 setQuery("");
                 setResults([]);
-                router.push(`/stock/${stock}`);
+                router.push(`/stock/${stock.symbol}`);
               }}
               className="px-4 py-3 hover:bg-white hover:bg-opacity-5 cursor-pointer transition-all duration-200 border-b border-accent border-opacity-10 last:border-b-0 group"
             >
               <span className="text-accent font-semibold group-hover:text-blue-300">
-                {stock}
+                {stock.name} ({stock.symbol})
               </span>
             </div>
           ))}

@@ -469,9 +469,9 @@ export default function Portfolio() {
                   />
                   {searchResults.length > 0 && (
                     <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "var(--bg-primary)", border: "1px solid var(--border-subtle)", borderRadius: "12px", zIndex: 50, marginTop: "6px", overflow: "hidden", boxShadow: "0 16px 48px var(--shadow-card)" }}>
-                      {searchResults.map(sym => {
-                        const metadata = STOCK_METADATA[sym] || {};
-                        const companyName = metadata.name || sym;
+                      {searchResults.map(stock => {
+                        const sym = stock.symbol;
+                        const companyName = stock.name;
                         return (
                           <div
                             key={sym}
@@ -481,7 +481,7 @@ export default function Portfolio() {
                             onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                           >
                             <span style={{ color: "var(--accent)" }}>{sym}</span>
-                            {metadata.name ? ` — ${companyName}` : ""}
+                            {companyName ? ` — ${companyName}` : ""}
                           </div>
                         );
                       })}
