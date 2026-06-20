@@ -10,7 +10,8 @@ import { STOCK_METADATA } from "../../services/stocks";
 // ── CLIENT-SIDE MATHEMATICAL CALCULATORS ────────────────────────────────────
 
 const cleanHistoryData = (history) => {
-  return (history || []).map((d) => {
+  if (!Array.isArray(history)) return [];
+  return history.map((d) => {
     if (!d) return null;
     const open = d.Open !== undefined && d.Open !== null ? Number(d.Open) : (d.open !== undefined && d.open !== null ? Number(d.open) : null);
     const high = d.High !== undefined && d.High !== null ? Number(d.High) : (d.high !== undefined && d.high !== null ? Number(d.high) : null);
@@ -230,7 +231,9 @@ export default function StockDetail() {
         setChartLoading(false);
       } catch (err) {
         console.error("Failed to load stock data:", err);
-        setError("Technical analysis data currently unavailable. The market may be closed.");
+        console.error("Core data fetch error details:", err.response?.data || err.message);
+        const detailedMsg = err.response?.data?.detail || err.response?.data?.error || err.message;
+        setError(detailedMsg || "Technical analysis data currently unavailable. The market may be closed.");
       } finally {
         setLoading(false);
       }
