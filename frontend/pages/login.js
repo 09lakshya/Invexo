@@ -2,120 +2,46 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/router";
 import Head from "next/head";
 import { useAuth } from "../context/AuthContext";
-import API from "../services/api";
+import SignupForm from "../components/auth/SignupForm";
+import OTPVerification from "../components/auth/OTPVerification";
+import ForgotPassword from "../components/auth/ForgotPassword";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { user, loading, login, signup, initiateSignupOtp, verifySignupOtp, setUser, initiateForgotPassword, verifyForgotPasswordOtp, resetPassword } = useAuth();
+  const {
+    user,
+    loading,
+    login,
+    initiateSignupOtp,
+    verifySignupOtp,
+    initiateForgotPassword,
+    verifyForgotPasswordOtp,
+    resetPassword,
+  } = useAuth();
 
   const submitLock = useRef(false);
 
-  const [mode, setMode] = useState("login"); // "login" | "signup"
-  const [flowMode, setFlowMode] = useState("credentials"); // "credentials" | "otp"
+  const [mode, setMode] = useState("login"); // "login" | "signup" | "forgot-password"
+  const [flowMode, setFlowMode] = useState("credentials"); // "credentials" | "otp" | "new-password"
+  
+  // Shared state for authentication details
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPw, setConfirmPw] = useState("");
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
+
+  // States specific to the Login credentials flow in this page
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-
-  // OTP inputs state (6 elements)
-  const [otpVal, setOtpVal] = useState(["", "", "", "", "", ""]);
-  const [cooldown, setCooldown] = useState(0);
-
-  // Cooldown countdown timer
-  useEffect(() => {
-    if (cooldown > 0) {
-      const timer = setTimeout(() => setCooldown(cooldown - 1), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [cooldown]);
-
-  // Handle OTP focus shifting
-  const handleOtpChange = (value, index) => {
-    const cleaned = value.replace(/[^0-9]/g, "");
-    if (!cleaned) {
-      const newOtp = [...otpVal];
-      newOtp[index] = "";
-      setOtpVal(newOtp);
-      return;
-    }
-
-    const val = cleaned[cleaned.length - 1];
-    const newOtp = [...otpVal];
-    newOtp[index] = val;
-    setOtpVal(newOtp);
-
-    // Auto-advance
-    if (index < 5) {
-      const nextInput = document.getElementById(`otp-input-${index + 1}`);
-      if (nextInput) nextInput.focus();
-    }
-  };
-
-  const handleOtpKeyDown = (e, index) => {
-    if (e.key === "Backspace") {
-      if (!otpVal[index] && index > 0) {
-        const prevInput = document.getElementById(`otp-input-${index - 1}`);
-        if (prevInput) {
-          prevInput.focus();
-          const newOtp = [...otpVal];
-          newOtp[index - 1] = "";
-          setOtpVal(newOtp);
-        }
-      } else {
-        const newOtp = [...otpVal];
-        newOtp[index] = "";
-        setOtpVal(newOtp);
-      }
-    }
-  };
-
-  const handleOtpPaste = (e) => {
-    e.preventDefault();
-    const pastedText = e.clipboardData.getData("text");
-    const digits = pastedText.replace(/[^0-9]/g, "").slice(0, 6).split("");
-    const newOtp = [...otpVal];
-    for (let i = 0; i < 6; i++) {
-      newOtp[i] = digits[i] || "";
-    }
-    setOtpVal(newOtp);
-    const focusIndex = Math.min(digits.length, 5);
-    const focusInput = document.getElementById(`otp-input-${focusIndex}`);
-    if (focusInput) focusInput.focus();
-  };
-
-  const handleResendOtp = async () => {
-    if (cooldown > 0) return;
-    setError("");
-    setSubmitting(true);
-    try {
-      await initiateSignupOtp(email, password, name.trim(), parseInt(age));
-      setCooldown(60);
-      setOtpVal(["", "", "", "", "", ""]);
-      setTimeout(() => {
-        const firstInput = document.getElementById("otp-input-0");
-        if (firstInput) firstInput.focus();
-      }, 50);
-    } catch (err) {
-      const msg = err?.response?.data?.detail || "Failed to resend OTP. Please try again.";
-      setError(msg);
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
 
   // Already logged in → go home
   useEffect(() => {
     if (!loading && user) router.replace("/");
   }, [loading, user]);
 
-  const handleSubmit = async (e) => {
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
     if (submitLock.current) return;
 
@@ -126,79 +52,17 @@ export default function LoginPage() {
     const currentEmail = (emailNode?.value || email).trim();
     const currentPassword = passwordNode?.value || password;
 
-    if (!currentEmail || (mode !== "forgot-password" && !currentPassword)) {
+    if (!currentEmail || !currentPassword) {
       setError("Please fill in all fields.");
       return;
-    }
-
-    if (mode === "signup") {
-      // Validate email domain
-      const domain = currentEmail.split("@")[1]?.toLowerCase();
-      const allowedDomains = [
-        "gmail.com", "googlemail.com", "yahoo.com", "yahoo.in", "yahoo.co.in",
-        "yahoo.co.uk", "outlook.com", "hotmail.com", "live.com", "msn.com",
-        "icloud.com", "me.com", "mac.com", "aol.com", "protonmail.com",
-        "proton.me", "zoho.com", "zoho.in", "yandex.com", "mail.com",
-        "gmx.com", "gmx.net", "tutanota.com", "tuta.io", "fastmail.com",
-        "hey.com", "pm.me", "rediffmail.com", "in.com", "sify.com",
-        "email.com", "usa.com", "inbox.com", "mail.ru", "rambler.ru",
-        "cox.net", "sbcglobal.net", "att.net", "comcast.net", "verizon.net",
-        "bellsouth.net", "charter.net", "earthlink.net", "optonline.net",
-        "web.de", "t-online.de", "libero.it", "virgilio.it",
-        "laposte.net", "orange.fr", "wanadoo.fr", "free.fr",
-        "naver.com", "hanmail.net", "daum.net", "qq.com", "163.com",
-        "126.com", "sina.com", "yeah.net",
-      ];
-
-      if (!domain || !allowedDomains.includes(domain)) {
-        setError("Please use a valid email provider (e.g. Gmail, Yahoo, Outlook).");
-        return;
-      }
-
-      if (currentPassword !== confirmPw) {
-        setError("Passwords do not match.");
-        return;
-      }
-      if (currentPassword.length < 6) {
-        setError("Password must be at least 6 characters.");
-        return;
-      }
-      if (!name.trim()) {
-        setError("Please enter your name.");
-        return;
-      }
-      if (!age || parseInt(age) < 1 || parseInt(age) > 150) {
-        setError("Please enter a valid age.");
-        return;
-      }
     }
 
     submitLock.current = true;
     setError("");
     setSubmitting(true);
     try {
-      if (mode === "login") {
-        await login(currentEmail, currentPassword, rememberMe);
-        router.replace("/");
-      } else if (mode === "forgot-password") {
-        await initiateForgotPassword(currentEmail);
-        setFlowMode("otp");
-        setPassword(""); // ensure new password field starts empty
-        setConfirmPw(""); // clear confirm password as well
-        setCooldown(60);
-        setTimeout(() => {
-          const firstInput = document.getElementById("otp-input-0");
-          if (firstInput) firstInput.focus();
-        }, 50);
-      } else {
-        await initiateSignupOtp(currentEmail, currentPassword, name.trim(), parseInt(age));
-        setFlowMode("otp");
-        setCooldown(60);
-        setTimeout(() => {
-          const firstInput = document.getElementById("otp-input-0");
-          if (firstInput) firstInput.focus();
-        }, 50);
-      }
+      await login(currentEmail, currentPassword, rememberMe);
+      router.replace("/");
     } catch (err) {
       let msg = err?.response?.data?.detail;
       if (Array.isArray(msg)) {
@@ -206,32 +70,11 @@ export default function LoginPage() {
       }
       msg = typeof msg === "string" ? msg : "Something went wrong. Please try again.";
       
-      if (mode === "signup" && msg.toLowerCase().includes("already exists")) {
-        setError(
-          <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-            This email is already registered.{" "}
-            <button
-              type="button"
-              onClick={() => {
-                setError("");
-                setMode("login");
-              }}
-              style={{
-                background: "none",
-                border: "none",
-                color: "var(--accent)",
-                fontWeight: 700,
-                cursor: "pointer",
-                padding: 0,
-                textDecoration: "underline",
-                fontSize: "inherit"
-              }}
-            >
-              Sign In Instead
-            </button>
-          </span>
-        );
-      } else if (mode === "login" && (msg.toLowerCase().includes("email not found") || msg.toLowerCase().includes("details not found") || msg.toLowerCase().includes("account not found"))) {
+      if (
+        msg.toLowerCase().includes("email not found") || 
+        msg.toLowerCase().includes("details not found") || 
+        msg.toLowerCase().includes("account not found")
+      ) {
         setError(
           <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
             Account not found.{" "}
@@ -240,6 +83,7 @@ export default function LoginPage() {
               onClick={() => {
                 setError("");
                 setMode("signup");
+                setFlowMode("credentials");
               }}
               style={{
                 background: "none",
@@ -265,61 +109,33 @@ export default function LoginPage() {
     }
   };
 
-  const handleOtpSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    const code = otpVal.join("");
-    if (code.length < 6) {
-      setError("Please enter all 6 digits of the verification code.");
-      return;
-    }
+  const handleSignupSubmit = async ({ name, age, email, password, rememberMe }) => {
+    setName(name);
+    setAge(age);
+    setEmail(email);
+    setPassword(password);
+    setRememberMe(rememberMe);
 
-    setSubmitting(true);
-    try {
-      if (mode === "forgot-password") {
-        await verifyForgotPasswordOtp(email, code);
-        setFlowMode("new-password");
-      } else {
-        await verifySignupOtp(email, code, rememberMe);
-        router.replace("/");
-      }
-    } catch (err) {
-      const msg = err?.response?.data?.detail || "Invalid or expired OTP code.";
-      setError(msg);
-    } finally {
-      setSubmitting(false);
-    }
+    await initiateSignupOtp(email, password, name, age);
+    setFlowMode("otp");
   };
 
-  const handleNewPasswordSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    
-    if (password !== confirmPw) {
-      setError("Passwords do not match.");
-      return;
-    }
-    if (password.length < 6) {
-      setError("New password must be at least 6 characters.");
-      return;
-    }
+  const handleSignupOtpVerify = async (code) => {
+    await verifySignupOtp(email, code, rememberMe);
+    router.replace("/");
+  };
 
-    setSubmitting(true);
-    try {
-      const code = otpVal.join("");
-      await resetPassword(email, code, password);
-      setMode("login");
-      setFlowMode("credentials");
-      setPassword("");
-      setConfirmPw("");
-      setOtpVal(["", "", "", "", "", ""]);
-      // Optional: success message
-    } catch (err) {
-      const msg = err?.response?.data?.detail || "Something went wrong.";
-      setError(msg);
-    } finally {
-      setSubmitting(false);
-    }
+  const handleSignupOtpResend = async () => {
+    await initiateSignupOtp(email, password, name, age);
+  };
+
+  const handleSignupOtpBack = () => {
+    setFlowMode("credentials");
+  };
+
+  const handleForgotPasswordBackToLogin = () => {
+    setMode("login");
+    setFlowMode("credentials");
   };
 
   if (loading) {
@@ -366,7 +182,7 @@ export default function LoginPage() {
   return (
     <>
       <Head>
-        <title>{mode === "login" ? "Sign In" : "Create Account"} — Invexo</title>
+        <title>{mode === "login" ? "Sign In" : mode === "forgot-password" ? "Reset Password" : "Create Account"} — Invexo</title>
         <meta name="description" content="Sign in to Invexo to access your portfolio, AI advisor, and live market data." />
       </Head>
 
@@ -382,8 +198,6 @@ export default function LoginPage() {
           overflow: "hidden",
         }}
       >
-
-
         <div
           style={{
             width: "100%",
@@ -425,15 +239,19 @@ export default function LoginPage() {
                 fontWeight: 400,
               }}
             >
-              {flowMode === "otp"
-                ? "We've sent a 6-digit verification code to your email."
-                : flowMode === "new-password"
-                ? "Choose a new password for your account."
-                : mode === "login"
+              {mode === "login"
                 ? "Welcome back. Sign in to continue."
+                : mode === "signup" && flowMode === "otp"
+                ? "We've sent a 6-digit verification code to your email."
+                : mode === "signup" && flowMode === "credentials"
+                ? "Create your account to get started."
+                : mode === "forgot-password" && flowMode === "otp"
+                ? "We've sent a 6-digit verification code to your email."
+                : mode === "forgot-password" && flowMode === "new-password"
+                ? "Choose a new password for your account."
                 : mode === "forgot-password"
                 ? "Enter your email to reset your password."
-                : "Create your account to get started."}
+                : ""}
             </p>
           </div>
 
@@ -474,211 +292,167 @@ export default function LoginPage() {
                 letterSpacing: "-0.01em",
               }}
             >
-              {flowMode === "otp" ? "Verify Email" : mode === "login" ? "Sign In" : mode === "forgot-password" ? "Reset Password" : "Create Account"}
+              {mode === "login"
+                ? "Sign In"
+                : mode === "signup" && flowMode === "otp"
+                ? "Verify Email"
+                : mode === "signup"
+                ? "Create Account"
+                : mode === "forgot-password" && flowMode === "otp"
+                ? "Verify Email"
+                : "Reset Password"}
             </h2>
 
-            {(flowMode === "otp" || flowMode === "new-password") ? (
-              <form onSubmit={flowMode === "otp" ? handleOtpSubmit : handleNewPasswordSubmit}>
-                {flowMode === "otp" && (
-                  <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", marginBottom: "20px", lineHeight: 1.5 }}>
-                    Please enter the 6-digit verification code sent to <strong style={{ color: "var(--accent)" }}>{email}</strong>:
-                  </p>
-                )}
-
-                {/* 6 Digit Inputs */}
-                {flowMode === "otp" && (
-                <div style={{ display: "flex", gap: "10px", justifyContent: "space-between", marginBottom: "20px" }}>
-                  {otpVal.map((digit, index) => (
-                    <input
-                      key={index}
-                      id={`otp-input-${index}`}
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      maxLength={6}
-                      value={digit}
-                      onChange={(e) => handleOtpChange(e.target.value, index)}
-                      onKeyDown={(e) => handleOtpKeyDown(e, index)}
-                      onPaste={handleOtpPaste}
-                      style={{
-                        width: "100%",
-                        height: "52px",
-                        background: "var(--input-bg)",
-                        border: "1.5px solid var(--input-border)",
-                        borderRadius: "12px",
-                        textAlign: "center",
-                        fontSize: "1.25rem",
-                        fontWeight: 700,
-                        color: "var(--text-primary)",
-                        outline: "none",
-                        transition: "all 0.25s",
-                      }}
-                      onFocus={(e) => {
-                        e.target.style.borderColor = "var(--accent)";
-                        e.target.style.boxShadow = "0 0 0 3px var(--accent-glow)";
-                      }}
-                      onBlur={(e) => {
-                        e.target.style.borderColor = "var(--input-border)";
-                        e.target.style.boxShadow = "none";
-                      }}
-                    />
-                  ))}
+            {mode === "login" && (
+              <form onSubmit={handleLoginSubmit}>
+                {/* Email */}
+                <div style={{ marginBottom: "18px" }}>
+                  <label style={labelStyle}>Email Address</label>
+                  <input
+                    id="email"
+                    name="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    autoComplete="username email"
+                    style={inputStyle}
+                    onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
+                    onBlur={(e) => (e.target.style.borderColor = "var(--input-border)")}
+                  />
                 </div>
-                )}
 
-                {/* New Password for Forgot Password Flow */}
-                {mode === "forgot-password" && flowMode === "new-password" && (
-                  <div style={{ marginBottom: "20px" }}>
-                    <label style={{
-                      display: "block",
-                      fontSize: "0.7rem",
-                      fontWeight: 700,
-                      color: "var(--text-muted)",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.08em",
-                      marginBottom: "8px",
-                    }}>New Password</label>
-                    <div style={{ position: "relative" }}>
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        autoComplete="new-password"
-                        style={{
-                          width: "100%",
-                          background: "var(--input-bg)",
-                          border: "1.5px solid var(--input-border)",
-                          borderRadius: "12px",
-                          padding: "14px 16px",
-                          paddingRight: "46px",
-                          color: "var(--text-primary)",
-                          fontSize: "0.95rem",
-                          fontFamily: "inherit",
-                          outline: "none",
-                          transition: "all 0.25s",
-                        }}
-                        onFocus={(e) =>
-                          (e.target.style.borderColor = "var(--accent)")
-                        }
-                        onBlur={(e) =>
-                          (e.target.style.borderColor = "var(--input-border)")
-                        }
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        style={{
-                          position: "absolute",
-                          right: "14px",
-                          top: "50%",
-                          transform: "translateY(-50%)",
-                          background: "none",
-                          border: "none",
-                          cursor: "pointer",
-                          padding: "4px",
-                          color: "var(--text-muted)",
-                          display: "flex",
-                          alignItems: "center",
-                          transition: "color 0.2s",
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent)")}
-                        onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
-                        tabIndex={-1}
-                        title={showPassword ? "Hide password" : "Show password"}
-                      >
-                        {showPassword ? (
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-                            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-                            <line x1="1" y1="1" x2="23" y2="23"/>
-                          </svg>
-                        ) : (
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                            <circle cx="12" cy="12" r="3"/>
-                          </svg>
-                        )}
-                      </button>
-                    </div>
+                {/* Password */}
+                <div style={{ marginBottom: "20px" }}>
+                  <label style={labelStyle}>Password</label>
+                  <div style={{ position: "relative" }}>
+                    <input
+                      id="password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      autoComplete="current-password"
+                      style={{ ...inputStyle, paddingRight: "46px" }}
+                      onFocus={(e) => (e.target.style.borderColor = "var(--accent)")}
+                      onBlur={(e) => (e.target.style.borderColor = "var(--input-border)")}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      style={{
+                        position: "absolute",
+                        right: "14px",
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        padding: "4px",
+                        color: "var(--text-muted)",
+                        display: "flex",
+                        alignItems: "center",
+                        transition: "color 0.2s",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
+                      tabIndex={-1}
+                      title={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                          <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                          <line x1="1" y1="1" x2="23" y2="23"/>
+                        </svg>
+                      ) : (
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                          <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                      )}
+                    </button>
                   </div>
-                )}
+                  <div style={{ textAlign: "right", marginTop: "8px" }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode("forgot-password");
+                        setFlowMode("credentials");
+                        setPassword(""); // clear any autofilled password
+                        setError("");
+                      }}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        color: "var(--accent)",
+                        fontSize: "0.8rem",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        padding: 0,
+                        textDecoration: "none",
+                      }}
+                      onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+                      onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+                    >
+                      Forgot Password?
+                    </button>
+                  </div>
+                </div>
 
-                {/* Confirm Password for Forgot Password Flow */}
-                {mode === "forgot-password" && flowMode === "new-password" && (
-                  <div style={{ marginBottom: "20px" }}>
-                    <label style={{
-                      display: "block",
-                      fontSize: "0.7rem",
-                      fontWeight: 700,
-                      color: "var(--text-muted)",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.08em",
-                      marginBottom: "8px",
-                    }}>Confirm Password</label>
-                    <div style={{ position: "relative" }}>
-                      <input
-                        type={showConfirmPw ? "text" : "password"}
-                        value={confirmPw}
-                        onChange={(e) => setConfirmPw(e.target.value)}
-                        autoComplete="new-password"
-                        style={{
-                          width: "100%",
-                          background: "var(--input-bg)",
-                          border: "1.5px solid var(--input-border)",
-                          borderRadius: "12px",
-                          padding: "14px 16px",
-                          paddingRight: "46px",
-                          color: "var(--text-primary)",
-                          fontSize: "0.95rem",
-                          fontFamily: "inherit",
-                          outline: "none",
-                          transition: "all 0.25s",
-                        }}
-                        onFocus={(e) =>
-                          (e.target.style.borderColor = "var(--accent)")
-                        }
-                        onBlur={(e) =>
-                          (e.target.style.borderColor = "var(--input-border)")
-                        }
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPw(!showConfirmPw)}
-                        style={{
-                          position: "absolute",
-                          right: "14px",
-                          top: "50%",
-                          transform: "translateY(-50%)",
-                          background: "none",
-                          border: "none",
-                          cursor: "pointer",
-                          padding: "4px",
-                          color: "var(--text-muted)",
-                          display: "flex",
-                          alignItems: "center",
-                          transition: "color 0.2s",
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent)")}
-                        onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
-                        tabIndex={-1}
-                        title={showConfirmPw ? "Hide password" : "Show password"}
+                {/* Keep me signed in */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    marginBottom: "24px",
+                  }}
+                >
+                  <div
+                    onClick={() => setRememberMe(!rememberMe)}
+                    style={{
+                      width: "18px",
+                      height: "18px",
+                      borderRadius: "5px",
+                      border: `1.5px solid ${
+                        rememberMe ? "var(--accent)" : "var(--border-medium)"
+                      }`,
+                      background: rememberMe ? "var(--accent-dim)" : "transparent",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      cursor: "pointer",
+                      transition: "all 0.2s",
+                      flexShrink: 0,
+                    }}
+                  >
+                    {rememberMe && (
+                      <svg
+                        width="11"
+                        height="11"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="var(--accent)"
+                        strokeWidth="3.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
                       >
-                        {showConfirmPw ? (
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-                            <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-                            <line x1="1" y1="1" x2="23" y2="23"/>
-                          </svg>
-                        ) : (
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                            <circle cx="12" cy="12" r="3"/>
-                          </svg>
-                        )}
-                      </button>
-                    </div>
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
                   </div>
-                )}
+                  <span
+                    onClick={() => setRememberMe(!rememberMe)}
+                    style={{
+                      fontSize: "0.85rem",
+                      color: "var(--text-muted)",
+                      cursor: "pointer",
+                      userSelect: "none",
+                    }}
+                  >
+                    Keep me signed in
+                  </span>
+                </div>
 
                 {/* Error */}
                 {error && (
@@ -701,7 +475,7 @@ export default function LoginPage() {
                   </div>
                 )}
 
-                {/* Submit OTP */}
+                {/* Submit */}
                 <button
                   type="submit"
                   disabled={submitting}
@@ -721,466 +495,89 @@ export default function LoginPage() {
                     color: "var(--bg-primary)",
                     boxShadow: submitting ? "none" : "0 8px 32px var(--accent-glow)",
                     transition: "all 0.3s",
-                    marginBottom: "20px",
+                    position: "relative",
+                    overflow: "hidden",
                   }}
                 >
-                  {submitting 
-                    ? (flowMode === "new-password" ? "Resetting..." : "Verifying...")
-                    : (flowMode === "new-password" ? "Reset Password" : mode === "forgot-password" ? "Verify OTP" : "Verify & Register")}
-                </button>
-
-                {/* Actions: Resend / Back */}
-                {flowMode === "otp" && (
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "0.85rem" }}>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFlowMode("credentials");
-                        setError("");
-                      }}
-                      style={{
-                        background: "none",
-                        border: "none",
-                        color: "var(--text-muted)",
-                        cursor: "pointer",
-                        padding: 0,
-                        textDecoration: "underline",
-                        fontFamily: "inherit",
-                      }}
-                    >
-                      Edit Details
-                    </button>
-
-                    {cooldown > 0 ? (
-                      <span style={{ color: "var(--text-muted)" }}>
-                        Resend code in {cooldown}s
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleResendOtp}
-                        style={{
-                          background: "none",
-                          border: "none",
-                          color: "var(--accent)",
-                          fontWeight: 700,
-                          cursor: "pointer",
-                          padding: 0,
-                          textDecoration: "underline",
-                          fontFamily: "inherit",
-                        }}
-                      >
-                        Resend Code
-                      </button>
-                    )}
-                  </div>
-                )}
-              </form>
-            ) : (
-              <>
-                <form onSubmit={handleSubmit}>
-                      {/* Name & Age — signup only */}
-                      {mode === "signup" && (
-                        <div
-                          style={{
-                            display: "flex",
-                            gap: "12px",
-                            marginBottom: "18px",
-                            animation: "fadeInUp 0.3s ease forwards",
-                          }}
-                        >
-                          <div style={{ flex: "2 1 0" }}>
-                            <label style={labelStyle}>Full Name</label>
-                            <input
-                              type="text"
-                              value={name}
-                              onChange={(e) => setName(e.target.value)}
-                              placeholder="John Doe"
-                              style={inputStyle}
-                              onFocus={(e) =>
-                                (e.target.style.borderColor = "var(--accent)")
-                              }
-                              onBlur={(e) =>
-                                (e.target.style.borderColor = "var(--input-border)")
-                              }
-                            />
-                          </div>
-                          <div style={{ flex: "1 1 0", minWidth: "80px" }}>
-                            <label style={labelStyle}>Age</label>
-                            <input
-                              type="number"
-                              value={age}
-                              onChange={(e) => setAge(e.target.value)}
-                              placeholder="25"
-                              min="1"
-                              max="150"
-                              style={inputStyle}
-                              onFocus={(e) =>
-                                (e.target.style.borderColor = "var(--accent)")
-                              }
-                              onBlur={(e) =>
-                                (e.target.style.borderColor = "var(--input-border)")
-                              }
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Email */}
-                      <div style={{ marginBottom: "18px" }}>
-                        <label style={labelStyle}>Email Address</label>
-                        <input
-                          id="email"
-                          name="email"
-                          type="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          autoComplete="username email"
-                          style={inputStyle}
-                          onFocus={(e) =>
-                            (e.target.style.borderColor = "var(--accent)")
-                          }
-                          onBlur={(e) =>
-                            (e.target.style.borderColor = "var(--input-border)")
-                          }
-                        />
-                      </div>
-
-                      {/* Password */}
-                      {mode !== "forgot-password" && (
-                      <div style={{ marginBottom: mode === "signup" ? "18px" : "20px" }}>
-                        <label style={labelStyle}>Password</label>
-                        <div style={{ position: "relative" }}>
-                          <input
-                            id="password"
-                            name="password"
-                            type={showPassword ? "text" : "password"}
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            autoComplete={
-                              mode === "login" ? "current-password" : "new-password"
-                            }
-                            style={{ ...inputStyle, paddingRight: "46px" }}
-                            onFocus={(e) =>
-                              (e.target.style.borderColor = "var(--accent)")
-                            }
-                            onBlur={(e) =>
-                              (e.target.style.borderColor = "var(--input-border)")
-                            }
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            style={{
-                              position: "absolute",
-                              right: "14px",
-                              top: "50%",
-                              transform: "translateY(-50%)",
-                              background: "none",
-                              border: "none",
-                              cursor: "pointer",
-                              padding: "4px",
-                              color: "var(--text-muted)",
-                              display: "flex",
-                              alignItems: "center",
-                              transition: "color 0.2s",
-                            }}
-                            onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent)")}
-                            onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
-                            tabIndex={-1}
-                            title={showPassword ? "Hide password" : "Show password"}
-                          >
-                            {showPassword ? (
-                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-                                <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-                                <line x1="1" y1="1" x2="23" y2="23"/>
-                              </svg>
-                            ) : (
-                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                                <circle cx="12" cy="12" r="3"/>
-                              </svg>
-                            )}
-                          </button>
-                        </div>
-                        {mode === "login" && (
-                          <div style={{ textAlign: "right", marginTop: "8px" }}>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setMode("forgot-password");
-                                setFlowMode("credentials");
-                                setPassword(""); // clear any autofilled password
-                                setConfirmPw("");
-                                setError("");
-                              }}
-                              style={{
-                                background: "none",
-                                border: "none",
-                                color: "var(--accent)",
-                                fontSize: "0.8rem",
-                                fontWeight: 600,
-                                cursor: "pointer",
-                                padding: 0,
-                                textDecoration: "none",
-                              }}
-                              onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
-                              onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
-                            >
-                              Forgot Password?
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                      )}
-
-                      {/* Confirm Password — signup only */}
-                      {mode === "signup" && (
-                        <div
-                          style={{
-                            marginBottom: "20px",
-                            animation: "fadeInUp 0.3s ease forwards",
-                          }}
-                        >
-                          <label style={labelStyle}>Confirm Password</label>
-                          <div style={{ position: "relative" }}>
-                            <input
-                              type={showConfirmPw ? "text" : "password"}
-                              value={confirmPw}
-                              onChange={(e) => setConfirmPw(e.target.value)}
-                              autoComplete="new-password"
-                              style={{ ...inputStyle, paddingRight: "46px" }}
-                              onFocus={(e) =>
-                                (e.target.style.borderColor = "var(--accent)")
-                              }
-                              onBlur={(e) =>
-                                (e.target.style.borderColor = "var(--input-border)")
-                              }
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowConfirmPw(!showConfirmPw)}
-                              style={{
-                                position: "absolute",
-                                right: "14px",
-                                top: "50%",
-                                transform: "translateY(-50%)",
-                                background: "none",
-                                border: "none",
-                                cursor: "pointer",
-                                padding: "4px",
-                                color: "var(--text-muted)",
-                                display: "flex",
-                                alignItems: "center",
-                                transition: "color 0.2s",
-                              }}
-                              onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent)")}
-                              onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-muted)")}
-                              tabIndex={-1}
-                              title={showConfirmPw ? "Hide password" : "Show password"}
-                            >
-                              {showConfirmPw ? (
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
-                                  <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
-                                  <line x1="1" y1="1" x2="23" y2="23"/>
-                                </svg>
-                              ) : (
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
-                                  <circle cx="12" cy="12" r="3"/>
-                                </svg>
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Remember me */}
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: "10px",
-                          marginBottom: "24px",
-                        }}
-                      >
-                        <div
-                          onClick={() => setRememberMe(!rememberMe)}
-                          style={{
-                            width: "18px",
-                            height: "18px",
-                            borderRadius: "5px",
-                            border: `1.5px solid ${
-                              rememberMe
-                                ? "var(--accent)"
-                                : "var(--border-medium)"
-                            }`,
-                            background: rememberMe
-                              ? "var(--accent-dim)"
-                              : "transparent",
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            cursor: "pointer",
-                            transition: "all 0.2s",
-                            flexShrink: 0,
-                          }}
-                        >
-                          {rememberMe && (
-                            <svg
-                              width="11"
-                              height="11"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="var(--accent)"
-                              strokeWidth="3.5"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                          )}
-                        </div>
-                        <span
-                          onClick={() => setRememberMe(!rememberMe)}
-                          style={{
-                            fontSize: "0.85rem",
-                            color: "var(--text-muted)",
-                            cursor: "pointer",
-                            userSelect: "none",
-                          }}
-                        >
-                          Keep me signed in
-                        </span>
-                      </div>
-
-                  {/* Error */}
-                  {error && (
-                    <div
-                      style={{
-                        background: "var(--red-dim)",
-                        border: "1px solid var(--red-dim)",
-                        borderRadius: "12px",
-                        padding: "12px 16px",
-                        marginBottom: "20px",
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "10px",
-                      }}
-                    >
-                      <span style={{ fontSize: "1rem" }}>⚠️</span>
-                      <span
-                        style={{
-                          color: "var(--red)",
-                          fontSize: "0.85rem",
-                          fontWeight: 600,
-                        }}
-                      >
-                        {error}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Submit */}
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    style={{
-                      width: "100%",
-                      padding: "15px 0",
-                      borderRadius: "14px",
-                      border: "none",
-                      cursor: submitting ? "not-allowed" : "pointer",
-                      fontFamily: "inherit",
-                      fontWeight: 800,
-                      fontSize: "1rem",
-                      letterSpacing: "0.02em",
-                      background: submitting
-                        ? "var(--accent-dim)"
-                        : "linear-gradient(135deg, var(--accent) 0%, var(--purple) 100%)",
-                      color: "var(--bg-primary)",
-                      boxShadow: submitting
-                        ? "none"
-                        : "0 8px 32px var(--accent-glow)",
-                      transition: "all 0.3s",
-                      position: "relative",
-                      overflow: "hidden",
-                    }}
-                    >
-                      {submitting ? (
-                        <span
-                          style={{
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: "8px",
-                          }}
-                        >
-                          <span className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }} />
-                          {mode === "login" ? "Signing in…" : mode === "forgot-password" ? "Sending code…" : "Signing up…"}
-                        </span>
-                      ) : mode === "login" ? (
-                        "Sign In"
-                      ) : mode === "forgot-password" ? (
-                        "Send Reset Code"
-                      ) : (
-                        "Create Account"
-                      )}
-                    </button>
-                </form>
-
-                {/* Mode switch prompt */}
-                <p
-                  style={{
-                    textAlign: "center",
-                    marginTop: "24px",
-                    fontSize: "0.85rem",
-                    color: "var(--text-muted)",
-                  }}
-                >
-                  {mode === "forgot-password" ? (
+                  {submitting ? (
                     <span
-                      onClick={() => {
-                        setMode("login");
-                        setError("");
-                      }}
                       style={{
-                        color: "var(--accent)",
-                        fontWeight: 700,
-                        cursor: "pointer",
-                        transition: "opacity 0.2s",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "8px",
                       }}
-                      onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.8")}
-                      onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
                     >
-                      Back to Sign In
+                      <span className="spinner" style={{ width: 18, height: 18, borderWidth: 2 }} />
+                      Signing in…
                     </span>
                   ) : (
-                    <>
-                      {mode === "login"
-                        ? "Don't have an account? "
-                        : "Already have an account? "}
-                      <span
-                        onClick={() => {
-                          setMode(mode === "login" ? "signup" : "login");
-                          setError("");
-                        }}
-                        style={{
-                          color: "var(--accent)",
-                          fontWeight: 700,
-                          cursor: "pointer",
-                          transition: "opacity 0.2s",
-                        }}
-                        onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.8")}
-                        onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
-                      >
-                        {mode === "login" ? "Sign Up" : "Sign In"}
-                      </span>
-                    </>
+                    "Sign In"
                   )}
-                </p>
-              </>
+                </button>
+              </form>
+            )}
+
+            {/* Mode switcher for login mode */}
+            {mode === "login" && (
+              <p
+                style={{
+                  textAlign: "center",
+                  marginTop: "24px",
+                  fontSize: "0.85rem",
+                  color: "var(--text-muted)",
+                }}
+              >
+                Don't have an account?{" "}
+                <span
+                  onClick={() => {
+                    setMode("signup");
+                    setFlowMode("credentials");
+                    setError("");
+                  }}
+                  style={{
+                    color: "var(--accent)",
+                    fontWeight: 700,
+                    cursor: "pointer",
+                    transition: "opacity 0.2s",
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.8")}
+                  onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+                >
+                  Sign Up
+                </span>
+              </p>
+            )}
+
+            {mode === "signup" && flowMode === "credentials" && (
+              <SignupForm
+                onSubmit={handleSignupSubmit}
+                onSwitchToLogin={() => {
+                  setMode("login");
+                  setFlowMode("credentials");
+                }}
+              />
+            )}
+
+            {mode === "signup" && flowMode === "otp" && (
+              <OTPVerification
+                email={email}
+                onVerify={handleSignupOtpVerify}
+                onResend={handleSignupOtpResend}
+                onBack={handleSignupOtpBack}
+              />
+            )}
+
+            {mode === "forgot-password" && (
+              <ForgotPassword
+                email={email}
+                setEmail={setEmail}
+                flowMode={flowMode}
+                setFlowMode={setFlowMode}
+                initiateForgotPassword={initiateForgotPassword}
+                verifyForgotPasswordOtp={verifyForgotPasswordOtp}
+                resetPassword={resetPassword}
+                onBackToLogin={handleForgotPasswordBackToLogin}
+              />
             )}
           </div>
 
