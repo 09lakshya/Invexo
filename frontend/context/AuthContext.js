@@ -78,10 +78,14 @@ export function useAuth() {
   return useContext(AuthContext);
 }
 
+// Global promise to prevent concurrent duplicate refresh requests
+let refreshTokenPromise = null;
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [avatar, setAvatar] = useState("");
 
   const refreshUser = async () => {
     const stored =
@@ -98,6 +102,95 @@ export function AuthProvider({ children }) {
     setToken(stored);
     return res.data;
   };
+
+  const performTokenRefresh = async () => {
+    if (refreshTokenPromise) {
+      return refreshTokenPromise;
+    }
+
+    refreshTokenPromise = (async () => {
+      try {
+        const storedRefresh =
+          localStorage.getItem("invexo_refresh_token") ||
+          sessionStorage.getItem("invexo_refresh_token") ||
+          getCookie("invexo_refresh_token");
+
+        if (!storedRefresh) {
+          throw new Error("No refresh token found");
+        }
+
+        const res = await API.post("/auth/refresh", { refresh_token: storedRefresh });
+        const { access_token, refresh_token } = res.data;
+
+        setToken(access_token);
+
+        const rememberMe = !!localStorage.getItem("invexo_refresh_token");
+        if (rememberMe) {
+          localStorage.setItem("invexo_token", access_token);
+          localStorage.setItem("invexo_refresh_token", refresh_token);
+          setCookie("invexo_token", access_token, 30);
+          setCookie("invexo_refresh_token", refresh_token, 30);
+        } else {
+          sessionStorage.setItem("invexo_token", access_token);
+          sessionStorage.setItem("invexo_refresh_token", refresh_token);
+          setCookie("invexo_token", access_token, null);
+          setCookie("invexo_refresh_token", refresh_token, null);
+        }
+
+        return access_token;
+      } catch (err) {
+        // Clear both access and refresh tokens if rotation fails
+        localStorage.removeItem("invexo_token");
+        sessionStorage.removeItem("invexo_token");
+        eraseCookie("invexo_token");
+        localStorage.removeItem("invexo_refresh_token");
+        sessionStorage.removeItem("invexo_refresh_token");
+        eraseCookie("invexo_refresh_token");
+        setToken(null);
+        setUser(null);
+        throw err;
+      } finally {
+        refreshTokenPromise = null;
+      }
+    })();
+
+    return refreshTokenPromise;
+  };
+
+  // Register Axios response interceptor for 401 token refresh on mount
+  useEffect(() => {
+    const interceptor = API.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        const originalRequest = error.config;
+        if (
+          error.response?.status === 401 &&
+          !originalRequest._retry &&
+          originalRequest.url &&
+          !originalRequest.url.includes("/auth/login") &&
+          !originalRequest.url.includes("/auth/signup") &&
+          !originalRequest.url.includes("/auth/refresh")
+        ) {
+          originalRequest._retry = true;
+          try {
+            const freshToken = await performTokenRefresh();
+            if (freshToken) {
+              originalRequest.headers = originalRequest.headers || {};
+              originalRequest.headers.Authorization = `Bearer ${freshToken}`;
+              return API(originalRequest);
+            }
+          } catch (refreshError) {
+            return Promise.reject(refreshError);
+          }
+        }
+        return Promise.reject(error);
+      }
+    );
+
+    return () => {
+      API.interceptors.response.eject(interceptor);
+    };
+  }, []);
 
   // On mount, restore session from localStorage, sessionStorage, or cookie
   useEffect(() => {
@@ -151,45 +244,61 @@ export function AuthProvider({ children }) {
     })
       .then((res) => {
         setUser(res.data);
-        setToken(stored);
+        // Avoid overwriting the token if refreshed during mount
+        const currentToken =
+          localStorage.getItem("invexo_token") ||
+          sessionStorage.getItem("invexo_token") ||
+          getCookie("invexo_token");
+        setToken(currentToken || stored);
       })
       .catch(() => {
         // Token invalid or expired; clear it
         localStorage.removeItem("invexo_token");
         sessionStorage.removeItem("invexo_token");
         eraseCookie("invexo_token");
+        localStorage.removeItem("invexo_refresh_token");
+        sessionStorage.removeItem("invexo_refresh_token");
+        eraseCookie("invexo_refresh_token");
       })
       .finally(() => setLoading(false));
   }, []);
 
   const login = async (email, password, rememberMe = false) => {
     const res = await API.post("/auth/login", { email, password });
-    const { token, access_token, user: u } = res.data;
+    const { token, access_token, refresh_token, user: u } = res.data;
     const tk = token || access_token;
     setToken(tk);
     setUser(u);
     if (rememberMe) {
       localStorage.setItem("invexo_token", tk);
+      localStorage.setItem("invexo_refresh_token", refresh_token);
       setCookie("invexo_token", tk, 30); // 30 days
+      setCookie("invexo_refresh_token", refresh_token, 30);
     } else {
       sessionStorage.setItem("invexo_token", tk);
+      sessionStorage.setItem("invexo_refresh_token", refresh_token);
       setCookie("invexo_token", tk, null); // session cookie
+      setCookie("invexo_refresh_token", refresh_token, null);
     }
     return u;
   };
 
   const signup = async (email, password, name, age, rememberMe = false) => {
     const res = await API.post("/auth/signup", { email, password, name, age });
-    const { token, access_token, user: u } = res.data;
+    const { token, access_token, refresh_token, user: u } = res.data;
     const tk = token || access_token;
     setToken(tk);
     setUser(u);
     if (rememberMe) {
       localStorage.setItem("invexo_token", tk);
+      localStorage.setItem("invexo_refresh_token", refresh_token);
       setCookie("invexo_token", tk, 30);
+      setCookie("invexo_refresh_token", refresh_token, 30);
     } else {
       sessionStorage.setItem("invexo_token", tk);
+      sessionStorage.setItem("invexo_refresh_token", refresh_token);
       setCookie("invexo_token", tk, null);
+      setCookie("invexo_refresh_token", refresh_token, null);
     }
     return u;
   };
@@ -201,16 +310,20 @@ export function AuthProvider({ children }) {
 
   const verifySignupOtp = async (email, otp, rememberMe = false) => {
     const res = await API.post("/auth/signup/verify", { email, otp });
-    const { token, access_token, user: u } = res.data;
+    const { token, access_token, refresh_token, user: u } = res.data;
     const tk = token || access_token;
     setToken(tk);
     setUser(u);
     if (rememberMe) {
       localStorage.setItem("invexo_token", tk);
+      localStorage.setItem("invexo_refresh_token", refresh_token);
       setCookie("invexo_token", tk, 30);
+      setCookie("invexo_refresh_token", refresh_token, 30);
     } else {
       sessionStorage.setItem("invexo_token", tk);
+      sessionStorage.setItem("invexo_refresh_token", refresh_token);
       setCookie("invexo_token", tk, null);
+      setCookie("invexo_refresh_token", refresh_token, null);
     }
     return u;
   };
@@ -230,17 +343,36 @@ export function AuthProvider({ children }) {
     return res.data;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    const storedRefresh =
+      localStorage.getItem("invexo_refresh_token") ||
+      sessionStorage.getItem("invexo_refresh_token") ||
+      getCookie("invexo_refresh_token");
+
+    if (storedRefresh) {
+      try {
+        await API.post("/auth/logout", { refresh_token: storedRefresh });
+      } catch (err) {
+        console.error("Backend logout error:", err);
+      }
+    }
+
     setUser(null);
     setToken(null);
+    
+    // Clear access tokens
     localStorage.removeItem("invexo_token");
     sessionStorage.removeItem("invexo_token");
     eraseCookie("invexo_token");
+    
+    // Clear refresh tokens
+    localStorage.removeItem("invexo_refresh_token");
+    sessionStorage.removeItem("invexo_refresh_token");
+    eraseCookie("invexo_refresh_token");
+    
     // Also clear old portfolio uid if present
     localStorage.removeItem("invexo_uid");
   };
-
-  const [avatar, setAvatar] = useState("");
 
   useEffect(() => {
     if (user?.id) {
