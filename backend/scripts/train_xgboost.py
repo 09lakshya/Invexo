@@ -10,7 +10,7 @@ from sklearn.metrics import mean_absolute_error, r2_score
 
 # Add parent dir to path to import services
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from services.ticker_utils import _working_ticker
+from app.services.market.ticker_utils import _working_ticker
 
 MODELS_DIR = os.environ.get("RENDER_DISK_PATH", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models"))
 os.makedirs(MODELS_DIR, exist_ok=True)
