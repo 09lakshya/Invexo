@@ -1,1393 +1,833 @@
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/router";
-import { useEffect, useState, useRef } from "react";
-import API from "../../services/api";
-import RealChart from "../../components/RealChart";
-import Navbar from "../../components/Navbar";
+import Link from "next/link";
 import Head from "next/head";
+import Navbar from "../../components/Navbar";
+import RealChart from "../../components/RealChart";
+import API from "../../services/api";
 import { STOCK_METADATA } from "../../services/stocks";
 
-const PERIODS = [
-  { key: "1d", label: "1D", yf: "1d" },
-  { key: "1w", label: "1W", yf: "5d" },
-  { key: "1m", label: "1M", yf: "1mo" },
-  { key: "3m", label: "3M", yf: "3mo" },
-  { key: "6m", label: "6M", yf: "6mo" },
-  { key: "1y", label: "1Y", yf: "1y" },
-  { key: "5y", label: "5Y", yf: "5y" },
-];
+// ── CLIENT-SIDE MATHEMATICAL CALCULATORS ────────────────────────────────────
 
-// ── Info chip ─────────────────────────────────────────────────────────────
-function InfoChip({ label, value, color, sub }) {
-  return (
-    <div
-      style={{
-        background: "var(--bg-card)",
-        border: "1px solid var(--border-subtle)",
-        borderRadius: "14px",
-        padding: "16px 18px",
-        transition: "all 0.2s",
-      }}
-      onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--accent-glow)"; }}
-      onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border-subtle)"; }}
-    >
-      <p style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "8px" }}>{label}</p>
-      <p style={{ fontSize: "clamp(1rem, 2vmin, 1.3rem)", fontWeight: 800, color: color || "var(--text-primary)", fontFamily: "'Space Grotesk', sans-serif", letterSpacing: "-0.02em" }}>{value}</p>
-      {sub && <p style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "4px" }}>{sub}</p>}
-    </div>
+const cleanHistoryData = (history) => {
+  return (history || []).map((d) => {
+    if (!d) return null;
+    const open = d.Open !== undefined && d.Open !== null ? Number(d.Open) : (d.open !== undefined && d.open !== null ? Number(d.open) : null);
+    const high = d.High !== undefined && d.High !== null ? Number(d.High) : (d.high !== undefined && d.high !== null ? Number(d.high) : null);
+    const low = d.Low !== undefined && d.Low !== null ? Number(d.Low) : (d.low !== undefined && d.low !== null ? Number(d.low) : null);
+    const close = d.Close !== undefined && d.Close !== null ? Number(d.Close) : (d.close !== undefined && d.close !== null ? Number(d.close) : null);
+    const date = d.Date || d.date;
+
+    const finalClose = close !== null && !isNaN(close) ? close : null;
+    const finalOpen = open !== null && !isNaN(open) ? open : finalClose;
+    const finalHigh = high !== null && !isNaN(high) ? high : Math.max(finalOpen || 0, finalClose || 0);
+    const finalLow = low !== null && !isNaN(low) ? low : Math.min(finalOpen || 999999, finalClose || 999999);
+
+    return {
+      Date: date,
+      Open: finalOpen,
+      High: finalHigh,
+      Low: finalLow,
+      Close: finalClose,
+    };
+  }).filter(
+    (d) => d && d.Date && d.Close !== null && d.Open !== null && d.High !== null && d.Low !== null
   );
+};
+
+// Calculate Bollinger Bands: 20-period SMA, 2-stdDev limits
+function calculateBollingerBands(history) {
+  if (!history || history.length < 20) return null;
+  const closes = history.map(d => d.Close);
+  const n = closes.length;
+  const period = 20;
+  const slice = closes.slice(n - period);
+  
+  const sum = slice.reduce((a, b) => a + b, 0);
+  const sma = sum / period;
+  
+  const variance = slice.reduce((a, b) => a + Math.pow(b - sma, 2), 0) / period;
+  const stdDev = Math.sqrt(variance);
+  
+  const upper = sma + 2 * stdDev;
+  const lower = sma - 2 * stdDev;
+  const current = closes[n - 1];
+  const percent = ((current - lower) / (upper - lower)) * 100;
+  
+  return {
+    lower,
+    middle: sma,
+    upper,
+    percent
+  };
 }
 
-// ── Score bar ─────────────────────────────────────────────────────────────
-function ScoreBar({ value, max = 100, color }) {
-  return (
-    <div style={{ height: "5px", background: "var(--border-subtle)", borderRadius: "5px", overflow: "hidden" }}>
-      <div style={{
-        height: "100%",
-        width: `${(value / max) * 100}%`,
-        background: color,
-        borderRadius: "5px",
-        transition: "width 0.8s ease",
-      }} />
-    </div>
-  );
+// Calculate ADX (Average Directional Index) - 14-period Wilder's Smoothing
+function calculateADX(history) {
+  if (!history || history.length < 28) return null;
+  const tr = [];
+  const plusDM = [];
+  const minusDM = [];
+  
+  for (let i = 1; i < history.length; i++) {
+    const curr = history[i];
+    const prev = history[i - 1];
+    
+    const hL = curr.High - curr.Low;
+    const hCp = Math.abs(curr.High - prev.Close);
+    const lCp = Math.abs(curr.Low - prev.Close);
+    const trueRange = Math.max(hL, hCp, lCp);
+    tr.push(trueRange);
+    
+    const upMove = curr.High - prev.High;
+    const downMove = prev.Low - curr.Low;
+    
+    if (upMove > downMove && upMove > 0) {
+      plusDM.push(upMove);
+    } else {
+      plusDM.push(0);
+    }
+    
+    if (downMove > upMove && downMove > 0) {
+      minusDM.push(downMove);
+    } else {
+      minusDM.push(0);
+    }
+  }
+  
+  const period = 14;
+  let smoothedTR = tr.slice(0, period).reduce((a, b) => a + b, 0);
+  let smoothedPlusDM = plusDM.slice(0, period).reduce((a, b) => a + b, 0);
+  let smoothedMinusDM = minusDM.slice(0, period).reduce((a, b) => a + b, 0);
+  
+  const dxValues = [];
+  let plusDI = 100 * (smoothedPlusDM / (smoothedTR || 1));
+  let minusDI = 100 * (smoothedMinusDM / (smoothedTR || 1));
+  let dx = 100 * Math.abs(plusDI - minusDI) / ((plusDI + minusDI) || 1);
+  dxValues.push(dx);
+  
+  for (let i = period; i < tr.length; i++) {
+    smoothedTR = smoothedTR - (smoothedTR / period) + tr[i];
+    smoothedPlusDM = smoothedPlusDM - (smoothedPlusDM / period) + plusDM[i];
+    smoothedMinusDM = smoothedMinusDM - (smoothedMinusDM / period) + minusDM[i];
+    
+    plusDI = 100 * (smoothedPlusDM / (smoothedTR || 1));
+    minusDI = 100 * (smoothedMinusDM / (smoothedTR || 1));
+    dx = 100 * Math.abs(plusDI - minusDI) / ((plusDI + minusDI) || 1);
+    dxValues.push(dx);
+  }
+  
+  if (dxValues.length < period) return null;
+  
+  let adx = dxValues.slice(0, period).reduce((a, b) => a + b, 0) / period;
+  for (let i = period; i < dxValues.length; i++) {
+    adx = (adx * (period - 1) + dxValues[i]) / period;
+  }
+  
+  return {
+    adx,
+    plusDI,
+    minusDI
+  };
 }
 
-export default function StockPage() {
+export default function StockDetail() {
   const router = useRouter();
   const { symbol } = router.query;
-  const normalizedSymbol =
-    typeof symbol === "string" ? symbol.replace(/\.NS$/i, "") : symbol;
 
-  const [history, setHistory]       = useState([]);
-  const [prediction, setPrediction] = useState(null);
-  const [news, setNews]             = useState([]);
-  const [period, setPeriod]         = useState("1m");
-  const [chartType, setChartType]   = useState("line");
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState(null);
-  const [logoError, setLogoError]   = useState(false);
-  const [isZoomed, setIsZoomed]     = useState(false);
-  const [zoomPercent, setZoomPercent] = useState(0);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const zoomRef                     = useRef(null);
-  const historyCacheRef             = useRef({});
-  const prefetchedSymbolRef         = useRef(null);
-
-  // Watchlist & Alerts states
+  const [predictionData, setPredictionData] = useState(null);
+  const [chartHistory, setChartHistory] = useState([]);
+  const [chartPeriod, setChartPeriod] = useState("3m"); // default 3mo period
+  
+  const [loading, setLoading] = useState(true);
+  const [chartLoading, setChartLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [watchlist, setWatchlist] = useState([]);
-  const [isWatched, setIsWatched] = useState(false);
-  const [watchlistLoading, setWatchlistLoading] = useState(false);
-  const [alerts, setAlerts] = useState([]);
-  const [alertTargetPrice, setAlertTargetPrice] = useState("");
-  const [alertCondition, setAlertCondition] = useState("above");
 
+  const cleanSymbol = useMemo(() => {
+    return symbol ? symbol.toUpperCase().replace(/\.NS$/i, "").replace(/\.BO$/i, "") : "";
+  }, [symbol]);
+
+  const companyName = useMemo(() => {
+    return STOCK_METADATA[cleanSymbol]?.name || cleanSymbol;
+  }, [cleanSymbol]);
+
+  const querySymbol = useMemo(() => {
+    return cleanSymbol ? `${cleanSymbol}.NS` : "";
+  }, [cleanSymbol]);
+
+  // Client-side computed indicators from 3-month history
+  const [indicators, setIndicators] = useState({
+    bollinger: null,
+    adx: null
+  });
+
+  const getPeriodFormat = (p) => {
+    const PERIODS = [
+      { key: "1d", yf: "1d" },
+      { key: "1w", yf: "5d" },
+      { key: "1m", yf: "1mo" },
+      { key: "3m", yf: "3mo" },
+      { key: "6m", yf: "6mo" },
+      { key: "1y", yf: "1y" },
+    ];
+    return PERIODS.find(x => x.key === p)?.yf || p;
+  };
+
+  // Fetch watchlist
   const fetchWatchlist = async () => {
     try {
       const res = await API.get("/watchlist/");
       setWatchlist(res.data.map(item => item.symbol.toUpperCase()));
-      if (normalizedSymbol) {
-        setIsWatched(res.data.some(item => item.symbol.toUpperCase() === normalizedSymbol.toUpperCase()));
-      }
     } catch (err) {
       console.error("Failed to fetch watchlist:", err);
     }
   };
 
-  const fetchAlerts = async () => {
-    try {
-      const res = await API.get("/alerts/");
-      setAlerts(res.data);
-    } catch (err) {
-      console.error("Failed to fetch alerts:", err);
-    }
-  };
-
-  useEffect(() => {
-    if (router.isReady && normalizedSymbol) {
-      fetchWatchlist();
-      fetchAlerts();
-    }
-  }, [router.isReady, normalizedSymbol]);
-
-  useEffect(() => {
-    if (prediction && prediction.current_price) {
-      setAlertTargetPrice(String(prediction.current_price));
-    }
-  }, [prediction]);
-
   const toggleWatchlist = async () => {
-    if (!normalizedSymbol) return;
-    setWatchlistLoading(true);
+    if (!cleanSymbol) return;
+    const isWatched = watchlist.includes(cleanSymbol);
     try {
       if (isWatched) {
-        await API.delete(`/watchlist/${normalizedSymbol.toUpperCase()}`);
-        setIsWatched(false);
+        await API.delete(`/watchlist/${cleanSymbol}`);
+        setWatchlist(prev => prev.filter(s => s !== cleanSymbol));
       } else {
-        await API.post("/watchlist/", { symbol: normalizedSymbol.toUpperCase() });
-        setIsWatched(true);
+        await API.post("/watchlist/", { symbol: cleanSymbol });
+        setWatchlist(prev => [...prev, cleanSymbol]);
       }
     } catch (err) {
-      console.error("Error toggling watchlist:", err);
-    } finally {
-      setWatchlistLoading(false);
+      console.error("Failed to toggle watchlist:", err);
     }
   };
 
-  const handleCreateAlert = async () => {
-    if (!normalizedSymbol || !alertTargetPrice) return;
-    try {
-      await API.post("/alerts/", {
-        symbol: normalizedSymbol.toUpperCase(),
-        target_price: parseFloat(alertTargetPrice),
-        condition: alertCondition
-      });
-      fetchAlerts();
-      alert(`Alert set for ${normalizedSymbol.toUpperCase()} when price goes ${alertCondition} ₹${alertTargetPrice}`);
-    } catch (err) {
-      console.error("Failed to create alert:", err);
-      alert("Failed to create alert");
-    }
-  };
-
-  const handleDeleteAlert = async (id) => {
-    try {
-      await API.delete(`/alerts/${id}`);
-      fetchAlerts();
-    } catch (err) {
-      console.error("Failed to delete alert:", err);
-      alert("Failed to delete alert");
-    }
-  };
-
-  // Reset cache and prefetch refs when symbol changes
+  // Load prediction data and stable indicators (using 3-month history) on mount
   useEffect(() => {
-    if (normalizedSymbol) {
-      historyCacheRef.current = {};
-      prefetchedSymbolRef.current = null;
-    }
-  }, [normalizedSymbol]);
+    if (!symbol) return;
 
-  const handleZoomStateChange = (zoomed, percent) => {
-    setIsZoomed(zoomed);
-    if (percent !== undefined) {
-      setZoomPercent(percent);
-    }
-  };
-
-  // Escape key to exit fullscreen
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === "Escape" && isFullscreen) {
-        setIsFullscreen(false);
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isFullscreen]);
-
-  // Lock body scroll and set fullscreen attribute when fullscreen
-  useEffect(() => {
-    if (isFullscreen) {
-      document.body.style.overflow = "hidden";
-      document.body.setAttribute("data-fullscreen", "true");
-    } else {
-      document.body.style.overflow = "";
-      document.body.removeAttribute("data-fullscreen");
-    }
-    return () => {
-      document.body.style.overflow = "";
-      document.body.removeAttribute("data-fullscreen");
-    };
-  }, [isFullscreen]);
-
-  const metadata = STOCK_METADATA[normalizedSymbol] || {};
-  const companyName = metadata.name || symbol;
-  const companyDomain = metadata.domain;
-  const logoUrl = null; // Removed external logo API — using styled initials badge
-
-  const getPeriodFormat = (p) => PERIODS.find(x => x.key === p)?.yf || p;
-
-  useEffect(() => {
-    if (!router.isReady || !normalizedSymbol) return;
-    const loadPrediction = async () => {
+    const loadCoreData = async () => {
+      setLoading(true);
+      setError(null);
       try {
-        setError(null);
-        const predRes = await API.get(`/predict/${normalizedSymbol}.NS`);
+        await fetchWatchlist();
+        
+        // Fetch AI prediction
+        const predRes = await API.get(`/predict/${querySymbol}`);
         if (predRes.data && predRes.data.error) {
           throw new Error(predRes.data.error);
         }
-        setPrediction(predRes.data);
+        setPredictionData(predRes.data);
+
+        // Fetch stable 3-month history to compute Bollinger Bands & ADX
+        const histRes = await API.get(`/market/${cleanSymbol}/history?period=3mo`);
+        const histData = cleanHistoryData(histRes.data);
+        
+        const bb = calculateBollingerBands(histData);
+        const adx = calculateADX(histData);
+        setIndicators({ bollinger: bb, adx: adx });
+        
+        // Initially set the chart history to this loaded 3-month history
+        setChartHistory(histData);
+        setChartLoading(false);
       } catch (err) {
-        console.error("ERROR loading prediction:", err);
-        setError("Data unavailable — market may be closed");
-      }
-    };
-    loadPrediction();
-  }, [router.isReady, normalizedSymbol]);
-
-  useEffect(() => {
-    if (!router.isReady || !normalizedSymbol) return;
-
-    const cacheKey = `${normalizedSymbol}_${period}`;
-    if (historyCacheRef.current[cacheKey]) {
-      setHistory(historyCacheRef.current[cacheKey]);
-      setLoading(false);
-      return;
-    }
-
-    const loadHistory = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const histRes = await API.get(`/market/${normalizedSymbol}/history?period=${getPeriodFormat(period)}`);
-        const data = Array.isArray(histRes.data) ? histRes.data : [];
-        setHistory(data);
-        historyCacheRef.current[cacheKey] = data;
-      } catch (err) {
-        console.error("ERROR loading history:", err);
-        setError("Data unavailable — market may be closed");
+        console.error("Failed to load stock data:", err);
+        setError("Technical analysis data currently unavailable. The market may be closed.");
       } finally {
         setLoading(false);
       }
     };
-    loadHistory();
-  }, [router.isReady, normalizedSymbol, period]);
 
-  // Background prefetcher for other periods to optimize horizon switching speed
+    loadCoreData();
+  }, [symbol, querySymbol, cleanSymbol]);
+
+  // Reload history only for chart when timeframe is changed
   useEffect(() => {
-    if (!router.isReady || !normalizedSymbol || loading || history.length === 0) return;
-    if (prefetchedSymbolRef.current === normalizedSymbol) return;
-    
-    prefetchedSymbolRef.current = normalizedSymbol;
-    
-    const periodsToPrefetch = PERIODS.map(p => p.key).filter(p => p !== period);
-    let active = true;
-    
-    const prefetchNext = async (index) => {
-      if (index >= periodsToPrefetch.length || !active) return;
-      const p = periodsToPrefetch[index];
-      const cacheKey = `${normalizedSymbol}_${p}`;
-      
-      // Skip if already in cache
-      if (historyCacheRef.current[cacheKey]) {
-        prefetchNext(index + 1);
-        return;
-      }
-      
+    if (!symbol || loading) return;
+
+    // Skip reload if timeframe is 3M (which matches core data)
+    if (chartPeriod === "3m") return;
+
+    const loadTimeframeHistory = async () => {
+      setChartLoading(true);
       try {
-        const histRes = await API.get(`/market/${normalizedSymbol}/history?period=${getPeriodFormat(p)}`);
-        const data = Array.isArray(histRes.data) ? histRes.data : [];
-        if (active) {
-          historyCacheRef.current[cacheKey] = data;
-        }
+        const histRes = await API.get(`/market/${cleanSymbol}/history?period=${getPeriodFormat(chartPeriod)}`);
+        setChartHistory(cleanHistoryData(histRes.data));
       } catch (err) {
-        console.error(`Error prefetching period ${p}:`, err);
-      }
-      
-      if (active) {
-        setTimeout(() => prefetchNext(index + 1), 800);
+        console.error("Failed to load timeframe history:", err);
+      } finally {
+        setChartLoading(false);
       }
     };
-    
-    const timer = setTimeout(() => prefetchNext(0), 1000);
-    return () => {
-      active = false;
-      clearTimeout(timer);
-    };
-  }, [router.isReady, normalizedSymbol, loading, history]);
 
+    loadTimeframeHistory();
+  }, [chartPeriod, symbol, cleanSymbol, loading]);
+
+  // Re-sync chart with 3-month history if timeframe returns to 3M
   useEffect(() => {
-    if (!router.isReady || !normalizedSymbol) return;
-    API.get(`/news/${normalizedSymbol}`)
-      .then(res => setNews(Array.isArray(res.data) ? res.data : []))
-      .catch(() => setNews([]));
-  }, [router.isReady, normalizedSymbol]);
+    if (chartPeriod === "3m" && !loading) {
+      const reloadDefaultHistory = async () => {
+        setChartLoading(true);
+        try {
+          const histRes = await API.get(`/market/${cleanSymbol}/history?period=3mo`);
+          setChartHistory(cleanHistoryData(histRes.data));
+        } catch (err) {
+          console.error(err);
+        } finally {
+          setChartLoading(false);
+        }
+      };
+      reloadDefaultHistory();
+    }
+  }, [chartPeriod]);
 
-  if (!router.isReady || !symbol) {
+  const isWatched = watchlist.includes(cleanSymbol);
+
+  if (loading) {
     return (
-      <div style={{ minHeight: "100vh" }}>
+      <div style={{ minHeight: "100vh", background: "var(--bg-primary)" }}>
         <Navbar />
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh" }}>
-          <div className="spinner" style={{ width: "40px", height: "40px" }} />
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: "70vh", gap: "16px" }}>
+          <div className="spinner" />
+          <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem", fontWeight: 500 }}>Analysing market datasets for {cleanSymbol}...</p>
         </div>
       </div>
     );
   }
 
-  if (error && !loading) {
+  if (error) {
     return (
       <div style={{ minHeight: "100vh", background: "var(--bg-primary)" }}>
         <Navbar />
-        <div style={{ maxWidth: "600px", margin: "80px auto 0", padding: "24px" }}>
-          <div
-            style={{
-              background: "var(--bg-card)",
-              border: "1px solid var(--red-dim)",
-              borderRadius: "20px",
-              padding: "40px 24px",
-              textAlign: "center",
-              boxShadow: "var(--shadow-card)",
-              backdropFilter: "blur(16px)",
-            }}
-          >
-            <p style={{ fontSize: "3rem", marginBottom: "16px" }}>⚠️</p>
-            <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: "1.4rem", fontWeight: 800, color: "var(--text-primary)", marginBottom: "10px" }}>
-              {error}
-            </h2>
-            <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginBottom: "24px" }}>
-              The requested stock data is currently unavailable. Please verify the symbol or try again later.
-            </p>
-            <button
-              onClick={() => router.back()}
-              style={{
-                padding: "10px 24px",
-                borderRadius: "10px",
-                border: "none",
-                cursor: "pointer",
-                fontFamily: "inherit",
-                fontWeight: 700,
-                fontSize: "0.9rem",
-                background: "linear-gradient(135deg, var(--accent) 0%, var(--purple) 100%)",
-                color: "var(--bg-primary)",
-                boxShadow: "0 4px 16px var(--accent-glow)",
-                transition: "all 0.2s",
-              }}
-            >
-              Go Back
-            </button>
+        <div style={{ maxWidth: "800px", margin: "80px auto", padding: "0 20px" }}>
+          <div className="glass" style={{ padding: "40px", textAlign: "center", display: "flex", flexDirection: "column", gap: "20px", border: "1px solid var(--red-dim)" }}>
+            <p style={{ fontSize: "3rem", margin: 0 }}>⚠️</p>
+            <h2 style={{ fontFamily: "Space Grotesk, sans-serif", fontWeight: 800 }}>Analysis Failed</h2>
+            <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem", lineHeight: 1.6 }}>{error}</p>
+            <div style={{ display: "flex", gap: "12px", justifyContent: "center", marginTop: "10px" }}>
+              <Link href="/" className="btn-primary" style={{ padding: "12px 24px", color: "var(--bg-primary)" }}>
+                Return to Dashboard
+              </Link>
+            </div>
           </div>
         </div>
       </div>
     );
   }
 
-  const pred = prediction;
-  const hasPrice = pred && pred.current_price;
-  const isPredUp = pred && pred.change >= 0;
-  const bull = pred && pred.trend === "BULLISH";
-  const neutral = pred && pred.trend === "NEUTRAL";
-  const predDelta = pred ? pred.predicted_price - pred.current_price : 0;
-  const predDeltaPct = pred && pred.current_price ? ((predDelta / pred.current_price) * 100).toFixed(2) : "0";
+  const currentPrice = predictionData?.current_price || 0;
+  const change = predictionData?.change || 0;
+  const percentChange = predictionData?.percent_change || 0;
+  const isPositive = change >= 0;
+
+  // Trend Badge styles
+  const trend = predictionData?.trend || "NEUTRAL";
+  const trendColor = trend === "BULLISH" ? "var(--green)" : trend === "BEARISH" ? "var(--red)" : "var(--accent)";
+  const trendBg = trend === "BULLISH" ? "var(--green-dim)" : trend === "BEARISH" ? "var(--red-dim)" : "var(--accent-dim)";
+
+  // RSI Styling
+  const rsi = predictionData?.rsi || 50;
+  const rsiLabel = rsi >= 70 ? "Overbought" : rsi <= 30 ? "Oversold" : "Neutral";
+  const rsiColor = rsi >= 70 ? "var(--red)" : rsi <= 30 ? "var(--green)" : "var(--accent)";
+
+  // MACD styling
+  const macd = predictionData?.macd || 0;
+  const macdLabel = macd > 0 ? "Bullish Crossover" : macd < 0 ? "Bearish Divergence" : "Neutral";
+  const macdColor = macd > 0 ? "var(--green)" : macd < 0 ? "var(--red)" : "var(--text-muted)";
+
+  // ADX strength rating
+  const adxVal = indicators.adx?.adx || 0;
+  const adxLabel = adxVal >= 50 ? "Very Strong Trend" : adxVal >= 25 ? "Strong Trend" : adxVal >= 20 ? "Developing Trend" : "Weak/No Trend";
+  const adxColor = adxVal >= 25 ? "var(--green)" : adxVal >= 20 ? "var(--gold)" : "var(--text-muted)";
+
+  // News sentiment
+  const newsSentiment = predictionData?.news_sentiment || 50;
+  const newsImpact = predictionData?.news_impact || "neutral";
+  const newsCount = predictionData?.news_count || 0;
+  const sentimentColor = newsSentiment > 55 ? "var(--green)" : newsSentiment < 45 ? "var(--red)" : "var(--accent)";
 
   return (
     <>
       <Head>
-        <title>{symbol} — Invexo</title>
-        <meta name="description" content={`Real-time price, AI predictions and analysis for ${symbol} stock.`} />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        <title>{cleanSymbol} Analysis — Invexo</title>
+        <meta name="description" content={`Real-time AI prediction, chart, technical indicators and fundamentals for ${companyName} (${cleanSymbol}).`} />
       </Head>
 
-      <div style={{ minHeight: "100vh" }}>
+      <div style={{ minHeight: "100vh", background: "var(--bg-primary)" }}>
         <Navbar />
 
-        <div style={{ maxWidth: "1300px", margin: "0 auto", padding: "clamp(20px, 4vmin, 32px) clamp(12px, 3vmin, 24px) clamp(40px, 8vmin, 80px)" }}>
-
-          {/* ── Header ─────────────────────────────────────────────── */}
-          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "16px", marginBottom: "32px", animation: "fadeInUp 0.5s ease forwards" }}>
+        <div className="page-wrapper" style={{ display: "flex", flexDirection: "column", gap: "var(--section-gap)" }}>
+          
+          {/* Navigation and Title Row */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px", animation: "fadeInUp 0.5s ease" }}>
             <div>
-              <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" }}>
-                <button
-                  onClick={() => router.back()}
-                  style={{
-                    background: "var(--bg-card)",
-                    border: "1px solid var(--border-medium)",
-                    borderRadius: "10px",
-                    padding: "6px 12px",
-                    cursor: "pointer",
-                    color: "var(--text-muted)",
-                    fontSize: "0.8rem",
-                    fontFamily: "inherit",
-                    transition: "all 0.2s",
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.color = "var(--text-primary)"; e.currentTarget.style.borderColor = "var(--accent-glow)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.color = "var(--text-muted)"; e.currentTarget.style.borderColor = "var(--border-medium)"; }}
-                >
-                  ← Back
-                </button>
-                <p style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--text-muted)", letterSpacing: "0.08em", textTransform: "uppercase" }}>NSE · India</p>
-              </div>
-
-              <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "4px" }}>
-                {logoUrl ? (
-                  <img
-                    src={logoUrl}
-                    alt={`${companyName} logo`}
-                    onError={() => setLogoError(true)}
-                    style={{
-                      width: "56px",
-                      height: "56px",
-                      borderRadius: "14px",
-                      border: "1px solid var(--border-medium)",
-                      background: "#fff",
-                      objectFit: "contain",
-                      padding: "4px",
-                      flexShrink: 0,
-                    }}
-                  />
-                ) : (
-                  <div
-                    style={{
-                      width: "56px",
-                      height: "56px",
-                      borderRadius: "14px",
-                      background: "var(--accent-dim)",
-                      border: "1px solid var(--accent-glow)",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: "1.5rem",
-                      fontWeight: 800,
-                      color: "var(--accent)",
-                      fontFamily: "'Space Grotesk', sans-serif",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {normalizedSymbol ? normalizedSymbol.substring(0, 2).toUpperCase() : "??"}
-                  </div>
-                )}
-                <div>
-                  <h1
-                    style={{
-                      fontFamily: "'Space Grotesk', sans-serif",
-                      fontSize: "clamp(2rem, 5vmin, 3.5rem)",
-                      fontWeight: 900,
-                      letterSpacing: "-0.04em",
-                      background: "linear-gradient(90deg, var(--accent) 0%, var(--purple) 100%)",
-                      WebkitBackgroundClip: "text",
-                      WebkitTextFillColor: "transparent",
-                      backgroundClip: "text",
-                      margin: 0,
-                      lineHeight: "1.1",
-                    }}
-                  >
-                    {companyName}
-                  </h1>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "4px" }}>
-                    <p style={{ color: "var(--accent)", fontWeight: 700, fontSize: "1.1rem", margin: 0 }}>
-                      NSE: {normalizedSymbol}
-                    </p>
-                    <button
-                      onClick={toggleWatchlist}
-                      disabled={watchlistLoading}
-                      style={{
-                        background: "var(--bg-card)",
-                        border: "1px solid var(--border-medium)",
-                        borderRadius: "8px",
-                        padding: "4px 8px",
-                        cursor: "pointer",
-                        color: isWatched ? "var(--gold)" : "var(--text-muted)",
-                        fontSize: "0.8rem",
-                        fontWeight: 700,
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: "4px",
-                        transition: "all 0.2s",
-                      }}
-                      title={isWatched ? "Remove from Watchlist" : "Add to Watchlist"}
-                    >
-                      {isWatched ? "★ Watched" : "☆ Watch"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
-                Real-time price · AI predictions · Market analysis
-              </p>
+              <Link href="/" className="btn-ghost" style={{ padding: "8px 16px", borderRadius: "10px", fontSize: "0.82rem", display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                <span>&larr;</span> Back to Dashboard
+              </Link>
             </div>
 
-            {/* Live price badge */}
-            {hasPrice && (
-              <div style={{
-                background: "var(--bg-card)",
-                border: "1px solid var(--border-medium)",
-                borderRadius: "18px",
-                padding: "20px 24px",
-                textAlign: "right",
-                backdropFilter: "blur(16px)",
-                boxShadow: "var(--shadow-card)",
-              }}>
-                <p style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "6px" }}>Current Price</p>
-                <p style={{ fontSize: "2rem", fontWeight: 900, color: "var(--text-primary)", fontFamily: "'Space Grotesk', sans-serif", letterSpacing: "-0.03em", marginBottom: "4px" }}>
-                  ₹{pred.current_price}
-                </p>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", justifyContent: "flex-end" }}>
-                  <span style={{ fontSize: "0.9rem", fontWeight: 700, color: isPredUp ? "var(--green)" : "var(--red)" }}>
-                    {isPredUp ? "\u25B2 +" : "\u25BC "}{pred.change} ({pred.percent_change}%)
-                  </span>
-                  <span style={{
-                    padding: "2px 8px",
-                    borderRadius: "20px",
-                    background: neutral ? "var(--accent-dim)" : bull ? "var(--green-dim)" : "var(--red-dim)",
-                    color: neutral ? "var(--accent)" : bull ? "var(--green)" : "var(--red)",
-                    fontSize: "0.7rem",
-                    fontWeight: 800,
-                    border: `1px solid ${neutral ? "var(--accent-glow)" : bull ? "var(--green-dim)" : "var(--red-dim)"}`,
-                  }}>
-                    {neutral ? "NEUTRAL" : bull ? "BULLISH" : "BEARISH"}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* ── Chart Controls (Period + Chart Type Switcher) ───────── */}
-          <div style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: "16px",
-            flexWrap: "wrap",
-            gap: "12px",
-            animation: "fadeInUp 0.5s 0.1s ease both",
-          }}>
-            {/* Period selector */}
-            <div style={{
-              display: "flex",
-              gap: "4px",
-              background: "var(--filter-tab-bg)",
-              border: "1px solid var(--filter-tab-border)",
-              borderRadius: "12px",
-              padding: "4px",
-              width: "fit-content",
-              maxWidth: "100%",
-              overflowX: "auto",
-              WebkitOverflowScrolling: "touch",
-            }}>
-              {PERIODS.map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => setPeriod(key)}
-                  style={{
-                    padding: "7px 14px",
-                    borderRadius: "9px",
-                    border: "none",
-                    cursor: "pointer",
-                    fontFamily: "inherit",
-                    fontWeight: 700,
-                    fontSize: "0.8rem",
-                    transition: "all 0.2s",
-                    background: period === key ? "var(--accent-dim)" : "transparent",
-                    color: period === key ? "var(--accent)" : "var(--filter-tab-inactive)",
-                    boxShadow: period === key ? "0 2px 8px var(--shadow-card)" : "none",
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            {/* Chart Type Selector + Zoom Controls (positioned next to each other) */}
-            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-              <div style={{
-                display: "flex",
-                background: "var(--filter-tab-bg)",
-                border: "1px solid var(--filter-tab-border)",
-                borderRadius: "12px",
-                padding: "4px",
-              }}>
-                <button
-                  onClick={() => setChartType("line")}
-                  style={{
-                    padding: "7px 14px",
-                    borderRadius: "9px",
-                    border: "none",
-                    cursor: "pointer",
-                    fontSize: "0.8rem",
-                    fontWeight: 700,
-                    background: chartType === "line" ? "var(--accent-dim)" : "transparent",
-                    color: chartType === "line" ? "var(--accent)" : "var(--filter-tab-inactive)",
-                    transition: "all 0.2s",
-                    fontFamily: "inherit",
-                  }}
-                >
-                  Line
-                </button>
-                <button
-                  onClick={() => setChartType("candle")}
-                  style={{
-                    padding: "7px 14px",
-                    borderRadius: "9px",
-                    border: "none",
-                    cursor: "pointer",
-                    fontSize: "0.8rem",
-                    fontWeight: 700,
-                    background: chartType === "candle" ? "var(--accent-dim)" : "transparent",
-                    color: chartType === "candle" ? "var(--accent)" : "var(--filter-tab-inactive)",
-                    transition: "all 0.2s",
-                    fontFamily: "inherit",
-                  }}
-                >
-                  Candle
-                </button>
-              </div>
-
-              {chartType === "candle" && (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
                 <div style={{
-                  display: "flex",
-                  gap: "4px",
-                  background: "var(--filter-tab-bg)",
-                  border: "1px solid var(--filter-tab-border)",
-                  borderRadius: "12px",
-                  padding: "4px",
-                  animation: "fadeIn 0.2s ease-in-out",
-                }}>
-                  <button
-                    onClick={() => {
-                      console.log("StockPage + button clicked. zoomRef:", zoomRef);
-                      console.log("StockPage + button zoomRef.current:", zoomRef.current);
-                      zoomRef.current?.zoomIn();
-                    }}
-                    title="Zoom In"
-                    style={{
-                      padding: "7px 12px",
-                      borderRadius: "9px",
-                      border: "none",
-                      cursor: "pointer",
-                      fontSize: "0.8rem",
-                      fontWeight: 700,
-                      background: "transparent",
-                      color: "var(--filter-tab-inactive)",
-                      transition: "all 0.2s",
-                      fontFamily: "inherit",
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.background = "var(--accent-dim)";
-                      e.currentTarget.style.color = "var(--accent)";
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = "transparent";
-                      e.currentTarget.style.color = "var(--filter-tab-inactive)";
-                    }}
-                  >
-                    +
-                  </button>
-                  <button
-                    onClick={() => {
-                      console.log("StockPage - button clicked. zoomRef:", zoomRef);
-                      console.log("StockPage - button zoomRef.current:", zoomRef.current);
-                      zoomRef.current?.zoomOut();
-                    }}
-                    title="Zoom Out"
-                    style={{
-                      padding: "7px 12px",
-                      borderRadius: "9px",
-                      border: "none",
-                      cursor: "pointer",
-                      fontSize: "0.8rem",
-                      fontWeight: 700,
-                      background: "transparent",
-                      color: "var(--filter-tab-inactive)",
-                      transition: "all 0.2s",
-                      fontFamily: "inherit",
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.background = "var(--accent-dim)";
-                      e.currentTarget.style.color = "var(--accent)";
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.background = "transparent";
-                      e.currentTarget.style.color = "var(--filter-tab-inactive)";
-                    }}
-                  >
-                    −
-                  </button>
-                  {isZoomed && (
-                    <>
-                      <span style={{
-                        padding: "7px 4px",
-                        fontSize: "0.75rem",
-                        fontWeight: 700,
-                        color: "var(--accent)",
-                        fontFamily: "inherit",
-                        display: "flex",
-                        alignItems: "center"
-                      }}>
-                        {zoomPercent}%
-                      </span>
-                      <button
-                        onClick={() => {
-                          console.log("StockPage reset button clicked. zoomRef:", zoomRef);
-                          console.log("StockPage reset button zoomRef.current:", zoomRef.current);
-                          zoomRef.current?.reset();
-                        }}
-                        title="Reset View"
-                        style={{
-                          padding: "7px 12px",
-                          borderRadius: "9px",
-                          border: "none",
-                          cursor: "pointer",
-                          fontSize: "0.75rem",
-                          fontWeight: 700,
-                          background: "transparent",
-                          color: "var(--filter-tab-inactive)",
-                          transition: "all 0.2s",
-                          fontFamily: "inherit",
-                        }}
-                        onMouseEnter={e => {
-                          e.currentTarget.style.background = "var(--accent-dim)";
-                          e.currentTarget.style.color = "var(--accent)";
-                        }}
-                        onMouseLeave={e => {
-                          e.currentTarget.style.background = "transparent";
-                          e.currentTarget.style.color = "var(--filter-tab-inactive)";
-                        }}
-                      >
-                        ↺
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
-
-              {/* Fullscreen toggle */}
-              <button
-                onClick={() => setIsFullscreen(prev => !prev)}
-                title={isFullscreen ? "Exit Fullscreen" : "Fullscreen"}
-                style={{
-                  padding: "7px 12px",
-                  borderRadius: "9px",
-                  border: "none",
-                  cursor: "pointer",
-                  fontSize: "0.85rem",
-                  fontWeight: 700,
-                  background: isFullscreen ? "var(--accent-dim)" : "var(--filter-tab-bg)",
-                  color: isFullscreen ? "var(--accent)" : "var(--filter-tab-inactive)",
-                  border: `1px solid ${isFullscreen ? "var(--accent-glow)" : "var(--filter-tab-border)"}`,
-                  borderRadius: "12px",
-                  transition: "all 0.2s",
-                  fontFamily: "inherit",
+                  width: "48px",
+                  height: "48px",
+                  borderRadius: "10px",
+                  background: "var(--accent-dim)",
+                  border: "1px solid var(--accent-glow)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.background = "var(--accent-dim)";
-                  e.currentTarget.style.color = "var(--accent)";
-                }}
-                onMouseLeave={e => {
-                  if (!isFullscreen) {
-                    e.currentTarget.style.background = "var(--filter-tab-bg)";
-                    e.currentTarget.style.color = "var(--filter-tab-inactive)";
-                  }
-                }}
-              >
-                {isFullscreen ? "✕" : "⛶"}
-              </button>
+                  fontSize: "1.3rem",
+                  fontWeight: 800,
+                  color: "var(--accent)",
+                  fontFamily: "'Space Grotesk', sans-serif"
+                }}>
+                  {cleanSymbol.substring(0, 2)}
+                </div>
+                <div>
+                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                    <h1 style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: "clamp(1.5rem, 3.5vw, 2.2rem)", fontWeight: 800, margin: 0, color: "var(--text-primary)", letterSpacing: "-0.02em" }}>
+                      {companyName}
+                    </h1>
+                    <button
+                      onClick={toggleWatchlist}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        cursor: "pointer",
+                        fontSize: "1.4rem",
+                        color: isWatched ? "var(--gold)" : "var(--text-muted)",
+                        transition: "color 0.2s",
+                        padding: "4px"
+                      }}
+                      title={isWatched ? "Remove from watchlist" : "Add to watchlist"}
+                    >
+                      {isWatched ? "★" : "☆"}
+                    </button>
+                  </div>
+                  <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", fontWeight: 500, margin: "2px 0 0 0" }}>
+                    NSE: {cleanSymbol} · Real-time Analytics
+                  </p>
+                </div>
+              </div>
+
+              {/* Price Details */}
+              <div style={{ textAlign: "right" }}>
+                <div style={{ fontSize: "clamp(1.6rem, 4vw, 2.4rem)", fontWeight: 900, fontFamily: "Space Grotesk, sans-serif", color: "var(--text-primary)", letterSpacing: "-0.02em" }}>
+                  ₹{currentPrice.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                </div>
+                <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", alignItems: "center", marginTop: "4px" }}>
+                  <span style={{
+                    padding: "3px 8px",
+                    borderRadius: "20px",
+                    fontSize: "0.75rem",
+                    fontWeight: 700,
+                    background: isPositive ? "var(--green-dim)" : "var(--red-dim)",
+                    color: isPositive ? "var(--green)" : "var(--red)",
+                  }}>
+                    {isPositive ? "\u25B2" : "\u25BC"} {isPositive ? "+" : ""}{change.toFixed(2)} ({isPositive ? "+" : ""}{percentChange.toFixed(2)}%)
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* ── Chart ──────────────────────────────────────────────── */}
-          {isFullscreen && (
-            <div
-              style={{
-                position: "fixed",
-                top: 0,
-                left: 0,
-                width: "100vw",
-                height: "100vh",
-                zIndex: 9999,
-                background: "var(--bg-primary)",
-                display: "flex",
-                flexDirection: "column",
-                animation: "fadeIn 0.2s ease",
-              }}
-            >
-              {/* Fullscreen header */}
+          {/* Candlestick Chart Area */}
+          <div className="glass" style={{ padding: "var(--card-padding)", animation: "fadeInUp 0.5s 0.05s ease both" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", flexWrap: "wrap", gap: "10px" }}>
+              <h2 style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: "1.1rem", fontWeight: 700, margin: 0 }}>
+                Price History & Charting
+              </h2>
+              
+              {/* Chart Period Selector */}
               <div style={{
                 display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                padding: "12px 20px",
-                borderBottom: "1px solid var(--border-subtle)",
-                background: "var(--bg-card)",
-                backdropFilter: "blur(16px)",
-                flexShrink: 0,
-                flexWrap: "wrap",
-                gap: "12px"
+                gap: "4px",
+                background: "var(--filter-tab-bg)",
+                border: "1px solid var(--filter-tab-border)",
+                borderRadius: "10px",
+                padding: "3px",
               }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap", maxWidth: "100%" }}>
-                  <span style={{ color: "var(--text-primary)", fontWeight: 800, fontSize: "1rem", fontFamily: "'Space Grotesk', sans-serif", whiteSpace: "nowrap" }}>
-                    {companyName} · {normalizedSymbol}
-                  </span>
-                  <div style={{
-                    display: "flex",
-                    gap: "4px",
-                    background: "var(--filter-tab-bg)",
-                    border: "1px solid var(--filter-tab-border)",
-                    borderRadius: "10px",
-                    padding: "2px",
-                    overflowX: "auto",
-                    WebkitOverflowScrolling: "touch",
-                    maxWidth: "100%",
-                  }}>
-                    {PERIODS.map(({ key, label }) => (
-                      <button
-                        key={key}
-                        onClick={() => setPeriod(key)}
-                        style={{
-                          padding: "5px 10px",
-                          borderRadius: "7px",
-                          border: "none",
-                          cursor: "pointer",
-                          fontFamily: "inherit",
-                          fontWeight: 700,
-                          fontSize: "0.7rem",
-                          transition: "all 0.2s",
-                          background: period === key ? "var(--accent-dim)" : "transparent",
-                          color: period === key ? "var(--accent)" : "var(--filter-tab-inactive)",
-                          flexShrink: 0,
-                        }}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Chart Type Switcher inside fullscreen header */}
-                  <div style={{
-                    display: "flex",
-                    background: "var(--filter-tab-bg)",
-                    border: "1px solid var(--filter-tab-border)",
-                    borderRadius: "10px",
-                    padding: "2px",
-                    flexShrink: 0,
-                  }}>
-                    <button
-                      onClick={() => setChartType("line")}
-                      style={{
-                        padding: "5px 10px",
-                        borderRadius: "7px",
-                        border: "none",
-                        cursor: "pointer",
-                        fontSize: "0.7rem",
-                        fontWeight: 700,
-                        background: chartType === "line" ? "var(--accent-dim)" : "transparent",
-                        color: chartType === "line" ? "var(--accent)" : "var(--filter-tab-inactive)",
-                        transition: "all 0.2s",
-                        fontFamily: "inherit",
-                      }}
-                    >
-                      Line
-                    </button>
-                    <button
-                      onClick={() => setChartType("candle")}
-                      style={{
-                        padding: "5px 10px",
-                        borderRadius: "7px",
-                        border: "none",
-                        cursor: "pointer",
-                        fontSize: "0.7rem",
-                        fontWeight: 700,
-                        background: chartType === "candle" ? "var(--accent-dim)" : "transparent",
-                        color: chartType === "candle" ? "var(--accent)" : "var(--filter-tab-inactive)",
-                        transition: "all 0.2s",
-                        fontFamily: "inherit",
-                      }}
-                    >
-                      Candle
-                    </button>
-                  </div>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                  {chartType === "candle" && (
-                    <div style={{
-                      display: "flex",
-                      gap: "2px",
-                      background: "var(--filter-tab-bg)",
-                      border: "1px solid var(--filter-tab-border)",
-                      borderRadius: "10px",
-                      padding: "2px",
-                      flexShrink: 0,
-                    }}>
-                      <button onClick={() => zoomRef.current?.zoomIn()} title="Zoom In" style={{ padding: "5px 10px", borderRadius: "7px", border: "none", cursor: "pointer", fontSize: "0.75rem", fontWeight: 700, background: "transparent", color: "var(--filter-tab-inactive)", transition: "all 0.2s", fontFamily: "inherit" }}>+</button>
-                      <button onClick={() => zoomRef.current?.zoomOut()} title="Zoom Out" style={{ padding: "5px 10px", borderRadius: "7px", border: "none", cursor: "pointer", fontSize: "0.75rem", fontWeight: 700, background: "transparent", color: "var(--filter-tab-inactive)", transition: "all 0.2s", fontFamily: "inherit" }}>−</button>
-                      {isZoomed && (
-                        <>
-                          <span style={{
-                            padding: "5px 4px",
-                            fontSize: "0.7rem",
-                            fontWeight: 700,
-                            color: "var(--accent)",
-                            fontFamily: "inherit",
-                            display: "flex",
-                            alignItems: "center"
-                          }}>
-                            {zoomPercent}%
-                          </span>
-                          <button onClick={() => zoomRef.current?.reset()} title="Reset View" style={{ padding: "5px 10px", borderRadius: "7px", border: "none", cursor: "pointer", fontSize: "0.65rem", fontWeight: 700, background: "transparent", color: "var(--filter-tab-inactive)", transition: "all 0.2s", fontFamily: "inherit" }}>↺</button>
-                        </>
-                      )}
-                    </div>
-                  )}
+                {[
+                  { key: "1d", label: "1D" },
+                  { key: "1w", label: "1W" },
+                  { key: "1m", label: "1M" },
+                  { key: "3m", label: "3M" },
+                  { key: "6m", label: "6M" },
+                  { key: "1y", label: "1Y" },
+                ].map(({ key, label }) => (
                   <button
-                    onClick={() => setIsFullscreen(false)}
-                    title="Exit Fullscreen (Esc)"
+                    key={key}
+                    onClick={() => setChartPeriod(key)}
                     style={{
-                      padding: "5px 14px",
-                      borderRadius: "10px",
-                      border: "1px solid var(--red-dim)",
+                      padding: "5px 12px",
+                      borderRadius: "7px",
+                      border: "none",
                       cursor: "pointer",
-                      fontSize: "0.8rem",
-                      fontWeight: 700,
-                      background: "var(--red-dim)",
-                      color: "var(--red)",
-                      transition: "all 0.2s",
                       fontFamily: "inherit",
-                      flexShrink: 0,
+                      fontWeight: 700,
+                      fontSize: "0.75rem",
+                      background: chartPeriod === key ? "var(--accent-dim)" : "transparent",
+                      color: chartPeriod === key ? "var(--accent)" : "var(--filter-tab-inactive)",
+                      transition: "all 0.2s",
                     }}
                   >
-                    ✕ Exit
+                    {label}
                   </button>
-                </div>
-              </div>
-              {/* Fullscreen chart body */}
-              <div style={{ flex: 1, padding: "12px", minHeight: 0, position: "relative" }}>
-                {loading && (
-                  <div style={{
-                    position: "absolute",
-                    inset: 0,
-                    background: "rgba(8, 12, 26, 0.4)",
-                    backdropFilter: "blur(4px)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    flexDirection: "column",
-                    gap: "12px",
-                    zIndex: 10,
-                    borderRadius: "8px",
-                  }}>
-                    <div className="spinner" style={{ width: "36px", height: "36px" }} />
-                    <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", fontWeight: 600 }}>Updating chart...</p>
-                  </div>
-                )}
-                <RealChart
-                  data={history}
-                  chartType={chartType}
-                  setChartType={setChartType}
-                  zoomRef={zoomRef}
-                  onZoomStateChange={handleZoomStateChange}
-                />
-              </div>
-            </div>
-          )}
-
-          <div style={{ marginBottom: "24px", animation: "fadeInUp 0.5s 0.15s ease both" }}>
-            {loading ? (
-              <div style={{
-                background: "var(--bg-card)",
-                border: "1px solid var(--border-subtle)",
-                borderRadius: "clamp(14px, 2vw, 20px)",
-                height: "clamp(250px, 40vw, 400px)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexDirection: "column",
-                gap: "16px",
-              }}>
-                <div className="spinner" style={{ width: "36px", height: "36px" }} />
-                <p style={{ color: "var(--text-muted)", fontSize: "0.875rem" }}>Loading chart data…</p>
-              </div>
-            ) : history.length > 0 ? (
-              <div
-                className="chart-container-responsive"
-                style={{
-                  background: "var(--bg-card)",
-                  border: "1px solid var(--border-subtle)",
-                  borderRadius: "clamp(14px, 2vmin, 20px)",
-                  padding: "clamp(14px, 3vmin, 24px)",
-                  height: "clamp(250px, 40vmin, 400px)",
-                  backdropFilter: "blur(16px)",
-                  boxShadow: "var(--shadow-card)",
-                }}
-              >
-                <RealChart
-                  data={history}
-                  chartType={chartType}
-                  setChartType={setChartType}
-                  zoomRef={zoomRef}
-                  onZoomStateChange={handleZoomStateChange}
-                />
-              </div>
-            ) : (
-              <div style={{
-                background: "var(--bg-card)",
-                border: "1px solid var(--red-dim)",
-                borderRadius: "20px",
-                padding: "60px 24px",
-                textAlign: "center",
-              }}>
-                <p style={{ fontSize: "2rem", marginBottom: "12px" }}>📉</p>
-                <p style={{ color: "var(--red)", fontSize: "1rem" }}>No chart data available for this period</p>
-              </div>
-            )}
-          </div>
-
-          {/* ── AI Prediction ───────────────────────────────────────── */}
-          {!prediction && !error ? (
-            <div style={{
-              background: "var(--bg-card)",
-              border: "1px solid var(--border-subtle)",
-              borderRadius: "20px",
-              padding: "28px",
-              marginBottom: "24px",
-              backdropFilter: "blur(16px)",
-              boxShadow: "var(--shadow-card)",
-            }}>
-              <div style={{ marginBottom: "24px" }}>
-                <div className="skeleton" style={{ width: "150px", height: "24px" }} />
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(140px, 100%), 1fr))", gap: "clamp(8px, 1.5vmin, 12px)" }}>
-                {Array.from({ length: 6 }).map((_, i) => (
-                  <div key={i} style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "14px", padding: "16px 18px", height: "80px" }}>
-                    <div className="skeleton" style={{ width: "50%", height: "10px", marginBottom: "12px" }} />
-                    <div className="skeleton" style={{ width: "80%", height: "18px" }} />
-                  </div>
                 ))}
               </div>
             </div>
-          ) : pred && pred.current_price ? (
-            <div style={{
-              background: "var(--bg-card)",
-              border: "1px solid var(--accent-glow)",
-              borderRadius: "20px",
-              padding: "28px",
-              marginBottom: "24px",
-              backdropFilter: "blur(16px)",
-              boxShadow: "var(--shadow-card)",
-              animation: "fadeInUp 0.5s 0.2s ease both",
-            }}>
-              <div style={{ marginBottom: "24px" }}>
-                <h2 style={{
-                  fontFamily: "'Space Grotesk', sans-serif",
-                  fontSize: "1.3rem",
-                  fontWeight: 800,
-                  background: "linear-gradient(90deg, var(--accent), var(--purple))",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                  margin: 0,
+
+            <div style={{ height: "420px", position: "relative" }}>
+              {chartLoading ? (
+                <div style={{
+                  position: "absolute",
+                  inset: 0,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "12px",
+                  background: "rgba(0,0,0,0.15)",
+                  borderRadius: "12px"
                 }}>
-                  AI Prediction
-                </h2>
-              </div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(140px, 100%), 1fr))", gap: "clamp(8px, 1.5vmin, 12px)" }}>
-                <InfoChip label="Current Price" value={`₹${pred.current_price}`} />
-                <InfoChip
-                  label="24h Change"
-                  value={`${isPredUp ? "\u25B2 +" : "\u25BC "}${pred.change}`}
-                  color={isPredUp ? "var(--green)" : "var(--red)"}
-                  sub={`${pred.percent_change}%`}
-                />
-                <InfoChip
-                  label="Predicted Price (5-7 Day Target)"
-                  value={`₹${pred.predicted_price}`}
-                  color={predDelta >= 0 ? "var(--green)" : "var(--red)"}
-                  sub={`${predDelta >= 0 ? "+" : ""}${predDelta.toFixed(2)} (${predDeltaPct}%)`}
-                />
-                <InfoChip
-                  label="Day Close (Prediction)"
-                  value={`₹${pred.day_close_prediction}`}
-                  color={pred.day_close_prediction - pred.current_price >= 0 ? "var(--green)" : "var(--red)"}
-                  sub={`Confidence: ${pred.day_close_confidence || pred.confidence}%`}
-                />
-                <InfoChip
-                  label="Trend"
-                  value={pred.trend}
-                  color={neutral ? "var(--accent)" : bull ? "var(--green)" : "var(--red)"}
-                />
-                <InfoChip
-                  label="Confidence"
-                  value={`${pred.confidence}%`}
-                  color={pred.confidence >= 70 ? "var(--green)" : pred.confidence >= 55 ? "var(--gold)" : "var(--red)"}
-                />
-                <InfoChip
-                  label="RSI"
-                  value={pred.rsi}
-                  color={pred.rsi < 35 ? "var(--accent)" : pred.rsi <= 65 ? "var(--green)" : "var(--red)"}
-                  sub={pred.rsi < 35 ? "Oversold" : pred.rsi > 65 ? "Overbought" : "Neutral"}
-                />
-              </div>
-            </div>
-          ) : null}
-
-          {/* ── Sentiment + Fundamentals ────────────────────────────── */}
-          {!prediction && !error ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))", gap: "clamp(12px, 2vmin, 16px)", marginBottom: "24px" }}>
-              <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "20px", padding: "24px", height: "240px" }}>
-                <div className="skeleton" style={{ width: "30%", height: "10px", marginBottom: "16px" }} />
-                <div className="skeleton" style={{ width: "50%", height: "20px", marginBottom: "24px" }} />
-                <div className="skeleton" style={{ width: "80%", height: "14px", marginBottom: "12px" }} />
-                <div className="skeleton" style={{ width: "100%", height: "8px" }} />
-              </div>
-              <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "20px", padding: "24px", height: "240px" }}>
-                <div className="skeleton" style={{ width: "30%", height: "10px", marginBottom: "16px" }} />
-                <div className="skeleton" style={{ width: "50%", height: "20px", marginBottom: "24px" }} />
-                <div className="skeleton" style={{ width: "80%", height: "14px", marginBottom: "12px" }} />
-                <div className="skeleton" style={{ width: "100%", height: "8px" }} />
-              </div>
-            </div>
-          ) : pred && (pred.news_sentiment !== undefined || pred.fundamental_score !== undefined) ? (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(280px, 100%), 1fr))", gap: "clamp(12px, 2vmin, 16px)", marginBottom: "24px", animation: "fadeInUp 0.5s 0.25s ease both" }}>
-
-              {/* News Sentiment */}
-              {pred.news_sentiment !== undefined && (
-                <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "20px", padding: "24px", backdropFilter: "blur(12px)", boxShadow: "var(--shadow-card)" }}>
-                  <p className="section-label">Analysis</p>
-                  <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: "1.2rem", fontWeight: 800, color: "var(--text-primary)", marginBottom: "20px" }}>News Sentiment</h2>
-
-                  <div style={{ marginBottom: "16px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "8px" }}>
-                      <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 600 }}>Sentiment Score</span>
-                      <span style={{
-                        fontSize: "1.8rem",
-                        fontWeight: 900,
-                        color: pred.news_sentiment > 60 ? "var(--green)" : pred.news_sentiment < 40 ? "var(--red)" : "var(--accent)",
-                        fontFamily: "'Space Grotesk', sans-serif",
-                      }}>
-                        {pred.news_sentiment.toFixed(1)}
-                        <span style={{ fontSize: "0.9rem", color: "var(--text-muted)", fontWeight: 600 }}>/100</span>
-                      </span>
-                    </div>
-                    <ScoreBar
-                      value={pred.news_sentiment}
-                      color={pred.news_sentiment > 60 ? "var(--green)" : pred.news_sentiment < 40 ? "var(--red)" : "var(--accent)"}
-                    />
-                  </div>
-
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <span style={{
-                      padding: "4px 12px",
-                      borderRadius: "20px",
-                      fontSize: "0.75rem",
-                      fontWeight: 800,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.05em",
-                      background: pred.news_impact === "bullish" ? "var(--green-dim)" : pred.news_impact === "bearish" ? "var(--red-dim)" : "var(--accent-dim)",
-                      color: pred.news_impact === "bullish" ? "var(--green)" : pred.news_impact === "bearish" ? "var(--red)" : "var(--accent)",
-                      border: `1px solid ${pred.news_impact === "bullish" ? "var(--green-dim)" : pred.news_impact === "bearish" ? "var(--red-dim)" : "var(--accent-glow)"}`,
-                    }}>
-                      {pred.news_impact}
-                    </span>
-                    <span style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
-                      {pred.sentiment_source === "news" ? `${pred.news_count} articles analyzed` : "Market momentum proxy"}
-                    </span>
-                  </div>
-
-                  <div style={{ marginTop: "16px", padding: "12px", background: "var(--accent-dim)", border: "1px solid var(--accent-glow)", borderRadius: "10px" }}>
-                    <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", lineHeight: 1.6 }}>
-                      ℹ️ News sentiment analysis improves prediction accuracy by ~15–20% by capturing market emotion shifts.
-                    </p>
-                  </div>
+                  <div className="spinner" />
+                  <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>Loading financial candlesticks...</p>
+                </div>
+              ) : chartHistory && chartHistory.length > 0 ? (
+                <RealChart data={chartHistory} />
+              ) : (
+                <div style={{
+                  height: "100%",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  border: "1px dashed var(--border-subtle)",
+                  borderRadius: "12px",
+                }}>
+                  <p style={{ color: "var(--text-muted)" }}>Chart unavailable for this period.</p>
                 </div>
               )}
+            </div>
+          </div>
 
-              {/* Fundamentals */}
-              {pred.fundamental_score !== undefined && (
-                <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "20px", padding: "24px", backdropFilter: "blur(12px)", boxShadow: "var(--shadow-card)" }}>
-                  <p className="section-label">Company Health</p>
-                  <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: "1.2rem", fontWeight: 800, color: "var(--text-primary)", marginBottom: "20px" }}>Fundamentals</h2>
+          {/* Grid Layout for Panels */}
+          <div style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(min(450px, 100%), 1fr))",
+            gap: "var(--section-gap)",
+            animation: "fadeInUp 0.5s 0.1s ease both"
+          }}>
+            
+            {/* PANEL 1: AI Prediction Panel */}
+            <div className="glass" style={{ padding: "var(--card-padding)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
+                <p className="section-label" style={{ margin: 0 }}>🤖 AI Prediction Model</p>
+                <span className="badge" style={{ background: trendBg, color: trendColor }}>
+                  {trend}
+                </span>
+              </div>
 
-                  <div style={{ marginBottom: "20px" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "8px" }}>
-                      <span style={{ fontSize: "0.75rem", color: "var(--text-muted)", fontWeight: 600 }}>Fundamental Score</span>
-                      <span style={{
-                        fontSize: "1.8rem",
-                        fontWeight: 900,
-                        color: pred.fundamental_score > 65 ? "var(--green)" : pred.fundamental_score < 35 ? "var(--red)" : "var(--accent)",
-                        fontFamily: "'Space Grotesk', sans-serif",
-                      }}>
-                        {pred.fundamental_score.toFixed(1)}
-                        <span style={{ fontSize: "0.9rem", color: "var(--text-muted)", fontWeight: 600 }}>/100</span>
-                      </span>
-                    </div>
-                    <ScoreBar
-                      value={pred.fundamental_score}
-                      color={pred.fundamental_score > 65 ? "var(--green)" : pred.fundamental_score < 35 ? "var(--red)" : "var(--accent)"}
-                    />
-                  </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
+                <div style={{ background: "var(--input-bg)", border: "1px solid var(--border-subtle)", padding: "12px 16px", borderRadius: "12px" }}>
+                  <p style={{ fontSize: "0.68rem", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.05em", marginBottom: "4px" }}>
+                    Current Price
+                  </p>
+                  <p style={{ fontSize: "1.3rem", fontWeight: 800, fontFamily: "Space Grotesk, sans-serif" }}>
+                    ₹{currentPrice.toFixed(2)}
+                  </p>
+                </div>
 
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(90px, 100%), 1fr))", gap: "10px", marginBottom: "16px" }}>
-                    {[
-                      { label: "PE Ratio", value: pred.pe_ratio != null ? pred.pe_ratio.toFixed(2) : "N/A", color: "var(--text-primary)" },
-                      { label: "Earnings Growth", value: pred.earnings_growth != null ? (pred.earnings_growth * 100).toFixed(1) + "%" : "N/A", color: pred.earnings_growth > 0 ? "var(--green)" : "var(--red)" },
-                      { label: "Revenue Growth", value: pred.revenue_growth != null ? (pred.revenue_growth * 100).toFixed(1) + "%" : "N/A", color: pred.revenue_growth > 0 ? "var(--green)" : "var(--red)" },
-                    ].map(({ label, value, color }) => (
-                      <div key={label} style={{ background: "var(--input-bg)", border: "1px solid var(--border-subtle)", borderRadius: "10px", padding: "12px" }}>
-                        <p style={{ fontSize: "0.65rem", color: "var(--text-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "6px" }}>{label}</p>
-                        <p style={{ fontSize: "1rem", fontWeight: 800, color, fontFamily: "'Space Grotesk', sans-serif" }}>{value}</p>
+                <div style={{ background: "var(--input-bg)", border: "1px solid var(--border-subtle)", padding: "12px 16px", borderRadius: "12px" }}>
+                  <p style={{ fontSize: "0.68rem", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.05em", marginBottom: "4px" }}>
+                    Predicted Price (5-7D Target)
+                  </p>
+                  <p style={{ fontSize: "1.3rem", fontWeight: 800, fontFamily: "Space Grotesk, sans-serif", color: predictionData?.predicted_price >= currentPrice ? "var(--green)" : "var(--red)" }}>
+                    ₹{predictionData?.predicted_price ? predictionData.predicted_price.toFixed(2) : "—"}
+                  </p>
+                </div>
+
+                <div style={{ background: "var(--input-bg)", border: "1px solid var(--border-subtle)", padding: "12px 16px", borderRadius: "12px" }}>
+                  <p style={{ fontSize: "0.68rem", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.05em", marginBottom: "4px" }}>
+                    XGBoost Prediction
+                  </p>
+                  <p style={{ fontSize: "1.3rem", fontWeight: 800, fontFamily: "Space Grotesk, sans-serif", color: predictionData?.xgb_predicted_price >= currentPrice ? "var(--green)" : "var(--red)" }}>
+                    {predictionData?.xgb_predicted_price ? `₹${predictionData.xgb_predicted_price.toFixed(2)}` : "Unavailable"}
+                  </p>
+                </div>
+
+                <div style={{ background: "var(--input-bg)", border: "1px solid var(--border-subtle)", padding: "12px 16px", borderRadius: "12px" }}>
+                  <p style={{ fontSize: "0.68rem", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.05em", marginBottom: "4px" }}>
+                    Model Confidence
+                  </p>
+                  <p style={{ fontSize: "1.3rem", fontWeight: 800, fontFamily: "Space Grotesk, sans-serif", color: predictionData?.confidence >= 70 ? "var(--green)" : predictionData?.confidence >= 55 ? "var(--gold)" : "var(--red)" }}>
+                    {predictionData?.confidence || 0}%
+                  </p>
+                </div>
+              </div>
+
+              {/* Explanatory summary text */}
+              {predictionData?.explanation?.summary && (
+                <div style={{ background: "var(--hover-overlay)", border: "1px solid var(--border-subtle)", borderRadius: "12px", padding: "14px" }}>
+                  <p style={{ fontSize: "0.85rem", color: "var(--text-secondary)", lineHeight: 1.5, margin: 0 }}>
+                    {predictionData.explanation.summary}
+                  </p>
+                  
+                  {/* SHAP values display */}
+                  {predictionData?.explanation?.shap_values && (
+                    <div style={{ marginTop: "12px", borderTop: "1px solid var(--border-subtle)", paddingTop: "10px" }}>
+                      <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px" }}>SHAP Driver Impacts</p>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
+                        {Object.entries(predictionData.explanation.shap_values).map(([feature, weight]) => {
+                          const isPos = weight >= 0;
+                          return (
+                            <span key={feature} style={{
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              background: "var(--bg-primary)",
+                              border: "1px solid var(--border-subtle)",
+                              borderRadius: "6px",
+                              padding: "4px 8px",
+                              fontSize: "0.72rem",
+                              fontWeight: 600,
+                              color: "var(--text-secondary)"
+                            }}>
+                              {feature}: <strong style={{ color: isPos ? "var(--green)" : "var(--red)" }}>{isPos ? "+" : ""}{weight.toFixed(2)}</strong>
+                            </span>
+                          );
+                        })}
                       </div>
-                    ))}
-                  </div>
-
-                  <div style={{ padding: "12px", background: "var(--accent-dim)", border: "1px solid var(--accent-glow)", borderRadius: "10px" }}>
-                    <p style={{ fontSize: "0.75rem", color: "var(--text-secondary)", lineHeight: 1.6 }}>
-                      ℹ️ Strong fundamentals with positive sentiment indicate long-term bullish potential.
-                    </p>
-                  </div>
+                    </div>
+                  )}
                 </div>
               )}
+            </div>
 
-              {/* Smart Alerts Setter Card */}
-              <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "20px", padding: "24px", backdropFilter: "blur(12px)", boxShadow: "var(--shadow-card)", display: "flex", flexDirection: "column", gap: "12px" }}>
-                <p className="section-label">Price Triggers</p>
-                <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: "1.2rem", fontWeight: 800, color: "var(--text-primary)", margin: 0 }}>Smart Alerts</h2>
-                
-                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                    <span style={{ fontSize: "0.82rem", color: "var(--text-secondary)" }}>Alert when price goes</span>
-                    <select
-                      value={alertCondition}
-                      onChange={(e) => setAlertCondition(e.target.value)}
-                      style={{
-                        background: "var(--bg-secondary)",
-                        color: "var(--text-primary)",
-                        border: "1px solid var(--border-medium)",
-                        borderRadius: "8px",
-                        padding: "6px 10px",
-                        fontSize: "0.8rem",
-                        fontWeight: 600,
-                      }}
-                    >
-                      <option value="above">Above</option>
-                      <option value="below">Below</option>
-                    </select>
+            {/* PANEL 2: Technical Indicators Panel */}
+            <div className="glass" style={{ padding: "var(--card-padding)" }}>
+              <p className="section-label" style={{ marginBottom: "18px" }}>📊 Technical Indicators</p>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                {/* RSI Gauge */}
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                    <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--text-secondary)" }}>Relative Strength Index (RSI-14)</span>
+                    <span style={{ fontSize: "0.78rem", fontWeight: 800, color: rsiColor }}>{rsi.toFixed(1)} ({rsiLabel})</span>
                   </div>
-                  <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                    <div style={{ position: "relative", display: "flex", alignItems: "center", flex: 1 }}>
-                      <span style={{ position: "absolute", left: "10px", fontSize: "0.82rem", color: "var(--text-muted)" }}>₹</span>
-                      <input
-                        type="number"
-                        step="any"
-                        value={alertTargetPrice}
-                        onChange={(e) => setAlertTargetPrice(e.target.value)}
-                        style={{
-                          background: "var(--bg-secondary)",
-                          color: "var(--text-primary)",
-                          border: "1px solid var(--border-medium)",
-                          borderRadius: "8px",
-                          padding: "6px 10px 6px 22px",
-                          fontSize: "0.8rem",
-                          fontWeight: 600,
-                          width: "100%",
-                        }}
-                      />
-                    </div>
-                    <button
-                      onClick={handleCreateAlert}
-                      className="btn-primary"
-                      style={{ padding: "6px 16px", fontSize: "0.8rem", color: "var(--bg-primary)" }}
-                    >
-                      Set Alert
-                    </button>
+                  <div style={{ height: "8px", background: "var(--border-subtle)", borderRadius: "4px", position: "relative" }}>
+                    {/* Zones markings */}
+                    <div style={{ position: "absolute", left: "30%", top: 0, bottom: 0, width: "1px", background: "var(--border-medium)" }} title="Oversold limit (30)" />
+                    <div style={{ position: "absolute", left: "70%", top: 0, bottom: 0, width: "1px", background: "var(--border-medium)" }} title="Overbought limit (70)" />
+                    {/* Fill */}
+                    <div style={{
+                      position: "absolute",
+                      left: 0,
+                      width: `${rsi}%`,
+                      height: "100%",
+                      background: `linear-gradient(90deg, var(--green) 0%, var(--accent) 50%, var(--red) 100%)`,
+                      borderRadius: "4px",
+                      opacity: 0.8
+                    }} />
+                    {/* Handle indicator */}
+                    <div style={{
+                      position: "absolute",
+                      left: `calc(${rsi}% - 5px)`,
+                      top: "-3px",
+                      width: "10px",
+                      height: "14px",
+                      background: "#fff",
+                      borderRadius: "2px",
+                      boxShadow: "0 2px 6px rgba(0,0,0,0.5)"
+                    }} />
                   </div>
                 </div>
 
-                {/* Active Alerts for this Ticker */}
-                {alerts.filter(a => a.symbol === normalizedSymbol.toUpperCase() && a.is_active).length > 0 ? (
-                  <div style={{ marginTop: "8px", borderTop: "1px solid var(--border-subtle)", paddingTop: "8px" }}>
-                    <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontWeight: 600, margin: "0 0 8px 0" }}>Active Alerts:</p>
-                    <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>
-                      {alerts.filter(a => a.symbol === normalizedSymbol.toUpperCase() && a.is_active).map(a => (
-                        <div key={a.id} style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          background: "var(--bg-secondary)",
-                          border: "1px solid var(--border-subtle)",
-                          borderRadius: "8px",
-                          padding: "6px 10px",
-                          fontSize: "0.75rem",
-                          fontWeight: 600,
-                          color: "var(--text-primary)"
-                        }}>
-                          <span>Price {a.condition.toUpperCase()} ₹{a.target_price}</span>
-                          <button
-                            onClick={() => handleDeleteAlert(a.id)}
-                            style={{
-                              background: "transparent",
-                              border: "none",
-                              color: "var(--red)",
-                              cursor: "pointer",
-                              fontSize: "0.75rem",
-                              padding: "2px 4px",
-                            }}
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      ))}
+                {/* MACD Histogram */}
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                    <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--text-secondary)" }}>MACD Histogram / Diff</span>
+                    <span style={{ fontSize: "0.78rem", fontWeight: 800, color: macdColor }}>{macd.toFixed(4)} ({macdLabel})</span>
+                  </div>
+                  <div style={{ display: "flex", gap: "2px", height: "14px", alignItems: "center" }}>
+                    {/* Simulated visual bar */}
+                    <div style={{ flex: 1, height: "4px", background: macd < 0 ? "var(--red)" : "var(--border-subtle)", borderRadius: "2px", opacity: 0.7 }} />
+                    <div style={{ width: "2px", height: "100%", background: "var(--text-muted)" }} />
+                    <div style={{ flex: 1, height: "4px", background: macd > 0 ? "var(--green)" : "var(--border-subtle)", borderRadius: "2px", opacity: 0.7 }} />
+                  </div>
+                </div>
+
+                {/* Bollinger Bands Position Indicator */}
+                {indicators.bollinger ? (
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                      <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--text-secondary)" }}>Bollinger Bands Position</span>
+                      <span style={{ fontSize: "0.78rem", fontWeight: 800, color: "var(--accent)" }}>{indicators.bollinger.percent.toFixed(1)}% of Band width</span>
+                    </div>
+                    {/* Bands Slider */}
+                    <div style={{ height: "6px", background: "var(--border-subtle)", borderRadius: "3px", position: "relative", margin: "10px 0" }}>
+                      <div style={{ position: "absolute", left: `calc(${Math.max(0, Math.min(100, indicators.bollinger.percent))}% - 4px)`, top: "-4px", width: "8px", height: "14px", borderRadius: "3px", background: "var(--accent)", boxShadow: "0 0 8px var(--accent)" }} />
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.68rem", color: "var(--text-muted)" }}>
+                      <span>Lower: ₹{indicators.bollinger.lower.toFixed(1)}</span>
+                      <span>Middle: ₹{indicators.bollinger.middle.toFixed(1)}</span>
+                      <span>Upper: ₹{indicators.bollinger.upper.toFixed(1)}</span>
                     </div>
                   </div>
                 ) : (
-                  <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", margin: "8px 0 0 0", fontStyle: "italic" }}>
-                    No alerts set for this stock.
-                  </p>
+                  <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Computing Bollinger Bands from price series...</div>
+                )}
+
+                {/* ADX Strength Bar */}
+                {indicators.adx ? (
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                      <span style={{ fontSize: "0.78rem", fontWeight: 700, color: "var(--text-secondary)" }}>Trend Strength (ADX-14)</span>
+                      <span style={{ fontSize: "0.78rem", fontWeight: 800, color: adxColor }}>{adxVal.toFixed(1)} ({adxLabel})</span>
+                    </div>
+                    <div style={{ height: "8px", background: "var(--border-subtle)", borderRadius: "4px", overflow: "hidden" }}>
+                      <div style={{
+                        width: `${Math.min(100, (adxVal / 60) * 100)}%`, // Map 0-60 to 0-100% progress
+                        height: "100%",
+                        background: `linear-gradient(90deg, var(--accent) 0%, ${adxColor} 100%)`,
+                        borderRadius: "4px"
+                      }} />
+                    </div>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.68rem", color: "var(--text-muted)", marginTop: "4px" }}>
+                      <span>DI+: {indicators.adx.plusDI.toFixed(1)}</span>
+                      <span>DI-: {indicators.adx.minusDI.toFixed(1)}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ fontSize: "0.75rem", color: "var(--text-muted)" }}>Computing ADX index series...</div>
                 )}
               </div>
             </div>
-          ) : null}
 
-          {/* ── News ────────────────────────────────────────────────── */}
-          {news.length > 0 && (
-            <div style={{ animation: "fadeInUp 0.5s 0.3s ease both" }}>
-              <div style={{ marginBottom: "16px" }}>
-                <p className="section-label">Market News</p>
-                <h2 style={{
-                  fontFamily: "'Space Grotesk', sans-serif",
-                  fontSize: "1.4rem",
-                  fontWeight: 800,
-                  background: "linear-gradient(90deg, var(--accent), var(--purple))",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                }}>
-                  Latest News
-                </h2>
-              </div>
+            {/* PANEL 3: News Sentiment Panel */}
+            <div className="glass" style={{ padding: "var(--card-padding)" }}>
+              <p className="section-label" style={{ marginBottom: "18px" }}>📰 News & Public Sentiment</p>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-                {news.map((item, i) => (
-                  <a
-                    key={i}
-                    href={item.link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      display: "block",
-                      background: "var(--bg-card)",
-                      border: "1px solid var(--border-subtle)",
-                      borderRadius: "16px",
-                      padding: "18px 22px",
-                      textDecoration: "none",
-                      transition: "all 0.2s",
-                      boxShadow: "var(--shadow-card)",
-                    }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.borderColor = "var(--accent-glow)";
-                      e.currentTarget.style.transform = "translateX(4px)";
-                    }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.borderColor = "var(--border-subtle)";
-                      e.currentTarget.style.transform = "translateX(0)";
-                    }}
-                  >
-                    <p style={{ fontWeight: 600, fontSize: "0.95rem", color: "var(--text-primary)", marginBottom: "8px", lineHeight: 1.5 }}>
-                      {item.title}
+              <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <p style={{ fontSize: "1.8rem", fontWeight: 900, fontFamily: "Space Grotesk, sans-serif", color: sentimentColor, margin: 0 }}>
+                      {newsSentiment.toFixed(1)}
                     </p>
-                    <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-                      <span style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--accent)", background: "var(--accent-dim)", padding: "2px 8px", borderRadius: "6px" }}>
-                        {item.publisher}
-                      </span>
-                      <span style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>·</span>
-                      <span style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontWeight: 500 }}>{item.date}</span>
-                    </div>
-                  </a>
-                ))}
+                    <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "2px 0 0 0" }}>
+                      Public Sentiment Index
+                    </p>
+                  </div>
+
+                  <div style={{ textAlign: "right" }}>
+                    <span className="badge" style={{
+                      background: newsImpact === "bullish" || newsImpact === "positive" ? "var(--green-dim)" : newsImpact === "bearish" || newsImpact === "negative" ? "var(--red-dim)" : "var(--accent-dim)",
+                      color: newsImpact === "bullish" || newsImpact === "positive" ? "var(--green)" : newsImpact === "bearish" || newsImpact === "negative" ? "var(--red)" : "var(--accent)"
+                    }}>
+                      {newsImpact} impact
+                    </span>
+                    <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "4px", margin: 0 }}>
+                      From {newsCount} media articles
+                    </p>
+                  </div>
+                </div>
+
+                {/* Sentiment Progress Gauge */}
+                <div>
+                  <div style={{ height: "8px", background: "var(--border-subtle)", borderRadius: "4px", overflow: "hidden" }}>
+                    <div style={{
+                      width: `${newsSentiment}%`,
+                      height: "100%",
+                      background: `linear-gradient(90deg, var(--red) 0%, var(--accent) 50%, var(--green) 100%)`,
+                      borderRadius: "4px"
+                    }} />
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.68rem", color: "var(--text-muted)", marginTop: "4px" }}>
+                    <span>Negative Sentiment</span>
+                    <span>Neutral</span>
+                    <span>Positive Sentiment</span>
+                  </div>
+                </div>
+
+                <div style={{ background: "var(--hover-overlay)", border: "1px solid var(--border-subtle)", borderRadius: "12px", padding: "12px 14px", fontSize: "0.82rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
+                  🎯 <strong>Impact Assessment:</strong> Media analysis shows a <strong>{newsImpact}</strong> tone across articles. Current sentiment exerts a <strong>{newsSentiment > 55 ? "positive pull" : newsSentiment < 45 ? "negative resistance" : "neutral effect"}</strong> on short-term price momentum.
+                </div>
               </div>
             </div>
-          )}
+
+            {/* PANEL 4: Fundamentals Panel */}
+            <div className="glass" style={{ padding: "var(--card-padding)" }}>
+              <p className="section-label" style={{ marginBottom: "18px" }}>📊 Financial Fundamentals</p>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <p style={{ fontSize: "1.8rem", fontWeight: 900, fontFamily: "Space Grotesk, sans-serif", color: "var(--accent)", margin: 0 }}>
+                      {predictionData?.fundamental_score ? predictionData.fundamental_score.toFixed(1) : "—"}
+                    </p>
+                    <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "2px 0 0 0" }}>
+                      Fundamental Quality Score
+                    </p>
+                  </div>
+                  
+                  <span className="badge" style={{
+                    background: predictionData?.fundamental_score >= 60 ? "var(--green-dim)" : predictionData?.fundamental_score >= 45 ? "var(--accent-dim)" : "var(--red-dim)",
+                    color: predictionData?.fundamental_score >= 60 ? "var(--green)" : predictionData?.fundamental_score >= 45 ? "var(--accent)" : "var(--red)"
+                  }}>
+                    {predictionData?.fundamental_score >= 60 ? "Strong Value" : predictionData?.fundamental_score >= 45 ? "Neutral Value" : "Weak Value"}
+                  </span>
+                </div>
+
+                {/* Score Progress Bar */}
+                <div style={{ height: "6px", background: "var(--border-subtle)", borderRadius: "3px", overflow: "hidden" }}>
+                  <div style={{
+                    width: `${predictionData?.fundamental_score || 50}%`,
+                    height: "100%",
+                    background: "linear-gradient(90deg, var(--accent) 0%, var(--purple) 100%)",
+                    borderRadius: "3px"
+                  }} />
+                </div>
+
+                {/* Fundamental Metrics list */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                  <div style={{ background: "var(--input-bg)", padding: "10px 14px", borderRadius: "10px", border: "1px solid var(--border-subtle)" }}>
+                    <p style={{ fontSize: "0.68rem", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.04em", marginBottom: "4px" }}>P/E Ratio</p>
+                    <p style={{ fontSize: "1.05rem", fontWeight: 800, margin: 0 }}>
+                      {predictionData?.pe_ratio !== null && predictionData?.pe_ratio !== undefined ? predictionData.pe_ratio.toFixed(2) : "N/A"}
+                    </p>
+                  </div>
+
+                  <div style={{ background: "var(--input-bg)", padding: "10px 14px", borderRadius: "10px", border: "1px solid var(--border-subtle)" }}>
+                    <p style={{ fontSize: "0.68rem", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.04em", marginBottom: "4px" }}>Fundamental Source</p>
+                    <p style={{ fontSize: "1.05rem", fontWeight: 800, margin: 0, textTransform: "capitalize", color: "var(--text-secondary)" }}>
+                      {predictionData?.fundamental_source ? predictionData.fundamental_source.replace("_", " ") : "N/A"}
+                    </p>
+                  </div>
+
+                  <div style={{ background: "var(--input-bg)", padding: "10px 14px", borderRadius: "10px", border: "1px solid var(--border-subtle)" }}>
+                    <p style={{ fontSize: "0.68rem", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.04em", marginBottom: "4px" }}>Earnings Growth</p>
+                    <p style={{ fontSize: "1.05rem", fontWeight: 800, margin: 0, color: predictionData?.earnings_growth >= 0 ? "var(--green)" : "var(--red)" }}>
+                      {predictionData?.earnings_growth !== null && predictionData?.earnings_growth !== undefined ? `${(predictionData.earnings_growth * 100).toFixed(1)}%` : "N/A"}
+                    </p>
+                  </div>
+
+                  <div style={{ background: "var(--input-bg)", padding: "10px 14px", borderRadius: "10px", border: "1px solid var(--border-subtle)" }}>
+                    <p style={{ fontSize: "0.68rem", color: "var(--text-muted)", textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.04em", marginBottom: "4px" }}>Revenue Growth</p>
+                    <p style={{ fontSize: "1.05rem", fontWeight: 800, margin: 0, color: predictionData?.revenue_growth >= 0 ? "var(--green)" : "var(--red)" }}>
+                      {predictionData?.revenue_growth !== null && predictionData?.revenue_growth !== undefined ? `${(predictionData.revenue_growth * 100).toFixed(1)}%` : "N/A"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          {/* Bottom disclaimer */}
+          <div style={{ textAlign: "center", marginTop: "16px", marginBottom: "48px" }}>
+            <p style={{ fontSize: "0.72rem", color: "var(--text-muted)", fontWeight: 500 }}>
+              All algorithmic models, indicators and forecast projections are for informational purposes only. Past performance does not guarantee future market returns. Invest responsibly.
+            </p>
+          </div>
+
         </div>
       </div>
     </>

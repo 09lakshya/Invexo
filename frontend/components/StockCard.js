@@ -82,7 +82,7 @@ export default function StockCard({ symbol, price, change, percent, color, small
 
   return (
     <div
-      onClick={onClick || (() => router.push(`/stock/${symbol}`))}
+      onClick={onClick || (() => router.push(`/stock/${cleanSymbol}`))}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
