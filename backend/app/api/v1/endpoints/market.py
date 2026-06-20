@@ -130,6 +130,13 @@ async def update_market_cache_loop():
                     redis_client.client.set("market:global_cache", json.dumps(GLOBAL_CACHE))
                     # Publish ticks to all connected workers
                     redis_client.client.publish("market:ticks", json.dumps(GLOBAL_CACHE))
+                else:
+                    # Broadcast directly to local connected clients if Redis is disabled
+                    for connection in list(_active_local_connections):
+                        try:
+                            asyncio.create_task(connection.send_json(GLOBAL_CACHE))
+                        except Exception:
+                            _active_local_connections.discard(connection)
                 
             if 'df' in locals():
                 del df
