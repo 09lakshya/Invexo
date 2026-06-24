@@ -278,6 +278,85 @@ class AdvisorService:
         return f"{context} {alignment} {tech} {sentiment}".strip()
 
     @staticmethod
+    def _generate_reasons_batch(selected_items: list, goal: str, duration: str) -> dict:
+        """Query Gemini API to generate real-time reasons for the selected recommended stocks in one batch."""
+        import os
+        import requests
+        import json
+        from app.utils.logger import get_logger
+        
+        logger = get_logger("advisor_service_gemini")
+        reasons_dict = {}
+        
+        api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+        if not api_key:
+            return reasons_dict
+            
+        dur = DURATION_LABELS.get(duration, "the long term")
+        
+        # Prepare context data
+        stocks_info = []
+        for item in selected_items:
+            sym = item["sym"]
+            meta = item["meta"]
+            signals = item["signals"]
+            sentiment = item["sentiment_score"]
+            stocks_info.append({
+                "symbol": sym,
+                "name": meta.get("name", sym),
+                "sector": meta.get("sector", ""),
+                "description": meta.get("desc", ""),
+                "risk": meta.get("risk", "medium"),
+                "price": signals["current_price"],
+                "rsi": signals["rsi"],
+                "trend": signals["trend"],
+                "news_sentiment": round(sentiment, 1)
+            })
+            
+        prompt = (
+            f"You are Invexo Advisor, a highly professional AI financial analyst. "
+            f"Provide a unique, customized, real-time 2-sentence investment reason/analysis for each of the following stocks "
+            f"tailored to the user's financial goal of '{goal}' and a duration of '{dur}'. "
+            f"Synthesize their description, trend, RSI, and news sentiment into a compelling, professional analysis.\n\n"
+            f"Recommended Stocks Data:\n"
+            f"{json.dumps(stocks_info, indent=2)}\n\n"
+            f"Return a JSON object where the keys are the exact stock symbols (e.g. 'HDFCBANK.NS') and the values are the 2-sentence analyses. "
+            f"Do not return any extra text, only the raw JSON."
+        )
+        
+        try:
+            api_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+            headers = {"Content-Type": "application/json"}
+            payload = {
+                "contents": [
+                    {
+                        "parts": [
+                            {"text": prompt}
+                        ]
+                    }
+                ],
+                "generationConfig": {
+                    "responseMimeType": "application/json"
+                }
+            }
+            
+            response = requests.post(api_url, json=payload, headers=headers, timeout=12)
+            if response.status_code == 200:
+                data = response.json()
+                candidates = data.get("candidates", [])
+                if candidates:
+                    text = candidates[0].get("content", {}).get("parts", [{}])[0].get("text", "")
+                    if text:
+                        reasons_dict = json.loads(text.strip())
+                        logger.info("Successfully generated real-time reasons using Gemini batch call.")
+            else:
+                logger.error(f"Gemini API Error {response.status_code}: {response.text}")
+        except Exception as e:
+            logger.error(f"Gemini batch generation exception: {e}")
+            
+        return reasons_dict
+
+    @staticmethod
     def get_recommendations(goal: str, duration: str, risk: str, budget: float, investment_type: str = "one-time", investment_months: Optional[int] = None) -> list[dict]:
         is_sip = investment_type in {"monthly", "sip"}
         months = int(investment_months or DEFAULT_MONTHS_BY_DURATION.get(duration, 36))
@@ -331,6 +410,9 @@ class AdvisorService:
         if not selected:
             return []
 
+        # Generate reasons in batch using Gemini (if api key is available)
+        gemini_reasons = AdvisorService._generate_reasons_batch(selected, goal, duration)
+
         per_stock = round(total_budget / len(selected), 0)
         monthly_per_stock = round(budget / len(selected), 0) if is_sip else None
 
@@ -344,6 +426,8 @@ class AdvisorService:
             price   = signals["current_price"]
             shares  = int(per_stock / price) if price > 0 else 0
 
+            reason = gemini_reasons.get(sym) or AdvisorService._reason(meta, signals, goal, duration, sentiment_score)
+
             results.append({
                 "symbol":               sym.replace(".NS", "").replace(".BO", ""),
                 "name":                 meta.get("name", sym),
@@ -356,7 +440,7 @@ class AdvisorService:
                 "rsi":                  signals["rsi"],
                 "sentiment_score":      round(sentiment_score, 1),
                 "confidence":           confidence,
-                "reason":               AdvisorService._reason(meta, signals, goal, duration, sentiment_score),
+                "reason":               reason,
                 "suggested_allocation": per_stock,
                 "monthly_allocation":    monthly_per_stock,
                 "investment_type":       "monthly" if is_sip else "one-time",
