@@ -1,5 +1,6 @@
 import { useRouter } from "next/router";
 import { useState, useEffect, useRef } from "react";
+import { memo } from "react";
 import { STOCK_METADATA } from "../services/stocks";
 
 // Tiny sparkline SVG generator
@@ -46,7 +47,7 @@ function genSparkline(price, change, n = 20) {
   return pts;
 }
 
-export default function StockCard({ symbol, price, change, percent, color, small, onClick, isWatched, onToggleWatchlist }) {
+export default memo(function StockCard({ symbol, price, change, percent, color, small, onClick, isWatched, onToggleWatchlist }) {
   const router = useRouter();
   const prc = typeof price === "number" && Number.isFinite(price) ? price : 0;
   const chg = typeof change === "number" && Number.isFinite(change) ? change : 0;
@@ -99,7 +100,9 @@ export default function StockCard({ symbol, price, change, percent, color, small
         cursor: "pointer",
         transition: "all 0.25s ease",
         transform: hovered ? "translateY(-3px)" : "translateY(0)",
-        boxShadow: hovered ? "var(--shadow-card), 0 0 0 1px var(--accent-dim)" : "var(--shadow-card)",
+        boxShadow: hovered
+          ? "var(--shadow-card), 0 0 0 1px var(--accent-dim)"
+          : "var(--shadow-card)",
         backdropFilter: "blur(16px)",
         WebkitBackdropFilter: "blur(16px)",
         position: "relative",
@@ -224,7 +227,7 @@ export default function StockCard({ symbol, price, change, percent, color, small
                   letterSpacing: "0.03em",
                 }}
               >
-                {isPositive ? "\u25B2" : "\u25BC"}
+                {isPositive ? "▲" : "▼"}
               </span>
             ) : (
               <span
@@ -261,7 +264,7 @@ export default function StockCard({ symbol, price, change, percent, color, small
               fontFamily: "'Space Grotesk', sans-serif",
             }}
           >
-            {"\u20B9"}{prc.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {"₹"}{prc.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
         ) : (
           <p
@@ -326,4 +329,5 @@ export default function StockCard({ symbol, price, change, percent, color, small
       </div>
     </div>
   );
-}
+  }
+);

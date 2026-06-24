@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import StockCard from "../components/StockCard";
@@ -342,7 +342,7 @@ export default function Home() {
     fetchAlerts();
   }, []);
 
-  const toggleWatchlist = async (symbol) => {
+  const toggleWatchlist = useCallback(async (symbol) => {
     const cleanSym = symbol.toUpperCase().replace(/\.NS$/i, "").replace(/\.BO$/i, "");
     const isWatched = watchlist.includes(cleanSym);
     try {
@@ -356,7 +356,7 @@ export default function Home() {
     } catch (err) {
       console.error("Failed to toggle watchlist:", err);
     }
-  };
+  }, [watchlist]);
 
   const handleCreateAlert = async () => {
     if (!activeStockSymbol || !alertTargetPrice) return;
@@ -521,38 +521,69 @@ export default function Home() {
     router.push(`/stock/${sym}`);
   };
 
-  const indexSymbols = ["NIFTY50", "SENSEX"];
+  const indexSymbols = useMemo(() => ["NIFTY50", "SENSEX"], []);
 
-  const entries = Object.entries(stocks || {});
-  const indexEntries = entries.filter(([s]) => indexSymbols.includes(s));
-  const stockEntries = entries
-    .filter(([s]) => !indexSymbols.includes(s))
-    .sort((a, b) => b[1].percent - a[1].percent);
-
-  const gainers = stockEntries.filter(([, d]) => d.percent >= 0);
-  const losers = stockEntries.filter(([, d]) => d.percent < 0).reverse();
-
-  let displayed = [];
-  if (filterCategory === "Gainers") {
-    displayed = viewAll ? gainers : gainers.slice(0, 10);
-  } else if (filterCategory === "Losers") {
-    displayed = viewAll ? losers : losers.slice(0, 10);
-  } else if (filterCategory === "Watchlist") {
-    const watchedStockEntries = stockEntries.filter(([sym]) => watchlist.includes(sym.toUpperCase().replace(/\.NS$/i, "").replace(/\.BO$/i, "")));
-    const missingSymbols = watchlist.filter(sym => !stockEntries.some(([s]) => s.toUpperCase().replace(/\.NS$/i, "").replace(/\.BO$/i, "") === sym));
-    const missingEntries = missingSymbols.map(sym => [sym + ".NS", stocks[sym + ".NS"] || stocks[sym] || { price: 0, change: 0, percent: 0 }]);
-    displayed = [...watchedStockEntries, ...missingEntries];
-  } else {
-    const topGainers = gainers.slice(0, 10);
-    const topLosers = losers.slice(0, 10);
-    displayed = viewAll ? [...gainers, ...losers] : [...topGainers, ...topLosers];
-  }
-
-  const totalStocks = stockEntries.length;
-  const gainersCount = gainers.length;
-  const losersCount = losers.length;
-
-  const isLoaded = stockEntries.length > 0;
+  const {
+    entries,
+    indexEntries,
+    stockEntries,
+    gainers,
+    losers,
+    displayed,
+    totalStocks,
+    gainersCount,
+    losersCount,
+    isLoaded
+  } = useMemo(() => {
+    const entries = Object.entries(stocks || {});
+    const indexEntries = entries.filter(([s]) => indexSymbols.includes(s));
+    const stockEntries = entries
+      .filter(([s]) => !indexSymbols.includes(s))
+      .sort((a, b) => b[1].percent - a[1].percent);
+    const gainers = stockEntries.filter(([, d]) => d.percent >= 0);
+    const losers = stockEntries.filter(([, d]) => d.percent < 0).reverse();
+    let displayed = [];
+    if (filterCategory === "Gainers") {
+      displayed = viewAll ? gainers : gainers.slice(0, 10);
+    } else if (filterCategory === "Losers") {
+      displayed = viewAll ? losers : losers.slice(0, 10);
+    } else if (filterCategory === "Watchlist") {
+      const watchedStockEntries = stockEntries.filter(([sym]) =>
+        watchlist.includes(sym.toUpperCase().replace(/\.NS$/i, "").replace(/\.BO$/i, ""))
+      );
+      const missingSymbols = watchlist.filter(
+        (sym) =>
+          !stockEntries.some(
+            ([s]) =>
+              s.toUpperCase().replace(/\.NS$/i, "").replace(/\.BO$/i, "") ===
+              sym
+          )
+      );
+      const missingEntries = missingSymbols.map((sym) => [
+        `${sym}.NS`,
+        stocks[`${sym}.NS`] || stocks[sym] || { price: 0, change: 0, percent: 0 },
+      ]);
+      displayed = [...watchedStockEntries, ...missingEntries];
+    } else {
+      const topGainers = gainers.slice(0, 10);
+      const topLosers = losers.slice(0, 10);
+      displayed = viewAll
+        ? [...gainers, ...losers]
+        : [...topGainers, ...topLosers];
+    }
+    return {
+      entries,
+      indexEntries,
+      stockEntries,
+      gainers,
+      losers,
+      displayed,
+      totalStocks: stockEntries.length,
+      gainersCount: gainers.length,
+      losersCount: losers.length,
+      isLoaded: stockEntries.length > 0,
+    };
+  }, [stocks, filterCategory, viewAll, watchlist, indexSymbols]);
 
   const normalizedActiveSymbol = activeStockSymbol ? activeStockSymbol.replace(/\.NS$/i, "") : null;
   const activeMetadata = STOCK_METADATA[normalizedActiveSymbol] || {};
