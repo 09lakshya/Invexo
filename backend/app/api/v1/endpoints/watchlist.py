@@ -17,6 +17,7 @@ def fetch_watchlist_item_details(symbol: str):
     
     signals = AdvisorService._fetch_signals(symbol)
     price = 0.0
+    change = 0.0
     change_pct = 0.0
     trend = "BEARISH"
     rsi = 50.0
@@ -33,6 +34,7 @@ def fetch_watchlist_item_details(symbol: str):
                 close = df["Close"]
                 current_close = float(close.iloc[-1])
                 prev_close = float(close.iloc[-2])
+                change = round(current_close - prev_close, 2)
                 change_pct = round(((current_close - prev_close) / prev_close) * 100, 2)
         except Exception:
             pass
@@ -42,6 +44,7 @@ def fetch_watchlist_item_details(symbol: str):
         "name": name,
         "sector": sector,
         "current_price": price,
+        "change": change,
         "change_pct": change_pct,
         "trend": trend,
         "rsi": rsi

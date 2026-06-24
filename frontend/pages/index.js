@@ -307,6 +307,7 @@ export default function Home() {
 
   // Watchlist & Alerts states
   const [watchlist, setWatchlist] = useState([]);
+  const [watchlistDetails, setWatchlistDetails] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [watchlistLoading, setWatchlistLoading] = useState(false);
   const [alertsLoading, setAlertsLoading] = useState(false);
@@ -318,6 +319,7 @@ export default function Home() {
     try {
       const res = await API.get("/watchlist/");
       setWatchlist(res.data.map(item => item.symbol.toUpperCase()));
+      setWatchlistDetails(res.data);
     } catch (err) {
       console.error("Failed to fetch watchlist:", err);
     } finally {
@@ -349,9 +351,11 @@ export default function Home() {
       if (isWatched) {
         await API.delete(`/watchlist/${cleanSym}`);
         setWatchlist(prev => prev.filter(s => s !== cleanSym));
+        setWatchlistDetails(prev => prev.filter(item => item.symbol.toUpperCase() !== cleanSym));
       } else {
         await API.post("/watchlist/", { symbol: cleanSym });
         setWatchlist(prev => [...prev, cleanSym]);
+        fetchWatchlist();
       }
     } catch (err) {
       console.error("Failed to toggle watchlist:", err);
@@ -559,10 +563,17 @@ export default function Home() {
               sym
           )
       );
-      const missingEntries = missingSymbols.map((sym) => [
-        `${sym}.NS`,
-        stocks[`${sym}.NS`] || stocks[sym] || { price: 0, change: 0, percent: 0 },
-      ]);
+      const missingEntries = missingSymbols.map((sym) => {
+        const details = watchlistDetails.find(item => item.symbol.toUpperCase() === sym);
+        return [
+          `${sym}.NS`,
+          stocks[`${sym}.NS`] || stocks[sym] || {
+            price: details?.current_price || 0,
+            change: details?.change || 0,
+            percent: details?.change_pct || 0,
+          },
+        ];
+      });
       displayed = [...watchedStockEntries, ...missingEntries];
     } else {
       const topGainers = gainers.slice(0, 10);
