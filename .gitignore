@@ -31,7 +31,7 @@ logs/
 # Project Caches / Data
 backend/services/*cache.json
 backend/app/services/*cache.json
-backend/models/
+# backend/models/
 .cache/
 .pytest_cache/
 

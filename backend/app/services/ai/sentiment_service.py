@@ -53,7 +53,7 @@ class SentimentService:
     @staticmethod
     def _market_sentiment_proxy(symbol: str):
         try:
-            stock = yf.Ticker(_working_ticker(symbol))
+            stock = yf.Ticker(_working_ticker(symbol), session=_yf_session)
             df = stock.history(period="3mo", interval="1d")
             df = df.dropna(subset=["Close"])
             if df.empty or len(df) < 15:

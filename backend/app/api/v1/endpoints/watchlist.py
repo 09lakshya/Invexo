@@ -3,7 +3,7 @@ from concurrent.futures import ThreadPoolExecutor
 from app.api.v1.dependencies import get_current_user
 from app.repositories.watchlist_repository import WatchlistRepository
 from app.schemas.watchlist import WatchlistItemCreate, WatchlistItemResponse
-from app.services.market.ticker_utils import _working_ticker
+from app.services.market.ticker_utils import _working_ticker, _yf_session
 from app.services.market.advisor_service import AdvisorService, UNIVERSE
 import yfinance as yf
 
@@ -28,7 +28,7 @@ def fetch_watchlist_item_details(symbol: str):
         
         # Calculate daily change percentage from yfinance history
         try:
-            df = yf.Ticker(ticker_symbol).history(period="5d", interval="1d")
+            df = yf.Ticker(ticker_symbol, session=_yf_session).history(period="5d", interval="1d")
             if not df.empty and len(df) >= 2:
                 close = df["Close"]
                 current_close = float(close.iloc[-1])

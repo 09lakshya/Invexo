@@ -169,7 +169,7 @@ class AdvisorService:
     def _fetch_signals(symbol: str):
         for ticker_symbol in _ticker_candidates(symbol):
             try:
-                df = yf.Ticker(ticker_symbol).history(period="1mo", interval="1d")
+                df = yf.Ticker(ticker_symbol, session=_yf_session).history(period="1mo", interval="1d")
                 df = df.dropna(subset=["Close"])
                 if df.empty or len(df) < 14:
                     continue

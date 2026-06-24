@@ -10,7 +10,7 @@ class DataService:
         import yfinance as yf
         for ticker_symbol in _ticker_candidates(symbol):
             try:
-                stock = yf.Ticker(ticker_symbol)
+                stock = yf.Ticker(ticker_symbol, session=_yf_session)
                 last_price = stock.fast_info.get("lastPrice")
                 if last_price is not None and not __import__("math").isnan(last_price):
                     return float(last_price)
@@ -48,7 +48,7 @@ class DataService:
         for ticker_symbol in _ticker_candidates(symbol):
             try:
                 url = f"https://query2.finance.yahoo.com/v8/finance/chart/{ticker_symbol}?range={range_val}&interval={interval_val}"
-                res = requests.get(url, headers=headers, timeout=5)
+                res = _yf_session.get(url, headers=headers, timeout=5)
                 if res.status_code != 200:
                     continue
 
