@@ -102,10 +102,14 @@ def test_rbac_endpoints():
     reg_token = create_access_token(reg_user["id"])
     prem_token = create_access_token(prem_user["id"])
 
-    # Try accessing advisor recommendations as regular user -> Forbidden
-    response = client.get("/api/v1/advisor/recommendations?goal=wealth&budget=1000", headers={"Authorization": f"Bearer {reg_token}"})
+    # Try accessing market prediction as regular user -> Forbidden
+    response = client.get("/api/v1/market/predict/RELIANCE", headers={"Authorization": f"Bearer {reg_token}"})
     assert response.status_code == 403
 
-    # Try accessing advisor recommendations as premium user -> Success
-    response = client.get("/api/v1/advisor/recommendations?goal=wealth&budget=1000", headers={"Authorization": f"Bearer {prem_token}"})
-    assert response.status_code == 200
+    # Try accessing market prediction as premium user -> Success
+    # Mock PredictionService.predict_stock to avoid actual ML inference call in auth tests
+    from unittest.mock import patch
+    with patch("app.services.ai.prediction_service.PredictionService.predict_stock") as mock_predict:
+        mock_predict.return_value = {"prediction": "Bullish", "confidence": 0.8}
+        response = client.get("/api/v1/market/predict/RELIANCE", headers={"Authorization": f"Bearer {prem_token}"})
+        assert response.status_code == 200

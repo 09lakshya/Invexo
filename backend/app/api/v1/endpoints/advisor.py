@@ -36,7 +36,7 @@ def handle_get_recommendations(
     budget: float = Query(50000.0, description="Amount (₹)"),
     investment_type: str = Query("one-time", description="Sip or one-time"),
     investment_months: Optional[int] = Query(None, description="sip duration in months"),
-    current_user: dict = Depends(require_role(["premium", "admin"]))
+    current_user: dict = Depends(require_role(["user", "premium", "admin"]))
 ):
     if budget <= 0:
         raise HTTPException(status_code=400, detail="Budget must be greater than 0")
@@ -55,7 +55,7 @@ def handle_get_recommendations(
 def recommend(
     request: Request,
     payload: AdvisorInput,
-    current_user: dict = Depends(require_role(["premium", "admin"]))
+    current_user: dict = Depends(require_role(["user", "premium", "admin"]))
 ):
     if payload.budget <= 0:
         raise HTTPException(status_code=400, detail="Budget must be greater than 0")
