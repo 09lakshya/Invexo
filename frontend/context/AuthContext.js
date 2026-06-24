@@ -50,7 +50,8 @@ const setCookie = (name, value, days) => {
     expires = "; expires=" + date.toUTCString();
   }
   if (typeof document !== "undefined") {
-    document.cookie = name + "=" + (value || "") + expires + "; path=/; secure; samesite=lax";
+    const isSecure = window.location.protocol === "https:";
+    document.cookie = name + "=" + (value || "") + expires + "; path=/; samesite=lax" + (isSecure ? "; secure" : "");
   }
 };
 

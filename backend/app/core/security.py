@@ -61,7 +61,7 @@ def verify_access_token(token: str) -> int | None:
         return None
 
 def verify_refresh_token(token: str) -> int | None:
-    """Verifies refresh token and checks if active in Redis."""
+    """Verifies refresh token and checks if active in Redis (falling back to JWT signature validation if Redis is disabled)."""
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
         if payload.get("type") != "refresh":
@@ -72,20 +72,32 @@ def verify_refresh_token(token: str) -> int | None:
         if user_id is None:
             return None
             
-        # Check if revoked or missing in Redis
         redis_key = f"refresh_token:{user_id}:{token}"
         status = redis_client.get(redis_key)
-        if status != "active":
+        
+        # If the token has been explicitly marked as revoked, we MUST reject it
+        if status == "revoked":
             return None
+            
+        # If Redis is enabled, we strictly enforce "active" status (missing/expired/revoked means not active)
+        if redis_client.enabled:
+            if status != "active":
+                return None
+        else:
+            # If Redis is disabled (falling back to memory):
+            # We reject if status is set and not "active", but if status is None (not found),
+            # we allow it because the memory fallback cache might have been cleared on server restart.
+            pass
             
         return user_id
     except (jwt.ExpiredSignatureError, jwt.InvalidTokenError, ValueError):
         return None
 
 def revoke_refresh_token(user_id: int, token: str):
-    """Revokes a refresh token in Redis."""
+    """Revokes a refresh token in Redis/in-memory cache wrapper by marking it as revoked."""
     redis_key = f"refresh_token:{user_id}:{token}"
-    redis_client.delete(redis_key)
+    ttl_seconds = JWT_REFRESH_EXPIRY_DAYS * 86400
+    redis_client.setex(redis_key, ttl_seconds, "revoked")
 
 def revoke_all_user_tokens(user_id: int):
     """Revokes all refresh tokens for a user by wildcard search."""

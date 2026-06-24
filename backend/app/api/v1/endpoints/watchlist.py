@@ -10,6 +10,17 @@ import yfinance as yf
 router = APIRouter(prefix="/watchlist", tags=["Watchlist"])
 
 def fetch_watchlist_item_details(symbol: str):
+    import math
+
+    def sanitize_float(val, default=0.0):
+        try:
+            val = float(val)
+            if math.isnan(val) or math.isinf(val):
+                return default
+            return val
+        except (TypeError, ValueError):
+            return default
+
     ticker_symbol = _working_ticker(symbol)
     meta = UNIVERSE.get(ticker_symbol, {})
     name = meta.get("name", symbol.upper())
@@ -43,11 +54,11 @@ def fetch_watchlist_item_details(symbol: str):
         "symbol": symbol.upper().strip(),
         "name": name,
         "sector": sector,
-        "current_price": price,
-        "change": change,
-        "change_pct": change_pct,
+        "current_price": sanitize_float(price),
+        "change": sanitize_float(change),
+        "change_pct": sanitize_float(change_pct),
         "trend": trend,
-        "rsi": rsi
+        "rsi": sanitize_float(rsi, 50.0)
     }
 
 @router.post("/", response_model=dict)
