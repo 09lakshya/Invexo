@@ -230,7 +230,7 @@ export default function Portfolio() {
   const [chatHistory, setChatHistory] = useState([
     {
       sender: "copilot",
-      text: "👋 **Hello! I'm Invexo Copilot, your AI investment assistant.**\n\nHow can I help you with your portfolio or stock research today?"
+      text: "👋 **Hello! I'm Vexo, your AI investment assistant.**\n\nHow can I help you with your portfolio or stock research today?"
     }
   ]);
   const [chatLoading, setChatLoading] = useState(false);
@@ -661,7 +661,7 @@ export default function Portfolio() {
                     </div>
                   </div>
                   <div style={{ background: "var(--hover-overlay)", border: "1px solid var(--border-subtle)", borderRadius: "12px", padding: "14px 16px" }}>
-                    <p style={{ fontSize: "0.72rem", fontWeight: 800, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 6px 0" }}>🤖 Copilot Suggestion</p>
+                    <p style={{ fontSize: "0.72rem", fontWeight: 800, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 6px 0" }}>🤖 Vexo Suggestion</p>
                     <p style={{ fontSize: "0.82rem", color: "var(--text-secondary)", lineHeight: "1.45", margin: 0 }}>{analytics.advice}</p>
                   </div>
                 </div>
@@ -700,7 +700,7 @@ export default function Portfolio() {
           {/* Floating Action Button */}
           <button
             onClick={() => setShowCopilot(true)}
-            aria-label="Open AI Copilot Chat"
+            aria-label="Open Vexo AI Chat"
             style={{
               position: "fixed",
               bottom: "24px",
@@ -723,7 +723,7 @@ export default function Portfolio() {
             onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.04)"; }}
             onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
           >
-            <span style={{ fontSize: "1.1rem" }}>💬</span> Invexo Copilot
+            <span style={{ fontSize: "1.1rem" }}>💬</span> Vexo
           </button>
 
           {/* Copilot Drawer Panel */}
@@ -750,13 +750,13 @@ export default function Portfolio() {
                   <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                     <span style={{ fontSize: "1.2rem" }}>🤖</span>
                     <div>
-                      <h3 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: "1.1rem", fontWeight: 800, margin: 0, color: "var(--text-primary)" }}>Invexo Copilot</h3>
+                      <h3 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: "1.1rem", fontWeight: 800, margin: 0, color: "var(--text-primary)" }}>Vexo</h3>
                       <span style={{ fontSize: "0.65rem", color: "var(--green)", fontWeight: 700, textTransform: "uppercase" }}>● Active Assistant</span>
                     </div>
                   </div>
                   <button
                     onClick={() => setShowCopilot(false)}
-                    aria-label="Close Copilot"
+                    aria-label="Close Vexo"
                     style={{ background: "transparent", border: "none", color: "var(--text-muted)", fontSize: "1.1rem", cursor: "pointer", padding: "4px" }}
                   >
                     ✕

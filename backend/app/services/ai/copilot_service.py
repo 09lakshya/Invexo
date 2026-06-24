@@ -37,9 +37,9 @@ class CopilotService:
             try:
                 # Prepare rich context prompt
                 context = (
-                    f"You are Invexo Copilot, a highly knowledgeable AI financial analyst. "
+                    f"You are Vexo, a highly knowledgeable AI financial analyst. "
                     f"Provide direct, professional, data-backed financial advice to the user. "
-                    f"Do not give legal/regulatory disclaimers in every sentence; act as an advanced Copilot assistant.\n\n"
+                    f"Do not give legal/regulatory disclaimers in every sentence; act as an advanced AI assistant.\n\n"
                     f"User's Portfolio:\n{portfolio_summary}\n\n"
                     f"User's Watchlist Tickers:\n{watchlist_summary}\n\n"
                     f"User's Query:\n\"{message}\"\n\n"
@@ -112,7 +112,7 @@ class CopilotService:
                     f"* **RSI (14-day)**: {rsi} ({rsi_status} conditions)\n"
                     f"* **Sector**: {meta.get('sector', 'Other')}\n"
                     f"* **Risk Profile**: {meta.get('risk', 'medium')}\n\n"
-                    f"💡 **Copilot Recommendation**: {owns_text} "
+                    f"💡 **Vexo Recommendation**: {owns_text} "
                 )
                 
                 if trend == "BULLISH":
@@ -203,7 +203,7 @@ class CopilotService:
 
         # Default fallback / Greeting
         return (
-            "👋 **Hello! I'm Invexo Copilot, your AI investment assistant.**\n\n"
+            "👋 **Hello! I'm Vexo, your AI investment assistant.**\n\n"
             "Here's what you can ask me:\n"
             "* 💼 **Show my portfolio summary** - Get allocations, total value, and returns.\n"
             "* 🛡️ **Analyze my portfolio risk** - View Beta, Volatility, and Value at Risk.\n"

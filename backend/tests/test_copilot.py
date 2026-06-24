@@ -17,7 +17,7 @@ def test_copilot_chat_intent_parsing():
     assert response.status_code == 200
     res_data = response.json()
     assert "response" in res_data
-    assert "Invexo Copilot" in res_data["response"]
+    assert "Vexo" in res_data["response"]
 
     # 2. Test portfolio keyword
     response = client.post("/api/v1/copilot/chat", json={"message": "can you check my portfolio holdings?"}, headers=headers)
