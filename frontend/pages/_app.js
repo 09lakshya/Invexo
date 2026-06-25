@@ -7,6 +7,7 @@ import '../styles/globals.css';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
 import { WebSocketProvider } from '../context/WebSocketContext';
+import VexoWidget from '../components/VexoWidget';
 
 // Pages that don't require authentication
 const PUBLIC_PAGES = ['/login'];
@@ -111,6 +112,7 @@ export default function App({ Component, pageProps }) {
                       <strong style={{ color: 'var(--text-primary)', fontWeight: '700' }}>Legal Disclaimer:</strong> Invexo is not SEBI registered. All content is for educational purposes only and does not constitute investment advice.
                     </span>
                   </div>
+                  <VexoWidget />
                 </div>
               </AuthGuard>
             </WebSocketProvider>
