@@ -129,12 +129,29 @@ export default function VexoWidget() {
 
   return (
     <>
+      <style jsx>{`
+        .vexo-drawer {
+          max-width: 400px;
+        }
+        .vexo-fab {
+          bottom: 24px;
+        }
+        @media (max-width: 600px) {
+          .vexo-drawer {
+            max-width: 100% !important;
+          }
+          .vexo-fab {
+            bottom: 80px !important;
+          }
+        }
+      `}</style>
+
       {/* Floating Action Button */}
       <button
+        className="vexo-fab"
         onClick={() => setShowCopilot((prev) => !prev)}
         style={{
           position: "fixed",
-          bottom: "24px",
           right: "24px",
           width: "60px",
           height: "60px",
@@ -145,7 +162,7 @@ export default function VexoWidget() {
           boxShadow: "0 8px 24px rgba(0, 200, 150, 0.4)",
           cursor: "pointer",
           zIndex: 9999,
-          display: "flex",
+          display: showCopilot ? "none" : "flex",
           alignItems: "center",
           justifyContent: "center",
           fontSize: "1.8rem",
@@ -161,12 +178,12 @@ export default function VexoWidget() {
 
       {/* Vexo Drawer / Modal */}
       <div
+        className="vexo-drawer"
         style={{
           position: "fixed",
           top: "0",
           right: "0",
           width: "100%",
-          maxWidth: "400px",
           height: "100%",
           background: "var(--bg-primary)",
           borderLeft: "1px solid var(--border-subtle)",
