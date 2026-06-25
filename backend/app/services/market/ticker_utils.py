@@ -44,12 +44,12 @@ def _ticker_candidates(symbol: str):
         yield YF_SYMBOL_OVERRIDES[symbol_upper]
         return
         
-    yield symbol_upper
-    
-    # Standard NSE / BSE tickers format fallback
+    # Standard NSE / BSE tickers format fallback (Prioritize for Indian stocks)
     if not symbol_upper.endswith(".NS") and not symbol_upper.endswith(".BO"):
         yield f"{symbol_upper}.NS"
         yield f"{symbol_upper}.BO"
+        
+    yield symbol_upper
 
 @ttl_cache(maxsize=100, ttl=86400)
 def _working_ticker(symbol: str) -> str:
