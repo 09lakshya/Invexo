@@ -5,6 +5,7 @@ import io
 import os
 import json
 import gc
+import math
 from contextlib import redirect_stdout, redirect_stderr
 from app.services.market.data_service import DataService
 from app.services.market.news_service import NewsService
@@ -65,6 +66,16 @@ except Exception as e:
 _background_task = None
 _active_local_connections = set()
 
+def _safe_float(val, default=0.0):
+    """Safely convert a value to float, returning default if NaN or Inf."""
+    try:
+        val = float(val)
+        if math.isnan(val) or math.isinf(val):
+            return default
+        return val
+    except (TypeError, ValueError):
+        return default
+
 # ==========================================
 # 🔄 REDIS PUB/SUB WEBSOCKET DISTRIBUTED SCALING
 # ==========================================
@@ -108,15 +119,17 @@ async def update_market_cache_loop():
                         if len(close_series) < 2:
                             continue
                             
-                        price = float(close_series.iloc[-1])
-                        prev_close = float(close_series.iloc[-2])
+                        price = _safe_float(close_series.iloc[-1])
+                        prev_close = _safe_float(close_series.iloc[-2])
+                        if price == 0 or prev_close == 0:
+                            continue
                         change = price - prev_close
                         percent = (change / prev_close * 100) if prev_close != 0 else 0
                         
                         new_data[sym] = {
                             "price": round(price, 2),
-                            "change": round(change, 2),
-                            "percent": round(percent, 2)
+                            "change": round(_safe_float(change), 2),
+                            "percent": round(_safe_float(percent), 2)
                         }
                     except Exception as ex:
                         logger.error(f"Error parsing {sym}: {ex}")
@@ -233,6 +246,63 @@ async def websocket_endpoint(websocket: WebSocket, token: Optional[str] = Query(
     finally:
         _active_local_connections.discard(websocket)
         ping_task.cancel()
+
+# ==========================================
+# 🔄 STARTUP CACHE REFRESH
+# ==========================================
+
+def refresh_market_cache():
+    """Synchronous one-time fetch to populate the GLOBAL_CACHE with fresh data.
+    Called during server startup to prevent serving stale Redis cache data."""
+    global GLOBAL_CACHE
+    import yfinance as yf
+    tickers_map = {get_ticker(s): s for s in NIFTY50_SYMBOLS}
+    ticker_string = " ".join(tickers_map.keys())
+    
+    try:
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            df = yf.download(ticker_string, period="5d", interval="1d", progress=False)
+        
+        new_data = {}
+        if "Close" in df:
+            close_df = df["Close"]
+            for ticker, sym in tickers_map.items():
+                try:
+                    if hasattr(close_df, "columns") and ticker in close_df.columns:
+                        close_series = close_df[ticker].dropna()
+                    elif isinstance(close_df, type(df["Close"])) and len(tickers_map) == 1:
+                        close_series = close_df.dropna()
+                    else:
+                        continue
+                    
+                    if len(close_series) < 2:
+                        continue
+                    
+                    price = _safe_float(close_series.iloc[-1])
+                    prev_close = _safe_float(close_series.iloc[-2])
+                    if price == 0 or prev_close == 0:
+                        continue
+                    change = price - prev_close
+                    percent = (change / prev_close * 100) if prev_close != 0 else 0
+                    
+                    new_data[sym] = {
+                        "price": round(price, 2),
+                        "change": round(_safe_float(change), 2),
+                        "percent": round(_safe_float(percent), 2)
+                    }
+                except Exception as ex:
+                    logger.error(f"Startup cache refresh error for {sym}: {ex}")
+        
+        new_data.setdefault("NIFTY50", GLOBAL_CACHE.get("NIFTY50", {"price": 0, "change": 0, "percent": 0}))
+        new_data.setdefault("SENSEX", GLOBAL_CACHE.get("SENSEX", {"price": 0, "change": 0, "percent": 0}))
+        
+        if new_data:
+            GLOBAL_CACHE.update(new_data)
+            if redis_client.enabled and redis_client.client:
+                redis_client.client.set("market:global_cache", json.dumps(GLOBAL_CACHE))
+            logger.info(f"Startup market cache refreshed with {len(new_data)} symbols.")
+    except Exception as e:
+        logger.error(f"Failed to refresh market cache on startup: {e}")
 
 # ==========================================
 # 📊 API ROUTERS

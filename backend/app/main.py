@@ -55,6 +55,13 @@ async def lifespan(app: FastAPI):
         thread.start()
     else:
         logger.info("Skipping initial picks calculation on Render startup to prevent memory spikes.")
+
+    # 5. Refresh market data cache with fresh prices on startup
+    from app.api.v1.endpoints.market import refresh_market_cache
+    cache_thread = threading.Thread(target=refresh_market_cache)
+    cache_thread.daemon = True
+    cache_thread.start()
+
     yield
     scheduler.shutdown()
 
