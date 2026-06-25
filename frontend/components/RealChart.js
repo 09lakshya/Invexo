@@ -67,7 +67,7 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher, zoomRef, onZ
   const visibleData = data.slice(zoomRange.start, zoomRange.end + 1);
   const zoomPercent = data.length > 0 ? Math.round((1 - (visibleData.length / data.length)) * 100) : 0;
 
-  const marginTop = showSwitcher ? 52 : 36; // Extra spacing for HUD
+  const marginTop = 36; // Space for HUD
   const marginBottom = 28;
   const marginLeft = 15;
   const marginRight = 60; // Space for Y-Axis labels
@@ -792,6 +792,8 @@ export default function RealChart({
   };
   const onZoomStateChange = handleZoomStateChange;
 
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
   // 🔥 FORCE VALID DATA (Normalize keys and sanitize nulls/NaNs)
   const cleaned = useMemo(() => {
     return (data || []).map((d) => {
@@ -911,7 +913,7 @@ export default function RealChart({
     maintainAspectRatio: false,
     layout: {
       padding: {
-        top: showSwitcher ? 52 : 0,
+        top: 4,
         right: 12,
         left: 4,
         bottom: 4,
@@ -1000,15 +1002,26 @@ export default function RealChart({
   };
 
   return (
-    <div style={{ height: "100%", width: "100%", position: "relative" }}>
+    <div style={{ 
+      height: isFullscreen ? "100vh" : "100%", 
+      width: isFullscreen ? "100vw" : "100%", 
+      position: isFullscreen ? "fixed" : "relative",
+      top: isFullscreen ? 0 : "auto",
+      left: isFullscreen ? 0 : "auto",
+      zIndex: isFullscreen ? 99999 : 1,
+      background: isFullscreen ? "var(--bg-primary)" : "transparent",
+      display: "flex",
+      flexDirection: "column",
+    }}>
       {showSwitcher && (
         <div style={{
-          position: "absolute",
-          top: "8px",
-          right: "12px",
           display: "flex",
+          justifyContent: "flex-end",
+          alignItems: "center",
           gap: "6px",
-          zIndex: 10,
+          padding: "8px 12px",
+          flexWrap: "wrap",
+          background: isFullscreen ? "var(--bg-card)" : "transparent",
         }}>
           {/* Switcher */}
           <div style={{
