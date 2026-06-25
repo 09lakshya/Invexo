@@ -1036,6 +1036,7 @@ export default function Home() {
                       change={current?.change}
                       percent={current?.percent}
                       color={colorClass}
+                      onClick={() => openQuickView(sym)}
                       isWatched={watchlist.includes(sym.toUpperCase().replace(/\.NS$/i, "").replace(/\.BO$/i, ""))}
                       onToggleWatchlist={() => toggleWatchlist(sym)}
                     />
