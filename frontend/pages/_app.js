@@ -55,6 +55,7 @@ function AuthGuard({ children }) {
 }
 
 export default function App({ Component, pageProps }) {
+  const router = useRouter();
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
@@ -112,7 +113,7 @@ export default function App({ Component, pageProps }) {
                       <strong style={{ color: 'var(--text-primary)', fontWeight: '700' }}>Legal Disclaimer:</strong> Invexo is not SEBI registered. All content is for educational purposes only and does not constitute investment advice.
                     </span>
                   </div>
-                  <VexoWidget />
+                  {!PUBLIC_PAGES.includes(router.pathname) && <VexoWidget />}
                 </div>
               </AuthGuard>
             </WebSocketProvider>
