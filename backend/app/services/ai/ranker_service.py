@@ -85,8 +85,14 @@ def get_ranker_meta() -> dict | None:
 
 def _download_recent(symbols: list) -> dict:
     """Batch-download ~1 year of daily OHLCV for feature computation
-    (126-day momentum needs ≥140 rows of history)."""
+    (126-day momentum needs ≥140 rows of history).
+
+    Uses the shared curl_cffi browser-impersonation session so cloud-host
+    IPs (Render) don't get rate-limited by Yahoo. That session is not
+    thread-safe, so chunks download sequentially (still fast — one batched
+    request per chunk)."""
     import yfinance as yf
+    from app.services.market.ticker_utils import _yf_session
 
     data = {}
     chunks = [symbols[i:i + CHUNK_SIZE] for i in range(0, len(symbols), CHUNK_SIZE)]
@@ -98,8 +104,9 @@ def _download_recent(symbols: list) -> dict:
                 interval="1d",
                 group_by="ticker",
                 auto_adjust=True,
-                threads=True,
+                threads=False,
                 progress=False,
+                session=_yf_session,
             )
         except Exception as e:
             logger.error(f"Ranker batch download failed: {e}")

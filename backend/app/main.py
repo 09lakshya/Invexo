@@ -53,13 +53,14 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(MarketService.evaluate_pick_outcomes, 'cron', hour=12, minute=0)
     scheduler.start()
     
-    # 4. Trigger initial picks calculation in the background (skip on Render to save memory on startup)
-    if not os.environ.get("RENDER"):
-        thread = threading.Thread(target=MarketService.generate_daily_picks, kwargs={"force": True})
-        thread.daemon = True
-        thread.start()
-    else:
-        logger.info("Skipping initial picks calculation on Render startup to prevent memory spikes.")
+    # 4. Trigger initial picks calculation in the background. The ranker
+    # path is light (one batched download + two small models, ~15s), so
+    # this is safe on Render too — the old per-symbol scan wasn't.
+    # Non-force: the daily lock file prevents duplicate work across workers,
+    # and existing valid picks for today are kept.
+    thread = threading.Thread(target=MarketService.generate_daily_picks)
+    thread.daemon = True
+    thread.start()
 
     # 5. Refresh market data cache with fresh prices on startup
     from app.api.v1.endpoints.market import refresh_market_cache

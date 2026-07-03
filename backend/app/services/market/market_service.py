@@ -145,6 +145,7 @@ class MarketService:
 
         import yfinance as yf
         import pandas as pd
+        from app.services.market.ticker_utils import _yf_session
 
         try:
             raw = yf.download(
@@ -153,8 +154,9 @@ class MarketService:
                 interval="1d",
                 group_by="ticker",
                 auto_adjust=True,
-                threads=True,
+                threads=False,
                 progress=False,
+                session=_yf_session,
             )
         except Exception as e:
             logger.error(f"Outcome evaluation download failed: {e}")

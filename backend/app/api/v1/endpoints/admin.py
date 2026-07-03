@@ -31,7 +31,7 @@ async def verify_admin_token(api_key: str = Security(api_key_header)):
 @limiter.limit("2/hour")
 def trigger_training(
     request: Request,
-    background_tasks: BackgroundTasks, 
+    background_tasks: BackgroundTasks,
     token: str = Depends(verify_admin_token)
 ):
     """
@@ -41,3 +41,18 @@ def trigger_training(
     from scripts.train_xgboost import run_training_job
     background_tasks.add_task(run_training_job, all_symbols=True, force=True)
     return {"status": "success", "message": "Background ML training job started"}
+
+@router.post("/regenerate-picks")
+@limiter.limit("6/hour")
+def regenerate_picks(
+    request: Request,
+    background_tasks: BackgroundTasks,
+    token: str = Depends(verify_admin_token)
+):
+    """
+    Force-regenerates today's Daily Edge picks in the background.
+    Protected by X-Admin-Token header.
+    """
+    from app.services.market.market_service import MarketService
+    background_tasks.add_task(MarketService.generate_daily_picks, force=True)
+    return {"status": "success", "message": "Daily Edge pick regeneration started"}
