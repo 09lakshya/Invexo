@@ -15,6 +15,10 @@ logger = get_logger("market_service")
 PICKS_PER_BUCKET = 6
 MIN_LIFT_5D = 1.10
 
+# Bump when the pick payload/logic changes: stored picks with an older
+# version are regenerated automatically on the next startup or cron run.
+PICKS_VERSION = "ranker_v2.1"
+
 
 class MarketService:
     @staticmethod
@@ -27,15 +31,20 @@ class MarketService:
         return PicksRepository.get_daily_picks(today)
 
     @staticmethod
-    def _signal_1d(prob: float) -> str:
-        if prob >= 0.55:
+    def _signal_1d(prob: float, q_low: float, q_high: float) -> str:
+        """Cross-sectional 1d signal: next-day probabilities cluster tightly
+        around 0.5 (next-day direction is mostly noise), so fixed absolute
+        thresholds label everything Neutral. Instead, compare the stock
+        against the rest of the universe today: top ~30% of 1d scores is
+        Bullish, bottom ~30% is Bearish."""
+        if prob >= q_high:
             return "Bullish"
-        if prob <= 0.45:
+        if prob <= q_low:
             return "Bearish"
         return "Neutral"
 
     @staticmethod
-    def _build_pick(row: dict) -> dict:
+    def _build_pick(row: dict, q_low: float = 0.45, q_high: float = 0.55) -> dict:
         """Convert a ranker score row into the pick payload the UI shows."""
         prob_5d = row["prob_5d"]
         lift_5d = row["lift_5d"]
@@ -53,7 +62,7 @@ class MarketService:
             "prob_1d": row["prob_1d"],
             "lift_5d": lift_5d,                       # x-times avg stock
             "lift_1d": row["lift_1d"],
-            "signal_1d": MarketService._signal_1d(row["prob_1d"]),
+            "signal_1d": MarketService._signal_1d(row["prob_1d"], q_low, q_high),
             "confidence": round(prob_5d * 100, 1),    # model probability as %
             "score": round(lift_5d * 100, 1),
             "momentum_21d_pct": row.get("momentum_21d_pct"),
@@ -82,11 +91,11 @@ class MarketService:
 
         existing = MarketService.get_daily_picks()
         if existing is not None and not force:
-            # v2 payloads carry a "model" marker; anything else is legacy → regenerate
-            if isinstance(existing, dict) and existing.get("model") == "ranker_v2":
+            # Payloads carry a "model" version marker; anything older is regenerated
+            if isinstance(existing, dict) and existing.get("model") == PICKS_VERSION:
                 logger.info(f"Valid ranker picks already exist for {today}. Skipping.")
                 return
-            logger.info(f"Legacy picks found for {today}. Regenerating with ranker.")
+            logger.info(f"Outdated/legacy picks found for {today}. Regenerating.")
 
         logger.info(f"Starting Daily Edge ranker screening for {today}...")
         from app.services.ai.ranker_service import RankerService, get_ranker_meta
@@ -96,6 +105,12 @@ class MarketService:
             logger.error("Ranker returned no scores; daily picks not generated.")
             return
 
+        # Cross-sectional thresholds for the 1d signal: today's 30th/70th
+        # percentile of 1d probabilities across the whole universe.
+        probs_1d = sorted(r["prob_1d"] for r in scores)
+        q_low = probs_1d[int(len(probs_1d) * 0.30)]
+        q_high = probs_1d[int(len(probs_1d) * 0.70)]
+
         buckets = {"large_cap": [], "mid_cap": [], "small_cap": []}
         for row in sorted(scores, key=lambda r: r["lift_5d"], reverse=True):
             bucket = buckets.get(row["cap"])
@@ -103,12 +118,12 @@ class MarketService:
                 continue
             if row["lift_5d"] < MIN_LIFT_5D:
                 continue
-            bucket.append(MarketService._build_pick(row))
+            bucket.append(MarketService._build_pick(row, q_low, q_high))
 
         meta = get_ranker_meta() or {}
         as_of = scores[0].get("as_of") if scores else today
         final_picks = {
-            "model": "ranker_v2",
+            "model": PICKS_VERSION,
             "generated_at": datetime.now().isoformat(),
             "as_of": as_of,
             "horizons": ["1d", "5d"],
