@@ -1,6 +1,6 @@
 # Invexo — Premium Real-Time AI Stock Dashboard
 
-**Live Production App**: [invexo-one.vercel.app](https://invexo-one.vercel.app/)
+**Live Production App**: [invexo.co.in](https://invexo.co.in/)
 
 Invexo (NexTrade) is a premium real-time Indian stock market analytics dashboard. It combines real-time streaming, advanced quantitative technical analysis indicators, natural language news sentiment models, and consensus-calibrated machine learning predictions into a unified, responsive glassmorphic user interface.
 
