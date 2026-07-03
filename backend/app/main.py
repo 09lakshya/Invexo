@@ -48,6 +48,9 @@ async def lifespan(app: FastAPI):
     from app.services.market.alert_service import AlertService
     scheduler.add_job(MarketService.generate_daily_picks, 'cron', hour=0, minute=0)
     scheduler.add_job(AlertService.check_alerts, 'interval', minutes=1)
+    # Evaluate realized outcomes of past Daily Edge picks after NSE close
+    # (12:00 UTC = 17:30 IST) so the page can show measured accuracy.
+    scheduler.add_job(MarketService.evaluate_pick_outcomes, 'cron', hour=12, minute=0)
     scheduler.start()
     
     # 4. Trigger initial picks calculation in the background (skip on Render to save memory on startup)

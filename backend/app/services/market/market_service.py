@@ -1,34 +1,20 @@
 import os
 import json
-import concurrent.futures
 from datetime import datetime
 from app.repositories.picks_repository import PicksRepository
-from app.services.ai.prediction_service import PredictionService
+from app.services.market.universe import (
+    LARGE_CAP_UNIVERSE, MID_CAP_UNIVERSE, SMALL_CAP_UNIVERSE,
+)
 from app.utils.logger import get_logger
 
 logger = get_logger("market_service")
 
-# Universes for different market caps
-LARGE_CAP_UNIVERSE = [
-    "RELIANCE.NS", "TCS.NS", "HDFCBANK.NS", "ICICIBANK.NS", "INFY.NS",
-    "ITC.NS", "SBIN.NS", "BHARTIARTL.NS", "HINDUNILVR.NS", "BAJFINANCE.NS",
-    "LT.NS", "KOTAKBANK.NS", "AXISBANK.NS", "ASIANPAINT.NS", "MARUTI.NS",
-    "SUNPHARMA.NS", "TITAN.NS", "ULTRACEMCO.NS", "WIPRO.NS", "TATAMOTORS.NS"
-]
+# How many picks per cap bucket, and the minimum edge a stock needs to
+# qualify: lift_5d is the stock's probability of being a top-30% 5-day
+# performer relative to the average stock (1.0 = average).
+PICKS_PER_BUCKET = 6
+MIN_LIFT_5D = 1.10
 
-MID_CAP_UNIVERSE = [
-    "TRENT.NS", "HAL.NS", "TATAELXSI.NS", "IRCTC.NS", "DIXON.NS",
-    "POLYCAB.NS", "CUMMINSIND.NS", "COFORGE.NS", "PERSISTENT.NS", "AUBANK.NS",
-    "IDFCFIRSTB.NS", "FEDERALBNK.NS", "PAGEIND.NS", "VOLTAS.NS", "MAXHEALTH.NS",
-    "OBEROIRLTY.NS", "LUPIN.NS", "BSE.NS", "INDHOTEL.NS", "MRF.NS"
-]
-
-SMALL_CAP_UNIVERSE = [
-    "SUZLON.NS", "YESBANK.NS", "IDEA.NS", "RPOWER.NS", "JPPOWER.NS",
-    "SOUTHBANK.NS", "GMRINFRA.NS", "HCC.NS", "URJA.NS", "PCJEWELLER.NS",
-    "RVNL.NS", "IRFC.NS", "UCOBANK.NS", "IEX.NS", "NHPC.NS",
-    "ZOMATO.NS", "PAYTM.NS", "NYKAA.NS", "EASEMYTRIP.NS", "RCOM.NS"
-]
 
 class MarketService:
     @staticmethod
@@ -41,58 +27,44 @@ class MarketService:
         return PicksRepository.get_daily_picks(today)
 
     @staticmethod
-    def score_and_rank_universe(universe_name: str, symbols: list) -> list:
-        logger.info(f"Evaluating universe: {universe_name}...")
-        results = []
-        
-        def process_symbol(symbol):
-            try:
-                res = PredictionService.predict_stock(symbol)
-                if "error" in res:
-                    return None
-                    
-                predicted_price = res.get("xgb_predicted_price") or res.get("predicted_price", res["current_price"])
-                upside_pct = ((predicted_price - res["current_price"]) / res["current_price"]) * 100
-                
-                if upside_pct <= 0:
-                    return None
-                
-                news_score = res.get("news_sentiment", 0) * 10
-                fundamental_score = res.get("fundamental_score", 50) - 50
-                rsi = res.get("rsi", 50)
-                rsi_bonus = (50 - rsi) * 0.2
-                macd = res.get("macd", 0)
-                macd_bonus = 5 if macd > 0 else -5
-                
-                composite_score = (upside_pct * 10) + news_score + fundamental_score + rsi_bonus + macd_bonus
-                
-                if composite_score != composite_score:
-                    composite_score = 0
-                    
-                return {
-                    "symbol": symbol.replace(".NS", ""),
-                    "full_symbol": symbol,
-                    "current_price": res["current_price"],
-                    "target_price": predicted_price,
-                    "upside": round(upside_pct, 2),
-                    "score": round(composite_score, 1),
-                    "confidence": res.get("day_close_confidence", "Moderate"),
-                    "sentiment": res.get("news_impact", "neutral").capitalize(),
-                    "reasoning": f"AI model projects {round(upside_pct, 2)}% upside. Technical trend is {res.get('trend', 'neutral')}."
-                }
-            except Exception as e:
-                logger.error(f"Error evaluating {symbol}: {e}")
-                return None
+    def _signal_1d(prob: float) -> str:
+        if prob >= 0.55:
+            return "Bullish"
+        if prob <= 0.45:
+            return "Bearish"
+        return "Neutral"
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future_to_symbol = {executor.submit(process_symbol, sym): sym for sym in symbols}
-            for future in concurrent.futures.as_completed(future_to_symbol):
-                res = future.result()
-                if res:
-                    results.append(res)
-                
-        results.sort(key=lambda x: x["score"], reverse=True)
-        return results[:10]
+    @staticmethod
+    def _build_pick(row: dict) -> dict:
+        """Convert a ranker score row into the pick payload the UI shows."""
+        prob_5d = row["prob_5d"]
+        lift_5d = row["lift_5d"]
+        expected_5d = row["expected_5d_pct"]
+        target_price = round(row["close"] * (1 + expected_5d / 100), 2)
+        return {
+            "symbol": row["symbol"].replace(".NS", "").replace(".BO", ""),
+            "full_symbol": row["symbol"],
+            "cap": row["cap"],
+            "current_price": row["close"],
+            "target_price": target_price,
+            "upside": expected_5d,                    # expected 5d move, %
+            "expected_5d_pct": expected_5d,
+            "prob_5d": prob_5d,
+            "prob_1d": row["prob_1d"],
+            "lift_5d": lift_5d,                       # x-times avg stock
+            "lift_1d": row["lift_1d"],
+            "signal_1d": MarketService._signal_1d(row["prob_1d"]),
+            "confidence": round(prob_5d * 100, 1),    # model probability as %
+            "score": round(lift_5d * 100, 1),
+            "momentum_21d_pct": row.get("momentum_21d_pct"),
+            "rsi_14": row.get("rsi_14"),
+            "daily_vol_pct": row.get("daily_vol_pct"),
+            "reasoning": (
+                f"The cross-sectional model rates {row['symbol'].replace('.NS', '')} "
+                f"{lift_5d}x more likely than the average stock to be a top 5-day performer "
+                f"(21-day momentum {row.get('momentum_21d_pct', 0):+.1f}%, RSI {row.get('rsi_14', 50):.0f})."
+            ),
+        }
 
     @staticmethod
     def generate_daily_picks(force=False):
@@ -105,49 +77,116 @@ class MarketService:
                 os.write(fd, b"locked")
                 os.close(fd)
             except FileExistsError:
-                logger.warning(f"Another worker process is already generating picks for {today}. Skipping duplicate execution.")
+                logger.warning(f"Another worker is already generating picks for {today}. Skipping.")
                 return
-                
-        picks = MarketService.get_daily_picks()
-        if picks is not None and not force:
-            if isinstance(picks, list):
-                logger.info(f"Found legacy array format for {today}. Forcing regeneration to multi-cap format.")
-            else:
-                has_anomaly = False
-                if isinstance(picks, dict):
-                    large_caps = set(LARGE_CAP_UNIVERSE)
-                    mid_caps = set(MID_CAP_UNIVERSE)
-                    for cap, cap_picks in picks.items():
-                        for pick in cap_picks:
-                            symbol = pick.get("symbol", "").upper() + ".NS"
-                            upside = pick.get("upside", 0)
-                            if symbol in large_caps and upside > 3.0:
-                                has_anomaly = True
-                                break
-                            elif symbol in mid_caps and upside > 5.0:
-                                has_anomaly = True
-                                break
-                            elif symbol not in large_caps and symbol not in mid_caps and upside > 8.0:
-                                has_anomaly = True
-                                break
-                
-                if not has_anomaly:
-                    logger.info(f"Already generated valid multi-cap picks for {today}. Skipping.")
-                    return
-                else:
-                    logger.info(f"Detected abnormal predictions for {today}. Forcing auto-regeneration.")
-            
-        logger.info(f"Starting comprehensive daily AI screening for {today}...")
-        large_cap_picks = MarketService.score_and_rank_universe("Large Cap", LARGE_CAP_UNIVERSE)
-        mid_cap_picks = MarketService.score_and_rank_universe("Mid Cap", MID_CAP_UNIVERSE)
-        small_cap_picks = MarketService.score_and_rank_universe("Small Cap / Penny", SMALL_CAP_UNIVERSE)
-        
+
+        existing = MarketService.get_daily_picks()
+        if existing is not None and not force:
+            # v2 payloads carry a "model" marker; anything else is legacy → regenerate
+            if isinstance(existing, dict) and existing.get("model") == "ranker_v2":
+                logger.info(f"Valid ranker picks already exist for {today}. Skipping.")
+                return
+            logger.info(f"Legacy picks found for {today}. Regenerating with ranker.")
+
+        logger.info(f"Starting Daily Edge ranker screening for {today}...")
+        from app.services.ai.ranker_service import RankerService, get_ranker_meta
+
+        scores = RankerService.score_universe()
+        if not scores:
+            logger.error("Ranker returned no scores; daily picks not generated.")
+            return
+
+        buckets = {"large_cap": [], "mid_cap": [], "small_cap": []}
+        for row in sorted(scores, key=lambda r: r["lift_5d"], reverse=True):
+            bucket = buckets.get(row["cap"])
+            if bucket is None or len(bucket) >= PICKS_PER_BUCKET:
+                continue
+            if row["lift_5d"] < MIN_LIFT_5D:
+                continue
+            bucket.append(MarketService._build_pick(row))
+
+        meta = get_ranker_meta() or {}
+        as_of = scores[0].get("as_of") if scores else today
         final_picks = {
-            "large_cap": large_cap_picks,
-            "mid_cap": mid_cap_picks,
-            "small_cap": small_cap_picks
+            "model": "ranker_v2",
+            "generated_at": datetime.now().isoformat(),
+            "as_of": as_of,
+            "horizons": ["1d", "5d"],
+            "universe_size": len(scores),
+            "model_metrics": meta.get("metrics", {}),
+            "large_cap": buckets["large_cap"],
+            "mid_cap": buckets["mid_cap"],
+            "small_cap": buckets["small_cap"],
         }
-        
-        picks_json_str = json.dumps(final_picks)
-        PicksRepository.save_daily_picks(today, picks_json_str)
-        logger.info(f"Successfully saved multi-cap picks for {today}.")
+
+        PicksRepository.save_daily_picks(today, json.dumps(final_picks))
+        all_picks = buckets["large_cap"] + buckets["mid_cap"] + buckets["small_cap"]
+        PicksRepository.record_pick_outcomes(today, all_picks)
+        logger.info(
+            f"Saved ranker picks for {today}: "
+            f"{len(buckets['large_cap'])} large, {len(buckets['mid_cap'])} mid, "
+            f"{len(buckets['small_cap'])} small (universe scored: {len(scores)})"
+        )
+
+    @staticmethod
+    def evaluate_pick_outcomes():
+        """Fill realized 1d/5d returns for past picks. Run daily after close.
+
+        A pick's 1d outcome uses the first close AFTER the pick date; the 5d
+        outcome uses the fifth close after. Evaluation is idempotent — each
+        outcome is written once.
+        """
+        pending = PicksRepository.get_pending_outcomes()
+        if not pending:
+            return
+
+        symbols = sorted({p["symbol"] for p in pending})
+        logger.info(f"Evaluating outcomes for {len(pending)} picks across {len(symbols)} symbols...")
+
+        import yfinance as yf
+        import pandas as pd
+
+        try:
+            raw = yf.download(
+                tickers=" ".join(symbols),
+                period="3mo",
+                interval="1d",
+                group_by="ticker",
+                auto_adjust=True,
+                threads=True,
+                progress=False,
+            )
+        except Exception as e:
+            logger.error(f"Outcome evaluation download failed: {e}")
+            return
+
+        filled = 0
+        for p in pending:
+            try:
+                sym = p["symbol"]
+                df = raw[sym] if isinstance(raw.columns, pd.MultiIndex) else raw
+                closes = df["Close"].dropna()
+                if closes.empty:
+                    continue
+                idx = pd.to_datetime(closes.index)
+                if idx.tz is not None:
+                    idx = idx.tz_localize(None)
+                idx_dates = [d.date() for d in idx]
+                pick_date = pd.Timestamp(p["pick_date"]).date()
+                # positions strictly after the pick date
+                after = [i for i, d in enumerate(idx_dates) if d > pick_date]
+                if not after:
+                    continue
+                entry = float(p["entry_price"])
+                if p.get("ret_1d") is None and len(after) >= 1:
+                    ret = float(closes.iloc[after[0]]) / entry - 1
+                    PicksRepository.fill_outcome(p["id"], "1d", round(ret, 5))
+                    filled += 1
+                if p.get("ret_5d") is None and len(after) >= 5:
+                    ret = float(closes.iloc[after[4]]) / entry - 1
+                    PicksRepository.fill_outcome(p["id"], "5d", round(ret, 5))
+                    filled += 1
+            except Exception as e:
+                logger.error(f"Outcome eval error for {p.get('symbol')}: {e}")
+
+        logger.info(f"Filled {filled} pick outcomes.")

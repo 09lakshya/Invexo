@@ -43,3 +43,5 @@ backend/app/services/*cache.json
 
 # Workspace specific
 scratch/
+# ML training data cache
+backend/data_cache/

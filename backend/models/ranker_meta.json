@@ -1,0 +1,46 @@
+{
+  "features": [
+    "ret_1d_rank",
+    "ret_5d_rank",
+    "ret_21d_rank",
+    "ret_63d_rank",
+    "ret_126d_rank",
+    "vol_21d_rank",
+    "vol_63d_rank",
+    "rsi_14_rank",
+    "macd_hist_rank",
+    "vol_ratio_rank",
+    "dist_high_63_rank",
+    "dist_low_63_rank",
+    "bb_pos_rank",
+    "ma20_gap_rank",
+    "ma50_gap_rank",
+    "rsi_14",
+    "bb_pos",
+    "vol_21d",
+    "mkt_ret_5d",
+    "mkt_ret_21d",
+    "breadth_ma50"
+  ],
+  "symbols": 253,
+  "rows": 277650,
+  "trained_at": "2026-07-04T00:57:48.525104",
+  "metrics": {
+    "1d": {
+      "auc": 0.5247,
+      "top10_label_hit_rate": 0.5334,
+      "label_base_rate": 0.4965,
+      "top10_abs_win_rate": 0.5032,
+      "top10_daily_edge_pct": 0.108,
+      "folds": 4
+    },
+    "5d": {
+      "auc": 0.5339,
+      "top10_label_hit_rate": 0.3653,
+      "label_base_rate": 0.3007,
+      "top10_abs_win_rate": 0.5086,
+      "top10_daily_edge_pct": 0.2682,
+      "folds": 4
+    }
+  }
+}
