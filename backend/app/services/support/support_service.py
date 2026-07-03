@@ -21,8 +21,7 @@ class SupportService:
         return (
             os.environ.get("SUPPORT_EMAIL")
             or os.environ.get("SMTP_USER")
-            or os.environ.get("RESEND_FROM")
-            or "support@invexo.co.in"
+            or "ai.invexo@outlook.com"
         )
 
     @staticmethod

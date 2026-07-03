@@ -381,10 +381,10 @@ export default function SupportPage() {
                   <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "4px" }}>
                     Email us directly at{" "}
                     <a
-                      href="mailto:support@invexo.co.in"
+                      href="mailto:ai.invexo@outlook.com"
                       style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}
                     >
-                      support@invexo.co.in
+                      ai.invexo@outlook.com
                     </a>
                   </p>
                 </div>
