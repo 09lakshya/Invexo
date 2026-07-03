@@ -25,7 +25,8 @@ async def lifespan(app: FastAPI):
     from app.repositories.portfolio_repository import PortfolioRepository
     from app.repositories.watchlist_repository import WatchlistRepository
     from app.repositories.alert_repository import AlertRepository
-    
+    from app.repositories.support_repository import SupportRepository
+
     try:
         logger.info("Initializing database schemas...")
         UserRepository.init_users_db()
@@ -33,6 +34,7 @@ async def lifespan(app: FastAPI):
         PortfolioRepository.init_portfolio_db()
         WatchlistRepository.init_watchlist_db()
         AlertRepository.init_alert_db()
+        SupportRepository.init_support_db()
         logger.info("Database schemas initialized successfully.")
     except Exception as e:
         logger.error(f"Failed to initialize database tables: {e}")

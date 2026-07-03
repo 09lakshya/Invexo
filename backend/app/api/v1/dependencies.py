@@ -19,6 +19,19 @@ def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
         
     return user
 
+def get_optional_user(authorization: Optional[str] = Header(None)) -> Optional[dict]:
+    """Like get_current_user but returns None instead of raising when unauthenticated.
+
+    Useful for public endpoints that want to associate a logged-in user when present.
+    """
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    token = authorization.split(" ", 1)[1]
+    user_id = verify_access_token(token)
+    if user_id is None:
+        return None
+    return UserRepository.get_user_by_id(user_id)
+
 def require_role(allowed_roles: list[str]):
     """Enforce Role-Based Access Control (RBAC) on endpoints."""
     def dependency(current_user: dict = Depends(get_current_user)) -> dict:

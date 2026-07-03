@@ -3,7 +3,7 @@ import Head from "next/head";
 import Link from "next/link";
 import Navbar from "../components/Navbar";
 import { useAuth } from "../context/AuthContext";
-import emailjs from "@emailjs/browser";
+import API from "../services/api";
 
 export default function SupportPage() {
   const { user } = useAuth();
@@ -35,56 +35,39 @@ export default function SupportPage() {
       return;
     }
 
-    setStatus({ type: "loading", text: "Sending your message..." });
-
-    // Grab keys from env
-    const serviceId = process.env.NEXT_PUBLIC_EMAILJS_SERVICE_ID;
-    const templateId = process.env.NEXT_PUBLIC_EMAILJS_TEMPLATE_ID;
-    const publicKey = process.env.NEXT_PUBLIC_EMAILJS_PUBLIC_KEY;
-
-    if (!serviceId || !templateId || !publicKey) {
-      // Configuration fallback
-      console.warn("EmailJS keys are missing. Simulating successful send.");
-      setTimeout(() => {
-        setStatus({
-          type: "success",
-          text: "Thank you! Your message has been sent (Developer Mode: Mock success).",
-        });
-        setSubject("");
-        setMessage("");
-      }, 1500);
+    // Basic email sanity check
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setStatus({ type: "error", text: "Please enter a valid email address." });
       return;
     }
 
-    try {
-      const result = await emailjs.send(
-        serviceId,
-        templateId,
-        {
-          from_name: name,
-          from_email: email,
-          subject: subject,
-          category: category.toUpperCase(),
-          message: message,
-        },
-        publicKey
-      );
+    setStatus({ type: "loading", text: "Sending your message..." });
 
-      if (result.status === 200) {
-        setStatus({
-          type: "success",
-          text: "Your message has been sent successfully. We will get back to you soon!",
-        });
-        setSubject("");
-        setMessage("");
-      } else {
-        throw new Error("Unable to send message");
-      }
+    try {
+      const res = await API.post("/support/contact", {
+        name: name.trim(),
+        email: email.trim(),
+        category,
+        subject: subject.trim(),
+        message: message.trim(),
+      });
+
+      setStatus({
+        type: "success",
+        text:
+          res?.data?.message ||
+          "Your message has been sent successfully. We will get back to you soon!",
+      });
+      setSubject("");
+      setMessage("");
     } catch (error) {
-      console.error("EmailJS Error:", error);
+      console.error("Support submit error:", error);
+      const detail = error?.response?.data?.detail;
       setStatus({
         type: "error",
-        text: error?.text || "Failed to send the message. Please try again later or contact us directly.",
+        text:
+          (typeof detail === "string" && detail) ||
+          "Failed to send the message. Please try again later or contact us directly.",
       });
     }
   };
@@ -398,10 +381,10 @@ export default function SupportPage() {
                   <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", marginTop: "4px" }}>
                     Email us directly at{" "}
                     <a
-                      href="mailto:support@invexo.com"
+                      href="mailto:support@invexo.co.in"
                       style={{ color: "var(--accent)", textDecoration: "none", fontWeight: 600 }}
                     >
-                      support@invexo.com
+                      support@invexo.co.in
                     </a>
                   </p>
                 </div>

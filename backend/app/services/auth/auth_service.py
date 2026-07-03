@@ -12,7 +12,7 @@ logger = get_logger("auth_service")
 
 class AuthService:
     @staticmethod
-    def _send_email(to: str, subject: str, text: str, html: str = None) -> bool:
+    def _send_email(to: str, subject: str, text: str, html: str = None, reply_to: str = None) -> bool:
         """Sends an email via Resend API with SMTP fallback. Returns True on success."""
         resend_key = os.environ.get("RESEND_API_KEY", "")
         if resend_key:
@@ -24,11 +24,13 @@ class AuthService:
                     "to": [to],
                     "subject": subject
                 }
+                if reply_to:
+                    payload["reply_to"] = reply_to
                 if html:
                     payload["html"] = html
                 else:
                     payload["text"] = text
-                    
+
                 res = requests.post(
                     "https://api.resend.com/emails",
                     headers={"Authorization": f"Bearer {resend_key}"},
@@ -61,10 +63,12 @@ class AuthService:
                     msg.attach(MIMEText(html, "html"))
                 else:
                     msg = MIMEText(text)
-                    
+
                 msg["Subject"] = subject
                 msg["From"] = sender
                 msg["To"] = to
+                if reply_to:
+                    msg["Reply-To"] = reply_to
 
                 if port == 465:
                     server = smtplib.SMTP_SSL(host, port, timeout=10)
