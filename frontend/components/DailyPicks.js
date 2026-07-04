@@ -40,7 +40,7 @@ export default function DailyPicks() {
           Daily Edge
         </h2>
         <p style={{ color: "var(--text-muted)", fontSize: "0.9rem", marginBottom: "24px" }}>
-          Our AI is currently crunching millions of data points across Large, Mid, and Small Cap stocks...
+          Ranking 253 liquid NSE stocks — 100 large, 94 mid &amp; 59 small cap — on today&apos;s prices…
         </p>
         
         <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
@@ -93,7 +93,7 @@ export default function DailyPicks() {
             Daily Edge
           </h2>
           <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem", margin: 0 }}>
-            Highly curated recommendations based on predictive XGBoost models and market sentiment.
+            A cross-sectional XGBoost model ranks 253 NSE stocks each day by their odds of out-performing over the next 5 sessions.
           </p>
         </div>
         <span style={{ fontSize: "0.75rem", background: "var(--purple-dim)", color: "var(--purple)", padding: "4px 8px", borderRadius: "8px", fontWeight: 700 }}>
@@ -260,10 +260,6 @@ export default function DailyPicks() {
       )}
       
       <style>{`
-        @keyframes shimmer {
-          0% { background-position: 200% 0; }
-          100% { background-position: -200% 0; }
-        }
         @keyframes pulse {
           0% { opacity: 0.6; }
           50% { opacity: 0.3; }

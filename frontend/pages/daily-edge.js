@@ -160,7 +160,7 @@ export default function DailyEdgePage() {
               Daily <span className="text-gradient">Edge</span>
             </h1>
             <p style={{ color: "var(--text-muted)", fontSize: "1rem", maxWidth: "640px", margin: "0 auto" }}>
-              A cross-sectional AI model ranks {picks?.universe_size || "250+"} liquid NSE stocks every day and
+              A cross-sectional AI model ranks {picks?.universe_size || "253"} liquid NSE stocks every day and
               surfaces the ones most likely to outperform — with its real track record shown below.
             </p>
             {picks?.as_of && (
