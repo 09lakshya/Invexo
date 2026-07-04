@@ -668,7 +668,7 @@ export default function StockDetail() {
                     </div>
                     {/* Bands Slider */}
                     <div style={{ height: "6px", background: "var(--border-subtle)", borderRadius: "3px", position: "relative", margin: "10px 0" }}>
-                      <div style={{ position: "absolute", left: `calc(${Math.max(0, Math.min(100, indicators.bollinger.percent))}% - 4px)`, top: "-4px", width: "8px", height: "14px", borderRadius: "3px", background: "var(--accent)", boxShadow: "0 0 8px var(--accent)" }} />
+                      <div style={{ position: "absolute", left: `calc(${Math.max(0, Math.min(100, indicators.bollinger.percent))}% - 4px)`, top: "-4px", width: "8px", height: "14px", borderRadius: "3px", background: "var(--accent)" }} />
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.68rem", color: "var(--text-muted)" }}>
                       <span>Lower: ₹{indicators.bollinger.lower.toFixed(1)}</span>

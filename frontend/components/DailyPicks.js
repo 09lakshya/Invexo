@@ -31,10 +31,10 @@ export default function DailyPicks() {
       }}>
         <div style={{
           position: "absolute",
-          top: 0, left: 0, right: 0, height: "3px",
-          background: "linear-gradient(90deg, var(--accent), var(--purple), var(--accent))",
-          backgroundSize: "200% 100%",
-          animation: "shimmer 2s infinite linear"
+          top: 0, left: 0, right: 0, height: "2px",
+          background: "var(--accent)",
+          opacity: 0.6,
+          animation: "skeletonPulse 1.6s ease-in-out infinite"
         }} />
         <h2 style={{ fontSize: "1.2rem", fontWeight: 800, marginBottom: "8px" }}>
           Daily Edge

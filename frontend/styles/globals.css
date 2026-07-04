@@ -179,27 +179,9 @@ body {
   overflow: hidden;
 }
 
-/* Shimmer sweep on hover */
-.card::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 60%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent);
-  pointer-events: none;
-  transition: left 0.5s ease;
-}
-
-.card:hover::after {
-  left: 150%;
-}
-
 .card:hover {
-  border-color: rgba(240, 185, 11, 0.3);
-  transform: translateY(-3px);
-  box-shadow: 0 24px 64px rgba(240, 185, 11, 0.1), 0 4px 16px rgba(0,0,0,0.4);
+  border-color: var(--border-medium);
+  box-shadow: var(--shadow-card);
 }
 
 /* ── Buttons ───────────────────────────────────────────────────── */
@@ -353,17 +335,12 @@ body {
   margin: 16px 0;
 }
 
-/* ── Glow Effects ──────────────────────────────────────────────── */
-.glow-accent {
-  box-shadow: 0 0 20px rgba(240, 185, 11, 0.2), 0 0 60px rgba(240, 185, 11, 0.05);
-}
-
-.glow-green {
-  box-shadow: 0 0 20px rgba(0, 230, 118, 0.2);
-}
-
+/* ── Glow Effects — retired for a calmer, flatter look ─────────────
+   Kept as no-ops so existing class usages don't need touching. */
+.glow-accent,
+.glow-green,
 .glow-red {
-  box-shadow: 0 0 20px rgba(255, 23, 68, 0.2);
+  box-shadow: none;
 }
 
 /* ── Sparkline SVG ─────────────────────────────────────────────── */
@@ -419,9 +396,10 @@ body {
 }
 
 /* ── Animations ────────────────────────────────────────────────── */
+/* Entrance motion retired — a quiet fade reads calmer than a rise. */
 @keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(24px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
 @keyframes fadeIn {
@@ -435,30 +413,32 @@ body {
 }
 
 @keyframes dealIn {
-  from { opacity: 0; transform: translateY(32px) scale(0.94) rotate(-0.5deg); }
-  to   { opacity: 1; transform: translateY(0) scale(1) rotate(0deg); }
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
+/* Was a pulsing glow; now a soft opacity breathe (no glow). */
 @keyframes pulseGlow {
-  0%, 100% { box-shadow: 0 0 20px rgba(240, 185, 11, 0.2); }
-  50%       { box-shadow: 0 0 40px rgba(240, 185, 11, 0.45); }
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.6; }
 }
 
 @keyframes pulseGlowGreen {
-  0%, 100% { box-shadow: 0 0 16px rgba(0, 230, 118, 0.25), 0 0 48px rgba(0, 230, 118, 0.08); }
-  50%       { box-shadow: 0 0 32px rgba(0, 230, 118, 0.5), 0 0 80px rgba(0, 230, 118, 0.15); }
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.6; }
 }
 
+/* Price ticks keep a subtle background flash, minus the glow. */
 @keyframes flashPriceUp {
-  0%   { background: rgba(0, 230, 118, 0); box-shadow: none; }
-  30%  { background: rgba(0, 230, 118, 0.12); box-shadow: 0 0 20px rgba(0, 230, 118, 0.3); }
-  100% { background: rgba(0, 230, 118, 0); box-shadow: none; }
+  0%   { background: rgba(0, 230, 118, 0); }
+  30%  { background: rgba(0, 230, 118, 0.12); }
+  100% { background: rgba(0, 230, 118, 0); }
 }
 
 @keyframes flashPriceDown {
-  0%   { background: rgba(255, 23, 68, 0); box-shadow: none; }
-  30%  { background: rgba(255, 23, 68, 0.12); box-shadow: 0 0 20px rgba(255, 23, 68, 0.3); }
-  100% { background: rgba(255, 23, 68, 0); box-shadow: none; }
+  0%   { background: rgba(255, 23, 68, 0); }
+  30%  { background: rgba(255, 23, 68, 0.12); }
+  100% { background: rgba(255, 23, 68, 0); }
 }
 
 @keyframes shimmer {
@@ -487,8 +467,13 @@ body {
 }
 
 @keyframes borderGlow {
-  0%, 100% { border-color: rgba(240, 185, 11, 0.15); }
-  50%       { border-color: rgba(240, 185, 11, 0.35); }
+  0%, 100% { border-color: rgba(240, 185, 11, 0.2); }
+  50%      { border-color: rgba(240, 185, 11, 0.2); }
+}
+
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.5; }
 }
 
 .animate-fadeInUp   { animation: fadeInUp 0.5s ease forwards; }
@@ -505,11 +490,10 @@ body {
 .animate-delay-300 { animation-delay: 0.3s; }
 .animate-delay-400 { animation-delay: 0.4s; }
 
-/* Skeleton loader */
+/* Skeleton loader — soft opacity pulse instead of a moving shimmer sweep. */
 .skeleton {
-  background: linear-gradient(90deg, var(--skeleton-from) 25%, var(--skeleton-mid) 50%, var(--skeleton-from) 75%);
-  background-size: 800px 100%;
-  animation: shimmer 1.5s infinite;
+  background: var(--skeleton-mid);
+  animation: skeletonPulse 1.6s ease-in-out infinite;
   border-radius: 8px;
 }
 
@@ -888,21 +872,9 @@ html[data-theme] textarea {
 [data-theme="light"] .text-positive { color: var(--green) !important; }
 [data-theme="light"] .text-negative { color: var(--red) !important; }
 
-/* Glow effects — softer in light mode */
-[data-theme="light"] .glow-accent {
-  box-shadow: 0 2px 12px rgba(180, 83, 9, 0.15);
-}
-[data-theme="light"] .glow-green {
-  box-shadow: 0 2px 12px rgba(22, 163, 74, 0.15);
-}
-[data-theme="light"] .glow-red {
-  box-shadow: 0 2px 12px rgba(220, 38, 38, 0.15);
-}
-
 /* Skeleton */
 [data-theme="light"] .skeleton {
-  background: linear-gradient(90deg, var(--skeleton-from) 25%, var(--skeleton-mid) 50%, var(--skeleton-from) 75%);
-  background-size: 800px 100%;
+  background: var(--skeleton-mid);
 }
 
 /* Spinner */

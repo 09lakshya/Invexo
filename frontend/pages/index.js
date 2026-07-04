@@ -69,8 +69,8 @@ function MarketStatusBadge({ connected }) {
           height: "6px",
           borderRadius: "50%",
           background: color,
-          animation: live ? "pulseGlowGreen 2s ease-in-out infinite" : "none",
-          boxShadow: live ? "0 0 8px var(--green)" : "none",
+          animation: live ? "pulseGlow 2s ease-in-out infinite" : "none",
+          boxShadow: "none",
         }}
       />
       {label}
@@ -699,7 +699,7 @@ export default function Home() {
                 borderRadius: "16px",
                 padding: "12px 18px",
                 transition: "all 0.25s ease",
-                boxShadow: focused ? "0 0 24px var(--accent-glow), var(--shadow-card)" : "var(--shadow-card)",
+                boxShadow: "var(--shadow-card)",
               }}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={focused ? "var(--accent)" : "var(--text-muted)"} strokeWidth="2.5" style={{ flexShrink: 0 }}>
@@ -899,7 +899,6 @@ export default function Home() {
                     background: "linear-gradient(90deg, var(--green), var(--green-dim))",
                     borderRadius: "8px 0 0 8px",
                     transition: "flex 0.5s ease",
-                    boxShadow: gainersCount > losersCount ? "0 0 12px var(--green-dim)" : "none",
                   }}
                 />
                 <div
@@ -908,7 +907,6 @@ export default function Home() {
                     background: "linear-gradient(90deg, var(--red-dim), var(--red))",
                     borderRadius: "0 8px 8px 0",
                     transition: "flex 0.5s ease",
-                    boxShadow: losersCount > gainersCount ? "0 0 12px var(--red-dim)" : "none",
                   }}
                 />
               </div>

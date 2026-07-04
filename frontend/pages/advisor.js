@@ -155,8 +155,8 @@ function OptionCard({ selected, onClick, label, sub, icon, accentColor }) {
           ? "var(--hover-overlay)"
           : "var(--bg-card)",
         transition: "all 0.2s ease",
-        transform: selected ? "scale(1.02)" : hovered ? "scale(1.01)" : "scale(1)",
-        boxShadow: selected ? "0 0 20px var(--accent-glow)" : "none",
+        transform: selected ? "scale(1.01)" : "scale(1)",
+        boxShadow: "none",
         userSelect: "none",
       }}
     >

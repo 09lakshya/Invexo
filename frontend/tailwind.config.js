@@ -56,8 +56,8 @@ module.exports = {
           "50%":       { transform: "translateY(-10px)" },
         },
         pulseGlow: {
-          "0%, 100%": { boxShadow: "0 0 20px rgba(240, 185, 11, 0.2)" },
-          "50%":       { boxShadow: "0 0 40px rgba(240, 185, 11, 0.45)" },
+          "0%, 100%": { opacity: "1" },
+          "50%":       { opacity: "0.6" },
         },
         fadeInUp: {
           from: { opacity: "0", transform: "translateY(24px)" },
