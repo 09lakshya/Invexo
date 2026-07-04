@@ -1028,7 +1028,7 @@ export default function Home() {
                 return (
                   <div
                     key={sym}
-                    style={{ animation: `dealIn 0.5s ${idx * 0.04}s cubic-bezier(0.22, 1, 0.36, 1) both` }}
+                    style={{ display: "flex", flexDirection: "column", height: "100%", animation: `dealIn 0.5s ${idx * 0.04}s cubic-bezier(0.22, 1, 0.36, 1) both` }}
                   >
                     <StockCard
                       symbol={sym}

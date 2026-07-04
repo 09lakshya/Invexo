@@ -107,6 +107,10 @@ export default memo(function StockCard({ symbol, price, change, percent, color, 
         WebkitBackdropFilter: "blur(16px)",
         position: "relative",
         overflow: "hidden",
+        flex: 1,
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
       }}
     >
       {/* Background glow on hover */}
@@ -121,7 +125,7 @@ export default memo(function StockCard({ symbol, price, change, percent, color, 
         />
       )}
 
-      <div style={{ position: "relative", zIndex: 1 }}>
+      <div style={{ position: "relative", zIndex: 1, flex: 1, display: "flex", flexDirection: "column" }}>
         {/* Header row */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "12px", gap: "8px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
@@ -281,7 +285,7 @@ export default memo(function StockCard({ symbol, price, change, percent, color, 
         )}
 
         {/* Change row + Sparkline */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: "auto" }}>
           <div>
             {hasData ? (
               <>
