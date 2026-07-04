@@ -6,10 +6,35 @@ from app.services.portfolio.portfolio_service import PortfolioService
 from app.services.ai.copilot_tools import TOOL_DECLARATIONS, WRITE_TOOLS, execute_tool
 from app.utils.logger import get_logger
 import os
+import re
 import time
 import requests
 
 logger = get_logger("copilot_service")
+
+# Purely social messages that never need a tool or the LLM — answered locally
+# with zero Gemini calls to save quota. Kept intentionally narrow: affirmations
+# like "ok"/"yes"/"sure" are excluded because they're often confirmations to a
+# follow-up Vexo asked and still need the model/tools.
+_GREETINGS = {
+    "hi", "hello", "hey", "yo", "hiya", "hii", "hey there", "hello there",
+    "namaste", "hola", "greetings", "good morning", "good afternoon",
+    "good evening", "gm", "sup", "whats up",
+}
+_THANKS = {
+    "thanks", "thank you", "thank you so much", "thanks a lot", "thanks so much",
+    "ty", "thx", "tysm", "thankyou", "cheers", "much appreciated", "appreciate it",
+}
+_BYES = {
+    "bye", "goodbye", "see you", "see ya", "cya", "later", "good night",
+    "goodnight", "gn", "take care",
+}
+_GREETING_REPLY = (
+    "👋 **Hi! I'm Vexo, your AI investment assistant.**\n\n"
+    "I can run AI **predictions**, pull today's **Daily Edge** picks, analyze your "
+    "**portfolio & watchlist**, fetch **news**, and set **price alerts** for you. "
+    "What would you like to do?"
+)
 
 # Gemini model powering Vexo. Override with GEMINI_MODEL env var.
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash").strip()
@@ -60,7 +85,28 @@ class _RateLimited(Exception):
 
 class CopilotService:
     @staticmethod
+    def _quick_reply(message: str) -> str | None:
+        """Instant local reply for purely social messages (no Gemini call)."""
+        cleaned = re.sub(r"[^a-z0-9\s]", "", message.lower()).strip()
+        words = [w for w in cleaned.split() if w != "vexo"]
+        phrase = " ".join(words)
+        if not phrase or len(words) > 4:
+            return None
+        if phrase in _GREETINGS:
+            return _GREETING_REPLY
+        if phrase in _THANKS:
+            return "You're welcome! 😊 Anything else — a prediction, your portfolio, or today's Daily Edge picks?"
+        if phrase in _BYES:
+            return "Take care! 📈 Come back anytime for predictions, alerts, or a portfolio check."
+        return None
+
+    @staticmethod
     def get_copilot_response(user_id: int, message: str, history: list | None = None) -> str:
+        # Fast path: social pleasantries need neither tools nor the LLM.
+        quick = CopilotService._quick_reply(message)
+        if quick:
+            return quick
+
         api_key = os.environ.get("GEMINI_API_KEY", "").strip()
         if api_key:
             try:

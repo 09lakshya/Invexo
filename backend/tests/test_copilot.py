@@ -127,6 +127,39 @@ def test_agent_create_alert_action_persists(monkeypatch):
     assert alerts[0]["condition"] == "above"
 
 
+def test_greetings_skip_gemini_entirely(monkeypatch):
+    """Pure greetings/thanks are answered locally with zero Gemini calls."""
+    headers, _ = _agent_user()
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+
+    def boom(*a, **k):
+        raise AssertionError("Gemini should not be called for a greeting")
+
+    monkeypatch.setattr(cs.requests, "post", boom)
+
+    for msg in ["hi", "Hello!", "hey Vexo", "thanks a lot", "thank you", "bye"]:
+        res = client.post("/api/v1/copilot/chat", json={"message": msg}, headers=headers)
+        assert res.status_code == 200
+        assert len(res.json()["response"]) > 0
+
+
+def test_affirmation_still_reaches_model(monkeypatch):
+    """'yes'/'sure' are NOT short-circuited — they may confirm a pending action."""
+    headers, _ = _agent_user()
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    called = {"n": 0}
+
+    def fake_post(url, json=None, headers=None, timeout=None):
+        called["n"] += 1
+        return _FakeResp(_model_text("Okay, done."))
+
+    monkeypatch.setattr(cs.requests, "post", fake_post)
+
+    res = client.post("/api/v1/copilot/chat", json={"message": "yes please do it"}, headers=headers)
+    assert res.status_code == 200
+    assert called["n"] == 1  # reached the model, not the local fast-path
+
+
 def test_rate_limit_keeps_chat_alive(monkeypatch):
     """A persistent 429 yields a friendly retry message, not a silent downgrade."""
     headers, _ = _agent_user()
@@ -180,7 +213,7 @@ def test_transient_500_retries_then_succeeds(monkeypatch):
 
     monkeypatch.setattr(cs.requests, "post", fake_post)
 
-    res = client.post("/api/v1/copilot/chat", json={"message": "hi"}, headers=headers)
+    res = client.post("/api/v1/copilot/chat", json={"message": "how is INFY doing?"}, headers=headers)
     assert res.status_code == 200
     assert "Recovered" in res.json()["response"]
     assert state["n"] == 2
