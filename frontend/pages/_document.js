@@ -14,7 +14,7 @@ export default function Document() {
         {/* Web App Manifest — Android Chrome, PWA */}
         <link rel="manifest" href="/site.webmanifest" />
         {/* Windows tile */}
-        <meta name="msapplication-TileColor" content="#080c1a" />
+        <meta name="msapplication-TileColor" content="#0b0e11" />
         <meta name="msapplication-TileImage" content="/logo-192.png" />
 
         {/* ── Fonts ── */}
@@ -26,7 +26,7 @@ export default function Document() {
         />
 
         {/* ── Meta ── */}
-        <meta name="theme-color" content="#080c1a" />
+        <meta name="theme-color" content="#0b0e11" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />

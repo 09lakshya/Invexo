@@ -164,7 +164,7 @@ export default function Navbar() {
                   width: "36px",
                   height: "36px",
                   flexShrink: 0,
-                  filter: "drop-shadow(0 2px 8px rgba(0,229,255,0.3))",
+                  filter: "drop-shadow(0 2px 8px rgba(240,185,11,0.3))",
                   objectFit: "contain",
                   borderRadius: "6px",
                   aspectRatio: "1 / 1",

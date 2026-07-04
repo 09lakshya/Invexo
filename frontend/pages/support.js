@@ -172,7 +172,7 @@ export default function SupportPage() {
                           ? "rgba(0, 230, 118, 0.2)"
                           : status.type === "error"
                           ? "rgba(255, 23, 68, 0.2)"
-                          : "rgba(0, 229, 255, 0.2)"
+                          : "rgba(240, 185, 11, 0.2)"
                       }`,
                       transition: "all 0.3s ease",
                     }}
