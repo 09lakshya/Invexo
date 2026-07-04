@@ -5,6 +5,7 @@ from app.repositories.user_repository import UserRepository
 from app.repositories.alert_repository import AlertRepository
 from app.services.market.alert_service import AlertService
 from app.services.market.advisor_service import AdvisorService
+from app.services.auth.auth_service import AuthService
 
 client = TestClient(app)
 
@@ -64,3 +65,46 @@ def test_alert_crud_and_poller():
     response = client.delete(f"/api/v1/alerts/{alert_id}", headers=headers)
     assert response.status_code == 200
     assert response.json()["success"] is True
+
+
+def test_target_reached_sends_email_to_registered_address():
+    # Setup user
+    pwd_hash = hash_password("mypassword")
+    user = UserRepository.create_user("target-email@gmail.com", pwd_hash, "Target User", 28)
+    token = create_access_token(user["id"])
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Create a "below" alert
+    response = client.post("/api/v1/alerts/", json={
+        "symbol": "TCS",
+        "target_price": 3000.0,
+        "condition": "below"
+    }, headers=headers)
+    assert response.status_code == 200
+
+    # Capture outbound emails instead of actually sending
+    sent = []
+    original_send = AuthService._send_email
+    original_fetch = AdvisorService._fetch_signals
+    AuthService._send_email = staticmethod(
+        lambda to, subject, text, html=None, reply_to=None: sent.append(
+            {"to": to, "subject": subject, "text": text, "html": html}
+        ) or True
+    )
+    # Price drops below target -> should trigger
+    AdvisorService._fetch_signals = lambda sym: {"current_price": 2900.0, "rsi": 40.0, "trend": "BEARISH"}
+
+    try:
+        triggered_count = AlertService.check_alerts()
+    finally:
+        AuthService._send_email = original_send
+        AdvisorService._fetch_signals = original_fetch
+
+    assert triggered_count == 1
+    # Exactly one notification, delivered to the user's registered email
+    matching = [m for m in sent if m["to"] == "target-email@gmail.com"]
+    assert len(matching) == 1
+    msg = matching[0]
+    assert "TCS" in msg["subject"]
+    assert "2,900.00" in msg["text"]  # current price rendered in the body
+    assert msg["html"] is not None
