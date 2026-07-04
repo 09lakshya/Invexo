@@ -36,7 +36,7 @@ services:
       - JWT_SECRET=production_secret_key_please_change_me_in_production
       # Vexo AI assistant. Set GEMINI_API_KEY in your host env / .env file.
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
-      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.0-flash}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
     ports:
       - "8000:8000"
     depends_on:

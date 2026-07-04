@@ -37,7 +37,7 @@ _GREETING_REPLY = (
 )
 
 # Gemini model powering Vexo. Override with GEMINI_MODEL env var.
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash").strip()
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash").strip()
 # Statuses worth retrying: rate limit (429) and transient server errors.
 RETRYABLE_STATUS = {429, 500, 503}
 # Per-message retry budget and the longest we'll wait for a single backoff.
