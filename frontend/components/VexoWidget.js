@@ -7,7 +7,7 @@ export default function VexoWidget() {
   const [chatHistory, setChatHistory] = useState([
     {
       sender: "copilot",
-      text: "👋 **Hello! I'm Vexo, your AI investment assistant.**\n\nHow can I help you with your portfolio or stock research today?",
+      text: "👋 **Hello! I'm Vexo, your AI investment assistant.**\n\nI can run AI **predictions**, pull today's **Daily Edge** picks, analyze your **portfolio & watchlist**, fetch **news**, and even set **price alerts** for you. What would you like to do?",
     },
   ]);
   const [chatLoading, setChatLoading] = useState(false);
@@ -24,10 +24,14 @@ export default function VexoWidget() {
     if (!chatInput.trim()) return;
     const msg = chatInput;
     setChatInput("");
+    // Send the recent conversation so Vexo has memory of the dialogue.
+    const priorHistory = chatHistory
+      .slice(-10)
+      .map((m) => ({ sender: m.sender, text: m.text }));
     setChatHistory((prev) => [...prev, { sender: "user", text: msg }]);
     setChatLoading(true);
     try {
-      const res = await API.post("/copilot/chat", { message: msg });
+      const res = await API.post("/copilot/chat", { message: msg, history: priorHistory });
       setChatHistory((prev) => [...prev, { sender: "copilot", text: res.data.response }]);
     } catch (err) {
       setChatHistory((prev) => [
@@ -326,7 +330,7 @@ export default function VexoWidget() {
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && sendCopilotMessage()}
-              placeholder="Ask about your portfolio..."
+              placeholder="Ask for a prediction, picks, or analysis..."
               style={{
                 flex: 1,
                 background: "var(--input-bg)",
@@ -365,7 +369,7 @@ export default function VexoWidget() {
             </button>
           </div>
           <p style={{ fontSize: "0.65rem", color: "var(--text-muted)", textAlign: "center", marginTop: "12px" }}>
-            Vexo can analyze your portfolio and give AI-powered recommendations.
+            Vexo can run AI predictions, analyze your portfolio, and take actions like setting alerts.
           </p>
         </div>
       </div>

@@ -11,5 +11,6 @@ def copilot_chat(
     current_user: dict = Depends(get_current_user)
 ):
     user_id = current_user["id"]
-    response_text = CopilotService.get_copilot_response(user_id, payload.message)
+    history = [turn.model_dump() for turn in payload.history] if payload.history else []
+    response_text = CopilotService.get_copilot_response(user_id, payload.message, history)
     return {"response": response_text}
