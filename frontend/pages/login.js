@@ -5,6 +5,7 @@ import { useAuth } from "../context/AuthContext";
 import SignupForm from "../components/auth/SignupForm";
 import OTPVerification from "../components/auth/OTPVerification";
 import ForgotPassword from "../components/auth/ForgotPassword";
+import Icon from "../components/Icon";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -468,7 +469,7 @@ export default function LoginPage() {
                       gap: "10px",
                     }}
                   >
-                    <span style={{ fontSize: "1rem" }}>⚠️</span>
+                    <Icon name="alert" size={16} style={{ color: "var(--red)" }} />
                     <span style={{ color: "var(--red)", fontSize: "0.85rem", fontWeight: 600 }}>
                       {error}
                     </span>

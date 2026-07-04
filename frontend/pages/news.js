@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import Head from "next/head";
 import Navbar from "../components/Navbar";
 import API from "../services/api";
+import Icon from "../components/Icon";
 
 export default function GeneralNewsPage() {
   const [news, setNews] = useState([]);
@@ -438,7 +439,7 @@ export default function GeneralNewsPage() {
               textAlign: "center",
               boxShadow: "var(--shadow-card)",
             }}>
-              <p style={{ fontSize: "3rem", marginBottom: "16px" }}>⚠️</p>
+              <p style={{ marginBottom: "16px", color: "var(--red)", display: "flex", justifyContent: "center" }}><Icon name="alert" size={44} strokeWidth={1.5} /></p>
               <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: "1.3rem", color: "var(--text-primary)", marginBottom: "8px" }}>
                 {error}
               </h2>
@@ -455,7 +456,7 @@ export default function GeneralNewsPage() {
               textAlign: "center",
               boxShadow: "var(--shadow-card)",
             }}>
-              <p style={{ fontSize: "3rem", marginBottom: "16px" }}>🔍</p>
+              <p style={{ marginBottom: "16px", color: "var(--text-muted)", display: "flex", justifyContent: "center" }}><Icon name="search" size={44} strokeWidth={1.5} /></p>
               <h2 style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: "1.3rem", color: "var(--text-primary)", marginBottom: "8px" }}>
                 {activeQuery ? `No Results for "${activeQuery}"` : "No News Available"}
               </h2>

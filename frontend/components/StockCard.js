@@ -2,6 +2,7 @@ import { useRouter } from "next/router";
 import { useState, useEffect, useRef } from "react";
 import { memo } from "react";
 import { STOCK_METADATA } from "../services/stocks";
+import Icon from "./Icon";
 
 // Tiny sparkline SVG generator
 function Sparkline({ data, positive, width = 80, height = 32 }) {
@@ -211,7 +212,7 @@ export default memo(function StockCard({ symbol, price, change, percent, color, 
                 }}
                 title={isWatched ? "Remove from watchlist" : "Add to watchlist"}
               >
-                {isWatched ? "★" : "☆"}
+                <Icon name="star" filled={isWatched} size={16} />
               </button>
             )}
 

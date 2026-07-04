@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import API from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
+import Icon from "./Icon";
 
 // Gear icon SVG for Settings
 const GearIcon = ({ size = 18, color = "currentColor" }) => (
@@ -448,7 +449,7 @@ export default function Navbar() {
             }}
             className="hidden-desktop"
           >
-            {mobileOpen ? "✕" : "☰"}
+            <Icon name={mobileOpen ? "x" : "menu"} size={22} />
           </button>
         </div>
       </nav>

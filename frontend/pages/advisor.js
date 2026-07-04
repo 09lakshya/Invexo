@@ -4,6 +4,7 @@ import API from "../services/api";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import { STOCK_METADATA } from "../services/stocks";
+import Icon from "../components/Icon";
 
 function numToIndianWords(num) {
   if (isNaN(num) || num === "" || parseFloat(num) === 0) return "";
@@ -64,11 +65,11 @@ function numToIndianWords(num) {
 }
 
 const GOALS = [
-  { id: "wealth",    label: "Wealth Creation",  desc: "Grow money aggressively over time",  icon: "🚀" },
-  { id: "income",    label: "Steady Income",    desc: "Regular returns with lower risk",     icon: "💰" },
-  { id: "retirement",label: "Retirement",       desc: "Safe, long-term wealth building",     icon: "🏖️" },
-  { id: "education", label: "Education Fund",   desc: "Save for a child's future",           icon: "🎓" },
-  { id: "safety",    label: "Capital Safety",   desc: "Protect my money first",              icon: "🛡️" },
+  { id: "wealth",    label: "Wealth Creation",  desc: "Grow money aggressively over time",  icon: "rocket" },
+  { id: "income",    label: "Steady Income",    desc: "Regular returns with lower risk",     icon: "wallet" },
+  { id: "retirement",label: "Retirement",       desc: "Safe, long-term wealth building",     icon: "umbrella" },
+  { id: "education", label: "Education Fund",   desc: "Save for a child's future",           icon: "graduation" },
+  { id: "safety",    label: "Capital Safety",   desc: "Protect my money first",              icon: "shield" },
 ];
 
 const DURATIONS = [
@@ -116,7 +117,7 @@ function StepHeader({ number, title, done }) {
           transition: "all 0.3s",
         }}
       >
-        {done ? "✓" : number}
+        {done ? <Icon name="check" size={15} /> : number}
       </div>
       <h2
         style={{
@@ -160,7 +161,7 @@ function OptionCard({ selected, onClick, label, sub, icon, accentColor }) {
       }}
     >
       {icon && (
-        <p style={{ fontSize: "1.4rem", marginBottom: "8px" }}>{icon}</p>
+        <p style={{ marginBottom: "8px", color: "var(--accent)" }}><Icon name={icon} size={26} strokeWidth={1.75} /></p>
       )}
       <p
         style={{
@@ -263,8 +264,8 @@ function PortfolioSummary({ stocks, budget, investmentType, investmentMonths }) 
 
       {/* Nominal returns */}
       <div style={{ background: "var(--green-dim)", border: "1px solid var(--green-dim)", borderRadius: "14px", padding: "20px", marginBottom: "12px" }}>
-        <p style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--green)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "14px" }}>
-          💹 Expected Returns ({isSip ? `${investmentMonths}-Month SIP` : "3-Year Horizon"})
+        <p style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--green)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
+          <Icon name="trending-up" size={14} /> Expected Returns ({isSip ? `${investmentMonths}-Month SIP` : "3-Year Horizon"})
         </p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100px, 100%), 1fr))", gap: "10px" }}>
           {[
@@ -284,8 +285,8 @@ function PortfolioSummary({ stocks, budget, investmentType, investmentMonths }) 
 
       {/* Real returns */}
       <div style={{ background: "var(--accent-dim)", border: "1px solid var(--accent-glow)", borderRadius: "14px", padding: "20px" }}>
-        <p style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--purple)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "14px" }}>
-          🎯 Real Returns (Inflation-Adjusted @ {INFLATION_RATE}%)
+        <p style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--accent)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "14px", display: "flex", alignItems: "center", gap: "6px" }}>
+          <Icon name="target" size={14} /> Real Returns (Inflation-Adjusted @ {INFLATION_RATE}%)
         </p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100px, 100%), 1fr))", gap: "10px" }}>
           {[
@@ -779,7 +780,10 @@ export default function Advisor() {
                     boxShadow: investmentType === type ? "0 2px 8px var(--shadow-card)" : "none",
                   }}
                 >
-                  {type === "one-time" ? "💰 Lump Sum" : "📅 Monthly SIP"}
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                    <Icon name={type === "one-time" ? "wallet" : "calendar"} size={15} />
+                    {type === "one-time" ? "Lump Sum" : "Monthly SIP"}
+                  </span>
                 </button>
               ))}
             </div>
@@ -932,8 +936,8 @@ export default function Advisor() {
 
           {/* Error */}
           {error && (
-            <div style={{ background: "var(--red-dim)", border: "1px solid var(--red-dim)", borderRadius: "12px", padding: "14px 18px", marginBottom: "20px", color: "var(--red)", fontSize: "0.875rem", fontWeight: 600, animation: "fadeIn 0.3s ease" }}>
-              ⚠️ {error}
+            <div style={{ background: "var(--red-dim)", border: "1px solid var(--red-dim)", borderRadius: "12px", padding: "14px 18px", marginBottom: "20px", color: "var(--red)", fontSize: "0.875rem", fontWeight: 600, animation: "fadeIn 0.3s ease", display: "flex", alignItems: "center", gap: "8px" }}>
+              <Icon name="alert" size={16} /> {error}
             </div>
           )}
 
@@ -1020,15 +1024,16 @@ export default function Advisor() {
               </div>
 
               {/* Disclaimer */}
-              <div style={{ background: "var(--red-dim)", border: "1px solid var(--red-dim)", borderRadius: "14px", padding: "16px 20px", fontSize: "0.8rem", color: "var(--red)" }}>
-                ⚠️ <strong>Disclaimer:</strong> These picks are AI-generated for educational purposes only and are <strong>not financial advice</strong>. Always consult a SEBI-registered investment advisor before investing.
+              <div style={{ background: "var(--red-dim)", border: "1px solid var(--red-dim)", borderRadius: "14px", padding: "16px 20px", fontSize: "0.8rem", color: "var(--red)", display: "flex", gap: "8px" }}>
+                <Icon name="alert" size={16} style={{ marginTop: "2px" }} />
+                <span><strong>Disclaimer:</strong> These picks are AI-generated for educational purposes only and are <strong>not financial advice</strong>. Always consult a SEBI-registered investment advisor before investing.</span>
               </div>
             </div>
           )}
 
           {results && results.length === 0 && (
             <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "18px", padding: "48px 24px", textAlign: "center" }}>
-              <p style={{ fontSize: "3rem", marginBottom: "12px" }}>🔍</p>
+              <p style={{ marginBottom: "12px", color: "var(--text-muted)", display: "flex", justifyContent: "center" }}><Icon name="search" size={44} strokeWidth={1.5} /></p>
               <p style={{ color: "var(--text-secondary)", fontSize: "1rem" }}>
                 No suitable stocks found for your criteria. Try adjusting your preferences.
               </p>

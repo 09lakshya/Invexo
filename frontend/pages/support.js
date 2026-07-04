@@ -4,6 +4,7 @@ import Link from "next/link";
 import Navbar from "../components/Navbar";
 import { useAuth } from "../context/AuthContext";
 import API from "../services/api";
+import Icon from "../components/Icon";
 
 export default function SupportPage() {
   const { user } = useAuth();
@@ -369,10 +370,9 @@ export default function SupportPage() {
                     alignItems: "center",
                     justifyContent: "center",
                     color: "var(--accent)",
-                    fontSize: "1.2rem",
                   }}
                 >
-                  ✉️
+                  <Icon name="mail" size={22} />
                 </div>
                 <div>
                   <h3 style={{ fontSize: "0.95rem", fontWeight: 700, color: "var(--text-primary)" }}>

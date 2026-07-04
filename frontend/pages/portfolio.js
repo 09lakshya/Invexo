@@ -5,6 +5,7 @@ import API from "../services/api";
 import Head from "next/head";
 import { useAuth } from "../context/AuthContext";
 import { STOCK_METADATA } from "../services/stocks";
+import Icon from "../components/Icon";
 
 // ── Mini donut for allocation ─────────────────────────────────────────────
 function AllocationDonut({ holdings, size = 100 }) {
@@ -62,7 +63,7 @@ function MetricCard({ label, value, color = "var(--text-primary)", icon, delta }
       onMouseLeave={e => { e.currentTarget.style.border = "1px solid var(--border-subtle)"; e.currentTarget.style.transform = "translateY(0)"; }}
     >
       <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "2px", background: `linear-gradient(90deg, ${color}, transparent)`, opacity: 0.6 }} />
-      {icon && <p style={{ fontSize: "1.1rem", marginBottom: "8px" }}>{icon}</p>}
+      {icon && <p style={{ marginBottom: "8px", color, display: "flex" }}><Icon name={icon} size={18} /></p>}
       <p style={{ fontSize: "0.65rem", fontWeight: 700, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "8px" }}>{label}</p>
       <p style={{ fontSize: "clamp(1.1rem, 2.5vmin, 1.6rem)", fontWeight: 900, color, fontFamily: "'Space Grotesk', sans-serif", letterSpacing: "-0.02em" }}>{value}</p>
       {delta && <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "4px" }}>{delta}</p>}
@@ -204,7 +205,7 @@ function HoldingRow({ h, onRemove }) {
           onMouseEnter={e => { e.currentTarget.style.background = "var(--red-dim)"; }}
           onMouseLeave={e => { e.currentTarget.style.background = "transparent"; }}
         >
-          {removing ? "…" : "✕"}
+          {removing ? "…" : <Icon name="x" size={14} />}
         </button>
       </td>
     </tr>
@@ -383,7 +384,10 @@ export default function Portfolio() {
                 transition: "all 0.25s",
               }}
             >
-              {showForm ? "✕ Cancel" : "+ Add Stock"}
+              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                <Icon name={showForm ? "x" : "plus"} size={15} />
+                {showForm ? "Cancel" : "Add Stock"}
+              </span>
             </button>
           </div>
 
@@ -489,7 +493,7 @@ export default function Portfolio() {
               </div>
 
               {formErr && (
-                <p style={{ color: "var(--red)", fontSize: "0.8rem", fontWeight: 600, marginTop: "12px" }}>⚠️ {formErr}</p>
+                <p style={{ color: "var(--red)", fontSize: "0.8rem", fontWeight: 600, marginTop: "12px", display: "flex", alignItems: "center", gap: "6px" }}><Icon name="alert" size={14} /> {formErr}</p>
               )}
             </div>
           )}
@@ -497,19 +501,19 @@ export default function Portfolio() {
           {/* Summary cards */}
           {holdings.length > 0 && (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(160px, 100%), 1fr))", gap: "clamp(10px, 1.5vmin, 14px)", marginBottom: "clamp(20px, 3vmin, 28px)", animation: "fadeInUp 0.5s 0.1s ease both" }}>
-              <MetricCard label="Total Invested"  value={`₹${fmt(totalInvested)}`}  icon="💼" />
-              <MetricCard label="Current Value"   value={`₹${fmt(totalCurrent)}`}   icon="📊" color="var(--accent)" />
+              <MetricCard label="Total Invested"  value={`₹${fmt(totalInvested)}`}  icon="briefcase" />
+              <MetricCard label="Current Value"   value={`₹${fmt(totalCurrent)}`}   icon="bar-chart" color="var(--accent)" />
               <MetricCard
                 label="Total P&L"
                 value={`${totalPnL >= 0 ? "+" : "−"}₹${fmt(Math.abs(totalPnL))}`}
                 color={isProfitable ? "var(--green)" : "var(--red)"}
-                icon={isProfitable ? "📈" : "📉"}
+                icon={isProfitable ? "trending-up" : "trending-down"}
               />
               <MetricCard
                 label="Overall Return"
                 value={`${totalPnLPct >= 0 ? "+" : ""}${totalPnLPct.toFixed(2)}%`}
                 color={isProfitable ? "var(--green)" : "var(--red)"}
-                icon="🎯"
+                icon="target"
               />
             </div>
           )}
@@ -545,7 +549,7 @@ export default function Portfolio() {
             </div>
           ) : holdings.length === 0 ? (
             <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "20px", padding: "80px 24px", textAlign: "center", animation: "fadeInUp 0.5s ease forwards" }}>
-              <p style={{ fontSize: "3.5rem", marginBottom: "16px" }}>📂</p>
+              <p style={{ marginBottom: "16px", color: "var(--text-muted)", display: "flex", justifyContent: "center" }}><Icon name="folder" size={48} strokeWidth={1.5} /></p>
               <p style={{ fontSize: "1.2rem", fontWeight: 700, color: "var(--text-primary)", marginBottom: "8px" }}>Portfolio is empty</p>
               <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem", marginBottom: "24px" }}>
                 Click <strong style={{ color: "var(--accent)" }}>+ Add Stock</strong> to start tracking your investments.
@@ -613,7 +617,7 @@ export default function Portfolio() {
                     </div>
                   </div>
                   <div style={{ background: "var(--hover-overlay)", border: "1px solid var(--border-subtle)", borderRadius: "12px", padding: "14px 16px" }}>
-                    <p style={{ fontSize: "0.72rem", fontWeight: 800, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 6px 0" }}>🤖 Vexo Suggestion</p>
+                    <p style={{ fontSize: "0.72rem", fontWeight: 800, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.05em", margin: "0 0 6px 0", display: "flex", alignItems: "center", gap: "6px" }}><Icon name="bot" size={14} /> Vexo Suggestion</p>
                     <p style={{ fontSize: "0.82rem", color: "var(--text-secondary)", lineHeight: "1.45", margin: 0 }}>{analytics.advice}</p>
                   </div>
                 </div>

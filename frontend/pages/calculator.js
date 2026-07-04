@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Navbar from "../components/Navbar";
 import Head from "next/head";
+import Icon from "../components/Icon";
 
 const INFLATION_RATE = 6;
 
@@ -254,9 +255,9 @@ export default function Calculator() {
           {/* Type toggle */}
           <div style={{ background: "var(--input-bg)", border: "1px solid var(--border-subtle)", borderRadius: "14px", padding: "4px", marginBottom: "24px", display: "flex", gap: "4px", animation: "fadeInUp 0.5s 0.1s ease both" }}>
             {[
-              { id: "lumpsum", label: "💰 Lump Sum", sub: "One-time investment" },
-              { id: "sip",     label: "📅 Monthly SIP", sub: "Regular investment" },
-            ].map(({ id, label }) => (
+              { id: "lumpsum", label: "Lump Sum", icon: "wallet", sub: "One-time investment" },
+              { id: "sip",     label: "Monthly SIP", icon: "calendar", sub: "Regular investment" },
+            ].map(({ id, label, icon }) => (
               <button
                 key={id}
                 onClick={() => { setCalcType(id); setCalcResult(null); }}
@@ -275,7 +276,9 @@ export default function Calculator() {
                   boxShadow: calcType === id ? "0 2px 12px var(--shadow-card)" : "none",
                 }}
               >
-                {label}
+                <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: "7px" }}>
+                  <Icon name={icon} size={15} /> {label}
+                </span>
               </button>
             ))}
           </div>
@@ -409,8 +412,8 @@ export default function Calculator() {
                   profit={calcResult.profit}
                 />
                 <div style={{ flex: 1, minWidth: "200px" }}>
-                  <p style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--green)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "8px" }}>
-                    💹 Nominal Returns
+                  <p style={{ fontSize: "0.72rem", fontWeight: 700, color: "var(--green)", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <Icon name="trending-up" size={14} /> Nominal Returns
                   </p>
                   <p style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: "clamp(1.4rem, 3vmin, 2.2rem)", fontWeight: 900, color: "var(--green)", letterSpacing: "-0.03em", marginBottom: "4px" }}>
                     ₹{calcResult.future_value.toLocaleString("en-IN")}
@@ -439,8 +442,8 @@ export default function Calculator() {
 
               {/* Real returns */}
               <div style={{ background: "var(--purple-dim)", border: "1px solid var(--purple-dim)", borderRadius: "clamp(14px, 2vmin, 20px)", padding: "clamp(16px, 3vmin, 24px)", marginBottom: "16px" }}>
-                <p className="section-label" style={{ color: "var(--purple)", marginBottom: "12px" }}>
-                  💡 Wealth Multiplier Effect
+                <p className="section-label" style={{ color: "var(--accent)", marginBottom: "12px", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <Icon name="bulb" size={14} /> Wealth Multiplier Effect
                 </p>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(120px, 100%), 1fr))", gap: "clamp(8px, 1.5vmin, 12px)" }}>
                   <StatCard
@@ -479,7 +482,7 @@ export default function Calculator() {
 
               {/* Tips */}
               <div style={{ background: "var(--accent-dim)", border: "1px solid var(--border-subtle)", borderRadius: "14px", padding: "20px" }}>
-                <p style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--accent)", marginBottom: "12px", textTransform: "uppercase", letterSpacing: "0.06em" }}>💬 Quick Tips</p>
+                <p style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--accent)", marginBottom: "12px", textTransform: "uppercase", letterSpacing: "0.06em", display: "flex", alignItems: "center", gap: "6px" }}><Icon name="bulb" size={14} /> Quick Tips</p>
                 <ul style={{ listStyle: "none", display: "flex", flexDirection: "column", gap: "8px" }}>
                   {[
                     ["Lump Sum", "Best if you have large capital to deploy immediately."],
@@ -488,7 +491,7 @@ export default function Calculator() {
                     ["Time",    "Even small amounts compound heavily over 10+ years."],
                   ].map(([bold, text]) => (
                     <li key={bold} style={{ fontSize: "0.82rem", color: "var(--text-muted)", display: "flex", gap: "8px" }}>
-                      <span style={{ color: "var(--accent)", flexShrink: 0 }}>✓</span>
+                      <span style={{ color: "var(--accent)", flexShrink: 0, display: "flex", marginTop: "2px" }}><Icon name="check" size={13} /></span>
                       <span><strong style={{ color: "var(--text-primary)" }}>{bold}:</strong> {text}</span>
                     </li>
                   ))}

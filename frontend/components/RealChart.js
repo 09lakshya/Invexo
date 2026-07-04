@@ -794,7 +794,7 @@ export default function RealChart({
 
   const [isFullscreen, setIsFullscreen] = useState(false);
 
-  // 🔥 FORCE VALID DATA (Normalize keys and sanitize nulls/NaNs)
+  // FORCE VALID DATA (Normalize keys and sanitize nulls/NaNs)
   const cleaned = useMemo(() => {
     return (data || []).map((d) => {
       if (!d) return null;

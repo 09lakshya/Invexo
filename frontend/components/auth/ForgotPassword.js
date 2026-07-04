@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import Icon from "../Icon";
 
 export default function ForgotPassword({
   email,
@@ -248,7 +249,7 @@ export default function ForgotPassword({
                 gap: "10px",
               }}
             >
-              <span style={{ fontSize: "1rem" }}>⚠️</span>
+              <Icon name="alert" size={16} style={{ color: "var(--red)" }} />
               <span style={{ color: "var(--red)", fontSize: "0.85rem", fontWeight: 600 }}>
                 {error}
               </span>
@@ -380,7 +381,7 @@ export default function ForgotPassword({
                 gap: "10px",
               }}
             >
-              <span style={{ fontSize: "1rem" }}>⚠️</span>
+              <Icon name="alert" size={16} style={{ color: "var(--red)" }} />
               <span style={{ color: "var(--red)", fontSize: "0.85rem", fontWeight: 600 }}>
                 {error}
               </span>
@@ -615,7 +616,7 @@ export default function ForgotPassword({
                 gap: "10px",
               }}
             >
-              <span style={{ fontSize: "1rem" }}>⚠️</span>
+              <Icon name="alert" size={16} style={{ color: "var(--red)" }} />
               <span style={{ color: "var(--red)", fontSize: "0.85rem", fontWeight: 600 }}>
                 {error}
               </span>

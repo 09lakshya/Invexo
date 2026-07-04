@@ -6,6 +6,7 @@ import Navbar from "../../components/Navbar";
 import RealChart from "../../components/RealChart";
 import API from "../../services/api";
 import { STOCK_METADATA } from "../../services/stocks";
+import Icon from "../../components/Icon";
 
 // ── CLIENT-SIDE MATHEMATICAL CALCULATORS ────────────────────────────────────
 
@@ -302,7 +303,7 @@ export default function StockDetail() {
         <Navbar />
         <div style={{ maxWidth: "800px", margin: "80px auto", padding: "0 20px" }}>
           <div className="glass" style={{ padding: "40px", textAlign: "center", display: "flex", flexDirection: "column", gap: "20px", border: "1px solid var(--red-dim)" }}>
-            <p style={{ fontSize: "3rem", margin: 0 }}>⚠️</p>
+            <p style={{ margin: 0, color: "var(--red)", display: "flex", justifyContent: "center" }}><Icon name="alert" size={44} strokeWidth={1.75} /></p>
             <h2 style={{ fontFamily: "Space Grotesk, sans-serif", fontWeight: 800 }}>Analysis Failed</h2>
             <p style={{ color: "var(--text-secondary)", fontSize: "0.95rem", lineHeight: 1.6 }}>{error}</p>
             <div style={{ display: "flex", gap: "12px", justifyContent: "center", marginTop: "10px" }}>
@@ -403,7 +404,7 @@ export default function StockDetail() {
                       }}
                       title={isWatched ? "Remove from watchlist" : "Add to watchlist"}
                     >
-                      {isWatched ? "★" : "☆"}
+                      <Icon name="star" filled={isWatched} size={18} />
                     </button>
                   </div>
                   <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", fontWeight: 500, margin: "2px 0 0 0" }}>
@@ -523,7 +524,7 @@ export default function StockDetail() {
             {/* PANEL 1: AI Prediction Panel */}
             <div className="glass" style={{ padding: "var(--card-padding)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
-                <p className="section-label" style={{ margin: 0 }}>🤖 AI Prediction Model</p>
+                <p className="section-label" style={{ margin: 0, display: "flex", alignItems: "center", gap: "7px" }}><Icon name="bot" size={15} /> AI Prediction Model</p>
                 <span className="badge" style={{ background: trendBg, color: trendColor }}>
                   {trend}
                 </span>
@@ -607,7 +608,7 @@ export default function StockDetail() {
 
             {/* PANEL 2: Technical Indicators Panel */}
             <div className="glass" style={{ padding: "var(--card-padding)" }}>
-              <p className="section-label" style={{ marginBottom: "18px" }}>📊 Technical Indicators</p>
+              <p className="section-label" style={{ marginBottom: "18px", display: "flex", alignItems: "center", gap: "7px" }}><Icon name="bar-chart" size={15} /> Technical Indicators</p>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                 {/* RSI Gauge */}
@@ -707,7 +708,7 @@ export default function StockDetail() {
 
             {/* PANEL 3: News Sentiment Panel */}
             <div className="glass" style={{ padding: "var(--card-padding)" }}>
-              <p className="section-label" style={{ marginBottom: "18px" }}>📰 News & Public Sentiment</p>
+              <p className="section-label" style={{ marginBottom: "18px", display: "flex", alignItems: "center", gap: "7px" }}><Icon name="news" size={15} /> News &amp; Public Sentiment</p>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -751,14 +752,14 @@ export default function StockDetail() {
                 </div>
 
                 <div style={{ background: "var(--hover-overlay)", border: "1px solid var(--border-subtle)", borderRadius: "12px", padding: "12px 14px", fontSize: "0.82rem", color: "var(--text-secondary)", lineHeight: 1.45 }}>
-                  🎯 <strong>Impact Assessment:</strong> Media analysis shows a <strong>{newsImpact}</strong> tone across articles. Current sentiment exerts a <strong>{newsSentiment > 55 ? "positive pull" : newsSentiment < 45 ? "negative resistance" : "neutral effect"}</strong> on short-term price momentum.
+                  <Icon name="target" size={15} style={{ verticalAlign: "-2px", marginRight: "4px" }} /><strong>Impact Assessment:</strong> Media analysis shows a <strong>{newsImpact}</strong> tone across articles. Current sentiment exerts a <strong>{newsSentiment > 55 ? "positive pull" : newsSentiment < 45 ? "negative resistance" : "neutral effect"}</strong> on short-term price momentum.
                 </div>
               </div>
             </div>
 
             {/* PANEL 4: Fundamentals Panel */}
             <div className="glass" style={{ padding: "var(--card-padding)" }}>
-              <p className="section-label" style={{ marginBottom: "18px" }}>📊 Financial Fundamentals</p>
+              <p className="section-label" style={{ marginBottom: "18px", display: "flex", alignItems: "center", gap: "7px" }}><Icon name="bar-chart" size={15} /> Financial Fundamentals</p>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "18px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>

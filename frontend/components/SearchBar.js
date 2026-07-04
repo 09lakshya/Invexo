@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useRouter } from "next/router";
 import API from "../services/api";
+import Icon from "./Icon";
 
 export default function SearchBar() {
   const [query, setQuery] = useState("");
@@ -42,9 +43,9 @@ export default function SearchBar() {
               setQuery("");
               setResults([]);
             }}
-            className="text-gray-400 hover:text-white transition-colors cursor-pointer text-lg"
+            className="text-gray-400 hover:text-white transition-colors cursor-pointer"
           >
-            ✕
+            <Icon name="x" size={16} />
           </button>
         )}
       </div>

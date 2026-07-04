@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import API from "../services/api";
+import Icon from "./Icon";
 
 export default function VexoWidget() {
   const [showCopilot, setShowCopilot] = useState(false);
@@ -177,7 +178,7 @@ export default function VexoWidget() {
         onMouseEnter={(e) => (e.currentTarget.style.transform = showCopilot ? "scale(0.8)" : "scale(1.05)")}
         onMouseLeave={(e) => (e.currentTarget.style.transform = showCopilot ? "scale(0.8)" : "scale(1)")}
       >
-        {showCopilot ? "✕" : "💬"}
+        <Icon name={showCopilot ? "x" : "chat"} size={26} />
       </button>
 
       {/* Vexo Drawer / Modal */}
@@ -221,10 +222,9 @@ export default function VexoWidget() {
                 alignItems: "center",
                 justifyContent: "center",
                 color: "var(--bg-primary)",
-                fontSize: "1.2rem",
               }}
             >
-              🤖
+              <Icon name="bot" size={22} />
             </div>
             <div>
               <h3
@@ -260,7 +260,7 @@ export default function VexoWidget() {
             }}
             aria-label="Close Vexo"
           >
-            ✕
+            <Icon name="x" size={16} />
           </button>
         </div>
 

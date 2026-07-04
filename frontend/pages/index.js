@@ -8,6 +8,7 @@ import API from "../services/api";
 import Head from "next/head";
 import { STOCK_METADATA } from "../services/stocks";
 import { useWebSocket } from "../context/WebSocketContext";
+import Icon from "../components/Icon";
 
 // ── Market hours helper (NSE: Mon–Fri 9:15–15:30 IST) ────────────────────
 function isMarketOpen() {
@@ -727,8 +728,8 @@ export default function Home() {
               {query && (
                 <button
                   onClick={() => { setQuery(""); setResults([]); }}
-                  style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", fontSize: "16px", padding: 0 }}
-                >✕</button>
+                  style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text-muted)", padding: 0, display: "flex" }}
+                ><Icon name="x" size={16} /></button>
               )}
             </div>
 
@@ -975,7 +976,11 @@ export default function Home() {
                     boxShadow: filterCategory === cat ? "0 2px 8px var(--shadow-card)" : "none",
                   }}
                 >
-                  {cat === "Watchlist" ? "★ Watchlist" : cat}
+                  {cat === "Watchlist" ? (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}>
+                      <Icon name="star" filled size={13} /> Watchlist
+                    </span>
+                  ) : cat}
                 </button>
               ))}
               </div>
@@ -1003,7 +1008,9 @@ export default function Home() {
                 textAlign: "center",
               }}
             >
-              <p style={{ fontSize: "3rem", marginBottom: "16px" }}>📉</p>
+              <p style={{ marginBottom: "16px", color: "var(--text-muted)", display: "flex", justifyContent: "center" }}>
+                <Icon name="trending-down" size={44} strokeWidth={1.5} />
+              </p>
               <p style={{ color: "var(--text-muted)", fontSize: "1rem" }}>
                 No {filterCategory.toLowerCase()} stocks right now.
               </p>
@@ -1216,7 +1223,7 @@ export default function Home() {
                 justifyContent: "center",
                 gap: "8px",
               }}>
-                <span>⚠️</span>
+                <Icon name="alert" size={16} />
                 <span>{modalError}</span>
               </div>
             )}
@@ -1326,8 +1333,8 @@ export default function Home() {
               gap: "10px",
               marginTop: "8px"
             }}>
-              <p style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.05em", margin: 0 }}>
-                🔔 Set Price Alert
+              <p style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--accent)", textTransform: "uppercase", letterSpacing: "0.05em", margin: 0, display: "flex", alignItems: "center", gap: "6px" }}>
+                <Icon name="bell" size={14} /> Set Price Alert
               </p>
               
               <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
@@ -1405,9 +1412,10 @@ export default function Home() {
                             fontSize: "0.75rem",
                             padding: 0,
                             marginLeft: "4px",
+                            display: "flex",
                           }}
                         >
-                          ✕
+                          <Icon name="x" size={13} />
                         </button>
                       </span>
                     ))}
