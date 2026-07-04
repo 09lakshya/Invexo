@@ -121,7 +121,7 @@ export default function DailyPicks() {
                 borderRadius: "8px",
                 border: "none",
                 background: activeTab === tab.id ? "var(--accent)" : "transparent",
-                color: activeTab === tab.id ? "#fff" : "var(--text-secondary)",
+                color: activeTab === tab.id ? "var(--bg-primary)" : "var(--text-secondary)",
                 fontWeight: 700,
                 fontSize: "0.85rem",
                 cursor: "pointer",
@@ -163,7 +163,7 @@ export default function DailyPicks() {
             {i === 0 && (
                <div style={{
                  position: "absolute", top: 0, right: 0,
-                 background: "var(--accent)", color: "#fff",
+                 background: "var(--accent)", color: "var(--bg-primary)",
                  fontSize: "0.65rem", fontWeight: 800, padding: "4px 12px",
                  borderBottomLeftRadius: "12px", letterSpacing: "0.05em"
                }}>

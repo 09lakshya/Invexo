@@ -308,7 +308,7 @@ export default function GeneralNewsPage() {
                   flexShrink: 0,
                   background: "linear-gradient(90deg, var(--accent) 0%, var(--purple) 100%)",
                   border: "none",
-                  color: "#ffffff",
+                  color: "var(--bg-primary)",
                   padding: "10px 20px",
                   borderRadius: "12px",
                   fontWeight: 600,
@@ -481,7 +481,7 @@ export default function GeneralNewsPage() {
                   }}
                   onMouseEnter={e => {
                     e.currentTarget.style.background = "var(--accent)";
-                    e.currentTarget.style.color = "#ffffff";
+                    e.currentTarget.style.color = "var(--bg-primary)";
                   }}
                   onMouseLeave={e => {
                     e.currentTarget.style.background = "var(--accent-dim)";
