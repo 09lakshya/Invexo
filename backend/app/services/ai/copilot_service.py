@@ -6,12 +6,24 @@ from app.services.portfolio.portfolio_service import PortfolioService
 from app.services.ai.copilot_tools import TOOL_DECLARATIONS, WRITE_TOOLS, execute_tool
 from app.utils.logger import get_logger
 import os
+import time
 import requests
 
 logger = get_logger("copilot_service")
 
 # Gemini model powering Vexo. Override with GEMINI_MODEL env var.
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash").strip()
+# Statuses worth retrying: rate limit (429) and transient server errors.
+RETRYABLE_STATUS = {429, 500, 503}
+# Per-message retry budget and the longest we'll wait for a single backoff.
+MAX_GEMINI_ATTEMPTS = 3
+MAX_BACKOFF_SECONDS = 5.0
+# Shown when Google keeps throttling us — keeps the chat alive instead of
+# silently degrading to the weaker offline engine.
+RATE_LIMIT_MESSAGE = (
+    "⚠️ Vexo is handling a lot of requests right now and briefly hit Google's "
+    "rate limit. Please try again in a few seconds — your conversation is still here."
+)
 # Safety cap on function-calling rounds per user message.
 MAX_TOOL_ROUNDS = 6
 
@@ -42,6 +54,10 @@ SYSTEM_INSTRUCTION = (
 )
 
 
+class _RateLimited(Exception):
+    """Raised when Gemini keeps returning 429 after our retries."""
+
+
 class CopilotService:
     @staticmethod
     def get_copilot_response(user_id: int, message: str, history: list | None = None) -> str:
@@ -51,6 +67,10 @@ class CopilotService:
                 answer = CopilotService._run_agent(user_id, message, history or [], api_key)
                 if answer:
                     return answer
+            except _RateLimited:
+                # Don't degrade to the offline engine — tell the user it's
+                # temporary so the conversation can simply resume.
+                return RATE_LIMIT_MESSAGE
             except Exception as e:
                 logger.error(f"Vexo agent failed, using fallback: {e}")
         # Offline / failure fallback: rule-based engine.
@@ -72,6 +92,62 @@ class CopilotService:
         return contents
 
     @staticmethod
+    def _retry_delay(response, attempt: int) -> float:
+        """Seconds to wait before a retry — prefer the server's hint, else backoff."""
+        retry_after = response.headers.get("Retry-After") if hasattr(response, "headers") else None
+        if retry_after:
+            try:
+                return min(float(retry_after), MAX_BACKOFF_SECONDS)
+            except (TypeError, ValueError):
+                pass
+        # Gemini returns a RetryInfo detail like {"retryDelay": "7s"} on 429.
+        try:
+            for detail in response.json().get("error", {}).get("details", []):
+                rd = detail.get("retryDelay")
+                if isinstance(rd, str) and rd.endswith("s"):
+                    return min(float(rd[:-1]), MAX_BACKOFF_SECONDS)
+        except Exception:
+            pass
+        return min(1.5 * (2 ** attempt), MAX_BACKOFF_SECONDS)
+
+    @staticmethod
+    def _post_gemini(api_url: str, payload: dict, headers: dict):
+        """
+        POST to Gemini, retrying transient failures with backoff.
+
+        Returns the parsed JSON body on success, or None on a non-retryable
+        failure. Raises _RateLimited if we're still throttled (429) after
+        exhausting retries, so the caller can surface a clear message instead
+        of silently falling back.
+        """
+        for attempt in range(MAX_GEMINI_ATTEMPTS):
+            last_status = None
+            try:
+                response = requests.post(api_url, json=payload, headers=headers, timeout=30)
+            except requests.RequestException as e:
+                logger.warning(f"Gemini request error (attempt {attempt + 1}): {e}")
+                if attempt < MAX_GEMINI_ATTEMPTS - 1:
+                    time.sleep(min(1.5 * (2 ** attempt), MAX_BACKOFF_SECONDS))
+                    continue
+                return None
+
+            if response.status_code == 200:
+                return response.json()
+
+            last_status = response.status_code
+            if last_status in RETRYABLE_STATUS and attempt < MAX_GEMINI_ATTEMPTS - 1:
+                delay = CopilotService._retry_delay(response, attempt)
+                logger.warning(f"Gemini {last_status}; retrying in {delay:.1f}s (attempt {attempt + 1})")
+                time.sleep(delay)
+                continue
+
+            logger.error(f"Gemini API error {last_status}: {response.text[:300]}")
+            if last_status == 429:
+                raise _RateLimited()
+            return None
+        return None
+
+    @staticmethod
     def _run_agent(user_id: int, message: str, history: list, api_key: str) -> str:
         api_url = (
             f"https://generativelanguage.googleapis.com/v1beta/models/"
@@ -88,12 +164,10 @@ class CopilotService:
 
         for _ in range(MAX_TOOL_ROUNDS):
             payload = {**base_payload, "contents": contents}
-            response = requests.post(api_url, json=payload, headers=headers, timeout=30)
-            if response.status_code != 200:
-                logger.error(f"Gemini API error {response.status_code}: {response.text[:500]}")
+            data = CopilotService._post_gemini(api_url, payload, headers)
+            if data is None:
                 return ""
 
-            data = response.json()
             candidates = data.get("candidates", [])
             if not candidates:
                 return ""

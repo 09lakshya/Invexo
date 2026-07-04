@@ -127,6 +127,65 @@ def test_agent_create_alert_action_persists(monkeypatch):
     assert alerts[0]["condition"] == "above"
 
 
+def test_rate_limit_keeps_chat_alive(monkeypatch):
+    """A persistent 429 yields a friendly retry message, not a silent downgrade."""
+    headers, _ = _agent_user()
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr(cs.time, "sleep", lambda *_a, **_k: None)  # no real waiting
+
+    calls = {"n": 0}
+
+    class _Resp429:
+        status_code = 429
+        headers = {"Retry-After": "1"}
+        text = "quota exceeded"
+
+        def json(self):
+            return {"error": {"message": "rate limit"}}
+
+    def fake_post(url, json=None, headers=None, timeout=None):
+        calls["n"] += 1
+        return _Resp429()
+
+    monkeypatch.setattr(cs.requests, "post", fake_post)
+
+    res = client.post("/api/v1/copilot/chat", json={"message": "predict reliance"}, headers=headers)
+    assert res.status_code == 200
+    body = res.json()["response"].lower()
+    assert "rate limit" in body or "try again" in body
+    assert calls["n"] == cs.MAX_GEMINI_ATTEMPTS  # retried before giving up
+
+
+def test_transient_500_retries_then_succeeds(monkeypatch):
+    """A one-off 500 is retried and the following success is returned."""
+    headers, _ = _agent_user()
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr(cs.time, "sleep", lambda *_a, **_k: None)
+
+    state = {"n": 0}
+
+    class _Resp500:
+        status_code = 500
+        headers = {}
+        text = "server error"
+
+        def json(self):
+            return {}
+
+    def fake_post(url, json=None, headers=None, timeout=None):
+        state["n"] += 1
+        if state["n"] == 1:
+            return _Resp500()
+        return _FakeResp(_model_text("Recovered after a transient error."))
+
+    monkeypatch.setattr(cs.requests, "post", fake_post)
+
+    res = client.post("/api/v1/copilot/chat", json={"message": "hi"}, headers=headers)
+    assert res.status_code == 200
+    assert "Recovered" in res.json()["response"]
+    assert state["n"] == 2
+
+
 def test_history_is_passed_through(monkeypatch):
     """Prior conversation turns are forwarded to the model for memory."""
     headers, _ = _agent_user()
