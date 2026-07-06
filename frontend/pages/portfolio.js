@@ -4,7 +4,7 @@ import Navbar from "../components/Navbar";
 import API from "../services/api";
 import Head from "next/head";
 import { useAuth } from "../context/AuthContext";
-import { STOCK_METADATA } from "../services/stocks";
+import { STOCK_METADATA, logoPath } from "../services/stocks";
 import Icon from "../components/Icon";
 
 // ── Mini donut for allocation ─────────────────────────────────────────────
@@ -83,7 +83,7 @@ function HoldingRow({ h, onRemove }) {
   const metadata = STOCK_METADATA[cleanSymbol] || {};
   const companyName = metadata.name || h.symbol;
   const [logoError, setLogoError] = useState(false);
-  const logoUrl = null; // Removed external logo API — using styled initials badge
+  const logoUrl = logoError ? null : logoPath(cleanSymbol);
 
   const handleRemove = async () => {
     setRemoving(true);

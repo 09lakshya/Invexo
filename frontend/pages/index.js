@@ -6,9 +6,10 @@ import RealChart from "../components/RealChart";
 import Navbar from "../components/Navbar";
 import API from "../services/api";
 import Head from "next/head";
-import { STOCK_METADATA } from "../services/stocks";
+import { STOCK_METADATA, logoPath } from "../services/stocks";
 import { useWebSocket } from "../context/WebSocketContext";
 import Icon from "../components/Icon";
+import CompanyLogo from "../components/CompanyLogo";
 
 // ── Market hours helper (NSE: Mon–Fri 9:15–15:30 IST) ────────────────────
 function isMarketOpen() {
@@ -600,8 +601,7 @@ export default function Home() {
   const normalizedActiveSymbol = activeStockSymbol ? activeStockSymbol.replace(/\.NS$/i, "") : null;
   const activeMetadata = STOCK_METADATA[normalizedActiveSymbol] || {};
   const activeCompanyName = activeMetadata.name || activeStockSymbol;
-  const activeCompanyDomain = activeMetadata.domain;
-  const activeLogoUrl = null; // Removed external logo API — using styled initials badge
+  const activeLogoUrl = modalLogoError ? null : logoPath(normalizedActiveSymbol);
 
   return (
     <>
@@ -769,23 +769,7 @@ export default function Home() {
                       onMouseEnter={e => e.currentTarget.style.background = "var(--hover-overlay)"}
                       onMouseLeave={e => e.currentTarget.style.background = "transparent"}
                     >
-                      <div
-                        style={{
-                          width: "32px",
-                          height: "32px",
-                          borderRadius: "10px",
-                          background: "var(--accent-dim)",
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: "11px",
-                          fontWeight: 700,
-                          color: "var(--accent)",
-                          flexShrink: 0,
-                        }}
-                      >
-                        {sym ? sym.slice(0, 2) : "??"}
-                      </div>
+                      <CompanyLogo symbol={sym} size={32} radius={10} fontSize={11} />
                       <span style={{ fontWeight: 600, color: "var(--text-primary)" }}>
                         {companyName}
                         {sym ? ` — ${sym}` : ""}

@@ -1,7 +1,7 @@
 import { useRouter } from "next/router";
 import { useState, useEffect, useRef } from "react";
 import { memo } from "react";
-import { STOCK_METADATA } from "../services/stocks";
+import { STOCK_METADATA, logoPath } from "../services/stocks";
 import Icon from "./Icon";
 
 // Tiny sparkline SVG generator
@@ -59,12 +59,12 @@ export default memo(function StockCard({ symbol, price, change, percent, color, 
   const [hovered, setHovered] = useState(false);
   const prevPriceRef = useRef(prc);
   const [flash, setFlash] = useState(null); // "up" | "down" | null
+  const [logoError, setLogoError] = useState(false);
 
   const cleanSymbol = symbol ? symbol.replace(/\.NS$/i, "").replace(/\.BO$/i, "") : "";
   const metadata = STOCK_METADATA[cleanSymbol] || {};
   const companyName = metadata.name || symbol;
-  const companyDomain = metadata.domain;
-  const logoUrl = null; // Removed external logo API — using styled initials badge
+  const logoUrl = logoError ? null : logoPath(cleanSymbol);
 
   useEffect(() => {
     if (hasData && prevPriceRef.current !== prc) {

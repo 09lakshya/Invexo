@@ -53,6 +53,20 @@ export const STOCK_METADATA = {
   "WIPRO": { name: "Wipro Ltd", domain: "wipro.com" }
 };
 
+// Resolves a ticker to its bundled official logo asset in /public/logos.
+// Filenames are the uppercased symbol with any non-alphanumeric char turned
+// into a hyphen (e.g. "M&M" -> "M-M.png"). Callers should fall back to the
+// initials badge via the <img> onError handler when a logo is missing.
+export function logoPath(symbol) {
+  if (!symbol) return null;
+  const slug = symbol
+    .replace(/\.NS$/i, "")
+    .replace(/\.BO$/i, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9-]+/g, "-");
+  return `/logos/${slug}.png`;
+}
+
 export const STOCKS = Object.entries(STOCK_METADATA).map(([symbol, data]) => ({
   symbol,
   name: data.name

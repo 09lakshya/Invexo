@@ -3,7 +3,7 @@ import Navbar from "../components/Navbar";
 import API from "../services/api";
 import Head from "next/head";
 import { useRouter } from "next/router";
-import { STOCK_METADATA } from "../services/stocks";
+import { STOCK_METADATA, logoPath } from "../services/stocks";
 import Icon from "../components/Icon";
 
 function numToIndianWords(num) {
@@ -331,7 +331,7 @@ function RecoCard({ stock, rank, totalBudget }) {
   const cleanSymbol = stock.symbol ? stock.symbol.replace(/\.NS$/i, "").replace(/\.BO$/i, "") : "";
   const metadata = STOCK_METADATA[cleanSymbol] || {};
   const [logoError, setLogoError] = useState(false);
-  const logoUrl = null; // Removed external logo API — using styled initials badge
+  const logoUrl = logoError ? null : logoPath(cleanSymbol);
 
   return (
     <div

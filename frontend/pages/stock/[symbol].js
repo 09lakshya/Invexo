@@ -7,6 +7,7 @@ import RealChart from "../../components/RealChart";
 import API from "../../services/api";
 import { STOCK_METADATA } from "../../services/stocks";
 import Icon from "../../components/Icon";
+import CompanyLogo from "../../components/CompanyLogo";
 
 // ── CLIENT-SIDE MATHEMATICAL CALCULATORS ────────────────────────────────────
 
@@ -370,22 +371,7 @@ export default function StockDetail() {
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-                <div style={{
-                  width: "48px",
-                  height: "48px",
-                  borderRadius: "10px",
-                  background: "var(--accent-dim)",
-                  border: "1px solid var(--accent-glow)",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: "1.3rem",
-                  fontWeight: 800,
-                  color: "var(--accent)",
-                  fontFamily: "'Space Grotesk', sans-serif"
-                }}>
-                  {cleanSymbol.substring(0, 2)}
-                </div>
+                <CompanyLogo symbol={cleanSymbol} size={48} radius={10} fontSize="1.3rem" />
                 <div>
                   <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                     <h1 style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: "clamp(1.5rem, 3.5vw, 2.2rem)", fontWeight: 800, margin: 0, color: "var(--text-primary)", letterSpacing: "-0.02em" }}>
