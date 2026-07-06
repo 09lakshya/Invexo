@@ -46,11 +46,21 @@ async def handle_import_preview(
     broker: str = Form("auto"),
     current_user: dict = Depends(get_current_user),
 ):
-    content = await file.read()
+    # Read in chunks and abort as soon as we exceed the cap, so a huge upload
+    # can't be fully buffered into memory before we reject it.
+    chunks = []
+    total = 0
+    while True:
+        chunk = await file.read(64 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > _MAX_IMPORT_BYTES:
+            raise HTTPException(status_code=413, detail="File too large. Max 5 MB.")
+        chunks.append(chunk)
+    content = b"".join(chunks)
     if not content:
         raise HTTPException(status_code=400, detail="The uploaded file is empty.")
-    if len(content) > _MAX_IMPORT_BYTES:
-        raise HTTPException(status_code=413, detail="File too large. Max 5 MB.")
     try:
         return PortfolioService.preview_import(content, file.filename or "", broker)
     except ValueError as e:
