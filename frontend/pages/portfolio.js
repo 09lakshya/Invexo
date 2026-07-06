@@ -75,7 +75,7 @@ function MetricCard({ label, value, color = "var(--text-primary)", icon, delta }
 function HoldingRow({ h, onRemove }) {
   const profit = (h.pnl ?? 0) >= 0;
   const hasPrice = h.current_price > 0;
-  const fmt = n => (n ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 0 });
+  const fmt = n => (n ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const pnlColor = profit ? "var(--green)" : "var(--red)";
   const [removing, setRemoving] = useState(false);
 
@@ -312,7 +312,7 @@ export default function Portfolio() {
   const totalCurrent  = holdings.reduce((s, h) => s + (h.current_price > 0 ? (h.current_value ?? 0) : (h.invested ?? 0)), 0);
   const totalPnL      = totalCurrent - totalInvested;
   const totalPnLPct   = totalInvested > 0 ? (totalPnL / totalInvested) * 100 : 0;
-  const fmt           = n => (n ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 0 });
+  const fmt           = n => (n ?? 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const isProfitable  = totalPnL >= 0;
 
   const inputStyle = {
