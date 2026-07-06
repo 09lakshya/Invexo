@@ -23,23 +23,23 @@
     "breadth_ma50"
   ],
   "symbols": 253,
-  "rows": 277650,
-  "trained_at": "2026-07-04T02:00:33.221684",
+  "rows": 277938,
+  "trained_at": "2026-07-06T11:59:28.987976",
   "metrics": {
     "1d": {
-      "auc": 0.5243,
-      "top10_label_hit_rate": 0.5298,
+      "auc": 0.5245,
+      "top10_label_hit_rate": 0.5318,
       "label_base_rate": 0.4965,
-      "top10_abs_win_rate": 0.5034,
-      "top10_daily_edge_pct": 0.092,
+      "top10_abs_win_rate": 0.4994,
+      "top10_daily_edge_pct": 0.0845,
       "folds": 4
     },
     "5d": {
-      "auc": 0.5336,
-      "top10_label_hit_rate": 0.3679,
+      "auc": 0.5332,
+      "top10_label_hit_rate": 0.3601,
       "label_base_rate": 0.3007,
-      "top10_abs_win_rate": 0.507,
-      "top10_daily_edge_pct": 0.3082,
+      "top10_abs_win_rate": 0.5,
+      "top10_daily_edge_pct": 0.2501,
       "folds": 4
     }
   }
