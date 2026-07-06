@@ -228,7 +228,7 @@ export default function Portfolio() {
   const { data: holdings = [], isLoading: loading } = useQuery({
     queryKey: ["portfolio", user?.id],
     queryFn: async () => {
-      const res = await API.get("/portfolio/me");
+      const res = await API.get("/portfolio");
       return Array.isArray(res.data) ? res.data : [];
     },
     enabled: !!user,
