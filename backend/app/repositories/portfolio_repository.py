@@ -81,6 +81,38 @@ class PortfolioRepository:
             return None
 
     @staticmethod
+    def bulk_add_holdings(user_id: str, holdings: list[dict]) -> int:
+        """Insert many holdings in a single transaction. Returns rows inserted."""
+        if not holdings:
+            return 0
+        conn, is_postgres = get_db_connection()
+        c = get_cursor(conn, is_postgres)
+        sql = """INSERT INTO portfolio
+                 (user_id, symbol, company_name, quantity, buy_price, added_on)
+                 VALUES (?, ?, ?, ?, ?, ?)"""
+        if is_postgres:
+            sql = sql.replace("?", "%s")
+        added_on = datetime.now().strftime("%Y-%m-%d")
+        inserted = 0
+        try:
+            for h in holdings:
+                execute_query(
+                    c, sql,
+                    (str(user_id), str(h["symbol"]).upper().strip(),
+                     h.get("company_name") or "", h["quantity"], h["buy_price"], added_on),
+                    False,
+                )
+                inserted += 1
+            conn.commit()
+            return inserted
+        except Exception as e:
+            conn.rollback()
+            logger.error(f"Error bulk-adding holdings: {e}")
+            return 0
+        finally:
+            conn.close()
+
+    @staticmethod
     def remove_holding(holding_id: int, user_id: str) -> bool:
         conn, is_postgres = get_db_connection()
         c = conn.cursor()

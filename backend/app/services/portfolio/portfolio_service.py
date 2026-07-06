@@ -1,6 +1,7 @@
 from app.repositories.portfolio_repository import PortfolioRepository
 from app.services.market.advisor_service import AdvisorService, UNIVERSE
 from app.services.market.ticker_utils import _working_ticker
+from app.services.portfolio.statement_parser import parse_statement
 import math
 import numpy as np
 
@@ -45,6 +46,15 @@ class PortfolioService:
     @staticmethod
     def remove_holding(holding_id: int, user_id: str) -> bool:
         return PortfolioRepository.remove_holding(holding_id, user_id)
+
+    @staticmethod
+    def preview_import(content: bytes, filename: str, broker: str) -> dict:
+        # Parsing errors are surfaced to the caller as ValueError for a 400.
+        return parse_statement(content, filename, broker)
+
+    @staticmethod
+    def commit_import(user_id: str, holdings: list[dict]) -> int:
+        return PortfolioRepository.bulk_add_holdings(user_id, holdings)
 
     @staticmethod
     def get_portfolio_analytics(user_id: str) -> dict:

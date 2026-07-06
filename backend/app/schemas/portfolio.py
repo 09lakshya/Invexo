@@ -1,6 +1,15 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 
+class ImportRow(BaseModel):
+    symbol: str = Field(..., min_length=1, description="Stock ticker symbol is required")
+    company_name: Optional[str] = None
+    quantity: float = Field(..., gt=0, description="Quantity must be greater than 0")
+    buy_price: float = Field(..., gt=0, description="Buy price must be greater than 0")
+
+class ImportCommit(BaseModel):
+    holdings: list[ImportRow] = Field(..., min_length=1, description="Reviewed holdings to import")
+
 class HoldingCreate(BaseModel):
     symbol: str = Field(..., min_length=1, description="Stock ticker symbol is required")
     company_name: Optional[str] = None

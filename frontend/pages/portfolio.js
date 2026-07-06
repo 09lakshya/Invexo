@@ -6,6 +6,7 @@ import Head from "next/head";
 import { useAuth } from "../context/AuthContext";
 import { STOCK_METADATA, logoPath } from "../services/stocks";
 import Icon from "../components/Icon";
+import ImportPortfolio from "../components/ImportPortfolio";
 
 // ── Mini donut for allocation ─────────────────────────────────────────────
 function AllocationDonut({ holdings, size = 100 }) {
@@ -217,6 +218,7 @@ export default function Portfolio() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [showForm, setShowForm]   = useState(false);
+  const [showImport, setShowImport] = useState(false);
 
   const [searchQ, setSearchQ]         = useState("");
   const [searchResults, setSearchResults] = useState([]);
@@ -368,27 +370,50 @@ export default function Portfolio() {
 
 
 
-            <button
-              onClick={() => { setShowForm(!showForm); setFormErr(""); }}
-              style={{
-                padding: "12px 24px",
-                borderRadius: "12px",
-                border: showForm ? "1px solid var(--red-dim)" : "none",
-                cursor: "pointer",
-                fontFamily: "inherit",
-                fontWeight: 700,
-                fontSize: "0.9rem",
-                background: showForm ? "var(--red-dim)" : "linear-gradient(135deg, var(--accent) 0%, var(--purple) 100%)",
-                color: showForm ? "var(--red)" : "var(--bg-primary)",
-                boxShadow: showForm ? "none" : "0 6px 24px var(--accent-glow)",
-                transition: "all 0.25s",
-              }}
-            >
-              <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-                <Icon name={showForm ? "x" : "plus"} size={15} />
-                {showForm ? "Cancel" : "Add Stock"}
-              </span>
-            </button>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              <button
+                onClick={() => setShowImport(true)}
+                style={{
+                  padding: "12px 22px",
+                  borderRadius: "12px",
+                  border: "1px solid var(--border-medium)",
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  fontWeight: 700,
+                  fontSize: "0.9rem",
+                  background: "var(--bg-card)",
+                  color: "var(--text-primary)",
+                  transition: "all 0.25s",
+                }}
+              >
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                  <Icon name="download" size={15} />
+                  Import Portfolio
+                </span>
+              </button>
+
+              <button
+                onClick={() => { setShowForm(!showForm); setFormErr(""); }}
+                style={{
+                  padding: "12px 24px",
+                  borderRadius: "12px",
+                  border: showForm ? "1px solid var(--red-dim)" : "none",
+                  cursor: "pointer",
+                  fontFamily: "inherit",
+                  fontWeight: 700,
+                  fontSize: "0.9rem",
+                  background: showForm ? "var(--red-dim)" : "linear-gradient(135deg, var(--accent) 0%, var(--purple) 100%)",
+                  color: showForm ? "var(--red)" : "var(--bg-primary)",
+                  boxShadow: showForm ? "none" : "0 6px 24px var(--accent-glow)",
+                  transition: "all 0.25s",
+                }}
+              >
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+                  <Icon name={showForm ? "x" : "plus"} size={15} />
+                  {showForm ? "Cancel" : "Add Stock"}
+                </span>
+              </button>
+            </div>
           </div>
 
           {/* Add Stock Form */}
@@ -554,14 +579,22 @@ export default function Portfolio() {
               <p style={{ marginBottom: "16px", color: "var(--text-muted)", display: "flex", justifyContent: "center" }}><Icon name="folder" size={48} strokeWidth={1.5} /></p>
               <p style={{ fontSize: "1.2rem", fontWeight: 700, color: "var(--text-primary)", marginBottom: "8px" }}>Portfolio is empty</p>
               <p style={{ color: "var(--text-secondary)", fontSize: "0.9rem", marginBottom: "24px" }}>
-                Click <strong style={{ color: "var(--accent)" }}>+ Add Stock</strong> to start tracking your investments.
+                <strong style={{ color: "var(--accent)" }}>Import</strong> your holdings from Zerodha, Groww, Angel One or Upstox — or add a stock manually.
               </p>
-              <button
-                onClick={() => setShowForm(true)}
-                style={{ padding: "12px 28px", borderRadius: "12px", border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 700, fontSize: "0.9rem", background: "linear-gradient(135deg, var(--accent), var(--purple))", color: "var(--bg-primary)", boxShadow: "0 6px 24px var(--accent-glow)" }}
-              >
-                + Add Your First Stock
-              </button>
+              <div style={{ display: "flex", gap: "12px", justifyContent: "center", flexWrap: "wrap" }}>
+                <button
+                  onClick={() => setShowImport(true)}
+                  style={{ padding: "12px 28px", borderRadius: "12px", border: "none", cursor: "pointer", fontFamily: "inherit", fontWeight: 700, fontSize: "0.9rem", background: "linear-gradient(135deg, var(--accent), var(--purple))", color: "var(--bg-primary)", boxShadow: "0 6px 24px var(--accent-glow)" }}
+                >
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}><Icon name="download" size={15} /> Import Portfolio</span>
+                </button>
+                <button
+                  onClick={() => setShowForm(true)}
+                  style={{ padding: "12px 28px", borderRadius: "12px", border: "1px solid var(--border-medium)", cursor: "pointer", fontFamily: "inherit", fontWeight: 700, fontSize: "0.9rem", background: "var(--bg-card)", color: "var(--text-primary)" }}
+                >
+                  + Add Manually
+                </button>
+              </div>
             </div>
           ) : (
             <div style={{ background: "var(--bg-card)", border: "1px solid var(--border-subtle)", borderRadius: "20px", overflow: "hidden", backdropFilter: "blur(12px)", animation: "fadeInUp 0.5s 0.2s ease both" }}>
@@ -657,6 +690,15 @@ export default function Portfolio() {
           {/* ── Removed Local Vexo Copilot UI ───────────────────────────── */}
         </div>
       </div>
+
+      <ImportPortfolio
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        onImported={() => {
+          queryClient.invalidateQueries({ queryKey: ["portfolio", user?.id] });
+          queryClient.invalidateQueries({ queryKey: ["portfolio-analytics", user?.id] });
+        }}
+      />
     </>
   );
 }
