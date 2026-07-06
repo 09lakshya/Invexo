@@ -16,5 +16,12 @@ class HoldingResponse(BaseModel):
     buy_price: float
     added_on: Optional[str] = None
 
+    # Computed financials (attached by PortfolioService.get_portfolio)
+    invested: Optional[float] = None
+    current_price: Optional[float] = None
+    current_value: Optional[float] = None
+    pnl: Optional[float] = None
+    pnl_percent: Optional[float] = None
+
     class Config:
         from_attributes = True

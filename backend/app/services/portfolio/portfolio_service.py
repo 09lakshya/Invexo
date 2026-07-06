@@ -7,7 +7,36 @@ import numpy as np
 class PortfolioService:
     @staticmethod
     def get_portfolio(user_id: str) -> list[dict]:
-        return PortfolioRepository.get_portfolio(user_id)
+        holdings = PortfolioRepository.get_portfolio(user_id)
+        enriched = []
+        for h in holdings:
+            qty = h.get("quantity") or 0
+            buy_price = h.get("buy_price") or 0
+            invested = qty * buy_price
+
+            # Live price is best-effort: a missing signal must not break the row.
+            curr_price = 0.0
+            try:
+                signals = AdvisorService._fetch_signals(h["symbol"])
+                if signals:
+                    curr_price = signals.get("current_price", 0) or 0
+            except Exception:
+                curr_price = 0.0
+
+            has_price = curr_price > 0
+            current_value = qty * curr_price if has_price else 0.0
+            pnl = current_value - invested if has_price else 0.0
+            pnl_percent = (pnl / invested * 100) if (has_price and invested > 0) else 0.0
+
+            enriched.append({
+                **h,
+                "invested": round(invested, 2),
+                "current_price": round(curr_price, 2),
+                "current_value": round(current_value, 2),
+                "pnl": round(pnl, 2),
+                "pnl_percent": round(pnl_percent, 2),
+            })
+        return enriched
 
     @staticmethod
     def add_holding(user_id: str, symbol: str, company_name: str, quantity: float, buy_price: float) -> int | None:

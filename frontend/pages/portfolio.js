@@ -73,9 +73,9 @@ function MetricCard({ label, value, color = "var(--text-primary)", icon, delta }
 
 // ── Holding row ───────────────────────────────────────────────────────────
 function HoldingRow({ h, onRemove }) {
-  const profit = h.pnl >= 0;
+  const profit = (h.pnl ?? 0) >= 0;
   const hasPrice = h.current_price > 0;
-  const fmt = n => n.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+  const fmt = n => (n ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 0 });
   const pnlColor = profit ? "var(--green)" : "var(--red)";
   const [removing, setRemoving] = useState(false);
 
@@ -181,7 +181,7 @@ function HoldingRow({ h, onRemove }) {
             fontWeight: 800,
             fontSize: "0.78rem",
           }}>
-            {profit ? "+" : ""}{pnlPct.toFixed(2)}%
+            {profit ? "+" : ""}{(pnlPct ?? 0).toFixed(2)}%
           </span>
         ) : <span style={{ color: "var(--text-muted)" }}>—</span>}
       </td>
@@ -308,11 +308,11 @@ export default function Portfolio() {
   const adding = addMutation.isPending;
 
   // Summary
-  const totalInvested = holdings.reduce((s, h) => s + h.invested, 0);
-  const totalCurrent  = holdings.reduce((s, h) => s + (h.current_price > 0 ? h.current_value : h.invested), 0);
+  const totalInvested = holdings.reduce((s, h) => s + (h.invested ?? 0), 0);
+  const totalCurrent  = holdings.reduce((s, h) => s + (h.current_price > 0 ? (h.current_value ?? 0) : (h.invested ?? 0)), 0);
   const totalPnL      = totalCurrent - totalInvested;
   const totalPnLPct   = totalInvested > 0 ? (totalPnL / totalInvested) * 100 : 0;
-  const fmt           = n => n.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+  const fmt           = n => (n ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 0 });
   const isProfitable  = totalPnL >= 0;
 
   const inputStyle = {
