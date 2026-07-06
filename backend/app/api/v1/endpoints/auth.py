@@ -10,6 +10,9 @@ from app.services.auth.auth_service import AuthService
 from app.core.security import verify_refresh_token, revoke_refresh_token, create_access_token, create_refresh_token
 from app.core.limiter import limiter
 from app.api.v1.dependencies import get_current_user
+from app.utils.logger import get_logger
+
+logger = get_logger("auth_endpoints")
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -59,6 +62,7 @@ def handle_login(payload: LoginInput, request: Request):
     try:
         user = AuthService.login(payload.email, payload.password)
     except Exception as e:
+        logger.error(f"Login failed for '{payload.email}': {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Login service temporarily unavailable. Please try again.")
     if user is None:
         raise HTTPException(status_code=401, detail="Invalid email or password")

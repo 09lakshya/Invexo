@@ -50,6 +50,40 @@ class PooledConnectionWrapper:
                     pass
                 self._released = True
 
+    # ── Leak safety net ──────────────────────────────────────────────
+    # Many repository methods only call close() on their happy path. If a
+    # query raises before close(), the raw connection would otherwise never
+    # be returned to the pool (max 20) and the pool would eventually exhaust,
+    # hanging the whole API. These guards return the connection on every exit
+    # path without requiring callers to change. Any pending/aborted
+    # transaction is rolled back first so a poisoned connection is never
+    # handed to the next caller.
+    def _safe_return(self):
+        if not self._released:
+            try:
+                self._conn.rollback()
+            except Exception:
+                pass
+            self.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        if exc_type is not None:
+            try:
+                self._conn.rollback()
+            except Exception:
+                pass
+        self.close()
+        return False
+
+    def __del__(self):
+        try:
+            self._safe_return()
+        except Exception:
+            pass
+
 def get_db_connection():
     global db_pool
     if db_pool is None:

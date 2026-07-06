@@ -44,6 +44,17 @@ class RedisClientWrapper:
                 del self._in_memory_fallback[key]
         return None
         
+    def _evict_expired(self):
+        """Drop expired keys from the in-memory fallback so it can't grow
+        without bound when Redis is unavailable."""
+        now = time.time()
+        expired = [
+            k for k, (_, expiry) in self._in_memory_fallback.items()
+            if expiry is not None and now >= expiry
+        ]
+        for k in expired:
+            self._in_memory_fallback.pop(k, None)
+
     def set(self, key: str, value: str, ex=None):
         if self.enabled and self.client:
             try:
@@ -52,8 +63,11 @@ class RedisClientWrapper:
                 return True
             except Exception as e:
                 logger.error(f"Redis set error for key '{key}': {e}")
-                
-        # In-memory fallback set
+
+        # In-memory fallback set. Sweep expired entries periodically so a
+        # long-lived process with Redis down doesn't leak memory.
+        if len(self._in_memory_fallback) > 1000:
+            self._evict_expired()
         expiry = time.time() + ex if ex is not None else None
         self._in_memory_fallback[key] = (value, expiry)
         return True

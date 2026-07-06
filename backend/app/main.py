@@ -43,15 +43,50 @@ async def lifespan(app: FastAPI):
     from app.services.ai.model_loader import load_all_models_async
     load_all_models_async()
 
-    # 3. Setup Scheduler Job for daily recommendations and price alerts
+    # 3. Setup Scheduler Job for daily recommendations and price alerts.
+    #
+    # Only ONE process should own the scheduler. With multiple uvicorn workers
+    # each would otherwise fire the same jobs — duplicate daily picks and, worse,
+    # a duplicate alert email every single minute. We elect a single "leader"
+    # via a short-lived Redis lock that the leader keeps renewing. If Redis is
+    # unavailable (single-process/dev), we just run the scheduler locally.
     from app.services.market.market_service import MarketService
     from app.services.market.alert_service import AlertService
-    scheduler.add_job(MarketService.generate_daily_picks, 'cron', hour=0, minute=0)
-    scheduler.add_job(AlertService.check_alerts, 'interval', minutes=1)
-    # Evaluate realized outcomes of past Daily Edge picks after NSE close
-    # (12:00 UTC = 17:30 IST) so the page can show measured accuracy.
-    scheduler.add_job(MarketService.evaluate_pick_outcomes, 'cron', hour=12, minute=0)
-    scheduler.start()
+    from app.core.redis import redis_client
+
+    _SCHED_LOCK_KEY = "lock:scheduler_leader"
+    _SCHED_LOCK_TTL = 120  # seconds
+
+    def _try_become_scheduler_leader() -> bool:
+        if not (redis_client.enabled and redis_client.client):
+            # No shared coordinator available — assume single process.
+            return True
+        try:
+            return bool(redis_client.client.set(_SCHED_LOCK_KEY, "leader", ex=_SCHED_LOCK_TTL, nx=True))
+        except Exception as e:
+            logger.error(f"Scheduler leader election failed, running locally: {e}")
+            return True
+
+    def _renew_scheduler_leadership():
+        # Keep the lock warm so it never expires while this process is alive.
+        if redis_client.enabled and redis_client.client:
+            try:
+                redis_client.client.set(_SCHED_LOCK_KEY, "leader", ex=_SCHED_LOCK_TTL)
+            except Exception as e:
+                logger.error(f"Failed to renew scheduler leadership lock: {e}")
+
+    if _try_become_scheduler_leader():
+        logger.info("This process is the scheduler leader; registering jobs.")
+        scheduler.add_job(MarketService.generate_daily_picks, 'cron', hour=0, minute=0)
+        scheduler.add_job(AlertService.check_alerts, 'interval', minutes=1)
+        # Evaluate realized outcomes of past Daily Edge picks after NSE close
+        # (12:00 UTC = 17:30 IST) so the page can show measured accuracy.
+        scheduler.add_job(MarketService.evaluate_pick_outcomes, 'cron', hour=12, minute=0)
+        # Renew the leadership lock well before its TTL expires.
+        scheduler.add_job(_renew_scheduler_leadership, 'interval', seconds=_SCHED_LOCK_TTL // 3)
+        scheduler.start()
+    else:
+        logger.info("Another process holds the scheduler lock; skipping job registration.")
     
     # 4. Trigger initial picks calculation in the background. The ranker
     # path is light (one batched download + two small models, ~15s), so
@@ -69,7 +104,10 @@ async def lifespan(app: FastAPI):
     cache_thread.start()
 
     yield
-    scheduler.shutdown()
+    # Only the leader ever started the scheduler; shutting down a scheduler that
+    # was never started raises SchedulerNotRunningError.
+    if scheduler.running:
+        scheduler.shutdown()
 
 
 app = FastAPI(
