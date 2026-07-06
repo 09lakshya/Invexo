@@ -402,6 +402,8 @@ export default function Portfolio() {
                 marginBottom: "28px",
                 backdropFilter: "blur(20px)",
                 animation: "fadeInUp 0.3s ease forwards",
+                position: "relative",
+                zIndex: 20,
               }}
             >
               <p style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: "1.1rem", color: "var(--text-primary)", marginBottom: "20px" }}>

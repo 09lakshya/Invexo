@@ -532,7 +532,7 @@ function CandlestickChart({ data, colors, isIntraday, showSwitcher, zoomRef, onZ
   const activeChangePct = (activeItem && activeItem.Open) ? ((activeItem.Close - activeItem.Open) / activeItem.Open) * 100 : 0;
 
   return (
-    <div ref={setRef} style={{ width: "100%", height: "100%", position: "relative" }}>
+    <div ref={setRef} style={{ width: "100%", flex: 1, minHeight: 0, position: "relative" }}>
       {/* Absolute OHLC Header HUD */}
       <div style={{
         position: "absolute",
@@ -1187,7 +1187,7 @@ export default function RealChart({
       )}
 
       {chartType === "line" ? (
-        <div style={{ height: "100%", width: "100%" }}>
+        <div style={{ flex: 1, minHeight: 0, width: "100%" }}>
           <Line data={chartData} options={chartOptions} />
         </div>
       ) : (

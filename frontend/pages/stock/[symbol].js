@@ -466,7 +466,7 @@ export default function StockDetail() {
               </div>
             </div>
 
-            <div style={{ height: "420px", position: "relative" }}>
+            <div style={{ height: "420px", position: "relative", overflow: "hidden" }}>
               {chartLoading ? (
                 <div style={{
                   position: "absolute",
