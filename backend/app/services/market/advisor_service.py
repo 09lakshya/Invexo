@@ -165,6 +165,20 @@ class AdvisorService:
         return sorted(selected, key=lambda x: x["score"], reverse=True)
 
     @staticmethod
+    def _fit_to_budget(selected: list, total_budget: float) -> list:
+        """Size the basket so an equal split funds at least one share of every
+        pick. Allocation is total_budget / N, so keep the largest N of the
+        highest-scored picks where every one of those N still costs <= that
+        slice. Shrinking N grows each slice, so this favours more diversification
+        first and falls back to the single best pick, or [] if nothing fits."""
+        ranked = sorted(selected, key=lambda x: x["score"], reverse=True)
+        for n in range(len(ranked), 0, -1):
+            per_stock = total_budget / n
+            if all(s["signals"]["current_price"] <= per_stock for s in ranked[:n]):
+                return ranked[:n]
+        return []
+
+    @staticmethod
     @ttl_cache(maxsize=100, ttl=900)
     def _fetch_signals(symbol: str):
         for ticker_symbol in _ticker_candidates(symbol):
@@ -405,7 +419,22 @@ class AdvisorService:
             })
 
         scored.sort(key=lambda x: x["score"], reverse=True)
-        selected = AdvisorService._select_recommendations(scored, goal, duration, risk, target_count)
+
+        # Affordability guard: never recommend a stock the user can't buy a
+        # single share of. Allocation is an equal split across N picks, so each
+        # pick gets total_budget/N — a stock priced above that would show 0
+        # shares. Filter out anything costlier than the whole budget up front,
+        # then let _fit_to_budget shrink the basket until every remaining pick
+        # affords at least one share.
+        affordable = [
+            s for s in scored
+            if 0 < s["signals"].get("current_price", 0) <= total_budget
+        ]
+        if not affordable:
+            return []
+
+        selected = AdvisorService._select_recommendations(affordable, goal, duration, risk, target_count)
+        selected = AdvisorService._fit_to_budget(selected, total_budget)
 
         if not selected:
             return []
