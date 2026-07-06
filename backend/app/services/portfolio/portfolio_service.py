@@ -2,13 +2,43 @@ from app.repositories.portfolio_repository import PortfolioRepository
 from app.services.market.advisor_service import AdvisorService, UNIVERSE
 from app.services.market.ticker_utils import _working_ticker
 from app.services.portfolio.statement_parser import parse_statement
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import math
 import numpy as np
 
 class PortfolioService:
     @staticmethod
+    def _parallel_map(fn, items, workers: int = 8) -> dict:
+        """Run `fn` over unique items concurrently, returning {item: result}.
+
+        Live price / ticker lookups hit the network (yfinance) but are
+        redis-TTL-cached underneath, so fanning them out only affects the cold
+        path — it turns N sequential round-trips into roughly one. Failures map
+        to None so a single bad symbol never breaks the whole page.
+        """
+        items = list(items)
+        if not items:
+            return {}
+        results = {}
+        with ThreadPoolExecutor(max_workers=min(workers, len(items))) as executor:
+            futures = {executor.submit(fn, item): item for item in items}
+            for future in as_completed(futures):
+                item = futures[future]
+                try:
+                    results[item] = future.result()
+                except Exception:
+                    results[item] = None
+        return results
+
+    @staticmethod
     def get_portfolio(user_id: str) -> list[dict]:
         holdings = PortfolioRepository.get_portfolio(user_id)
+        # Fetch every holding's live price in parallel — a sequential call per
+        # holding made a cold load scale linearly with portfolio size.
+        sig_map = PortfolioService._parallel_map(
+            AdvisorService._fetch_signals,
+            {h["symbol"] for h in holdings if h.get("symbol")},
+        )
         enriched = []
         for h in holdings:
             qty = h.get("quantity") or 0
@@ -16,13 +46,8 @@ class PortfolioService:
             invested = qty * buy_price
 
             # Live price is best-effort: a missing signal must not break the row.
-            curr_price = 0.0
-            try:
-                signals = AdvisorService._fetch_signals(h["symbol"])
-                if signals:
-                    curr_price = signals.get("current_price", 0) or 0
-            except Exception:
-                curr_price = 0.0
+            signals = sig_map.get(h.get("symbol"))
+            curr_price = (signals.get("current_price", 0) or 0) if signals else 0.0
 
             has_price = curr_price > 0
             current_value = qty * curr_price if has_price else 0.0
@@ -87,30 +112,37 @@ class PortfolioService:
         
         # Intermediate calculated list of holdings
         holding_details = []
-        
+
+        # Resolve live prices and canonical tickers for all symbols in parallel
+        # so a cold analytics load doesn't do 2 sequential network calls per
+        # holding.
+        symbols = {h["symbol"] for h in holdings if h.get("symbol")}
+        sig_map = PortfolioService._parallel_map(AdvisorService._fetch_signals, symbols)
+        tick_map = PortfolioService._parallel_map(_working_ticker, symbols)
+
         for holding in holdings:
             symbol = holding["symbol"]
             qty = holding["quantity"]
             buy_price = holding["buy_price"]
             purchase_value = qty * buy_price
             total_investment += purchase_value
-            
+
             # Fetch current price
-            signals = AdvisorService._fetch_signals(symbol)
+            signals = sig_map.get(symbol)
             curr_price = buy_price
             trend = "BULLISH"
             rsi = 50.0
-            
+
             if signals:
                 curr_price = signals.get("current_price", buy_price)
                 trend = signals.get("trend", "BULLISH")
                 rsi = signals.get("rsi", 50.0)
-                
+
             curr_value = qty * curr_price
             total_current_value += curr_value
-            
+
             # Get metadata from UNIVERSE
-            ticker_symbol = _working_ticker(symbol)
+            ticker_symbol = tick_map.get(symbol) or _working_ticker(symbol)
             meta = UNIVERSE.get(ticker_symbol, {})
             sector = meta.get("sector", "Other")
             risk = meta.get("risk", "medium")
