@@ -7,7 +7,7 @@ from datetime import datetime
 from email.mime.text import MIMEText
 from app.repositories.user_repository import UserRepository
 from app.core.redis import redis_client
-from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token
+from app.core.security import hash_password, verify_password, create_access_token, create_refresh_token, needs_rehash
 from app.utils.logger import get_logger
 
 logger = get_logger("auth_service")
@@ -299,6 +299,20 @@ class AuthService:
         )
         if not ok:
             return None
+
+        # Rehash-on-login: if this user's hash still uses an older, slower
+        # bcrypt cost, transparently upgrade it to the current work factor so
+        # their NEXT login is faster. Done in the background — the verify above
+        # already succeeded, so this must not add latency to the response.
+        if needs_rehash(user["password_hash"]):
+            uid, plain = user["id"], password
+            def _rehash():
+                try:
+                    UserRepository.update_password(uid, hash_password(plain))
+                except Exception as e:
+                    logger.error(f"Rehash-on-login failed for user {uid}: {e}")
+            threading.Thread(target=_rehash, daemon=True).start()
+
         # Return cleaned dict
         return {
             "id": user["id"],
