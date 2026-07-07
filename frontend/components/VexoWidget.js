@@ -13,6 +13,16 @@ export default function VexoWidget() {
   ]);
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef(null);
+  const textareaRef = useRef(null);
+
+  // Auto-grow the input as the user types so the whole message stays visible
+  // (WhatsApp-style), capped before it scrolls.
+  const MAX_INPUT_HEIGHT = 140;
+  const autosize = (el) => {
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, MAX_INPUT_HEIGHT) + "px";
+  };
 
   // Scroll to bottom of chat when new messages arrive
   useEffect(() => {
@@ -25,6 +35,7 @@ export default function VexoWidget() {
     if (!chatInput.trim()) return;
     const msg = chatInput;
     setChatInput("");
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
     // Send the recent conversation so Vexo has memory of the dialogue.
     const priorHistory = chatHistory
       .slice(-10)
@@ -44,6 +55,32 @@ export default function VexoWidget() {
     }
   };
 
+  // Convert inline markdown (**bold**, *italic*) to React nodes. Any stray
+  // asterisk that isn't part of a matched pair is stripped, so no literal *
+  // ever shows in Vexo's answers.
+  const renderInline = (text, boldColor = "var(--text-primary)") => {
+    const nodes = [];
+    const regex = /\*\*(.+?)\*\*|\*(.+?)\*/g;
+    let last = 0;
+    let m;
+    let key = 0;
+    while ((m = regex.exec(text)) !== null) {
+      if (m.index > last) nodes.push(text.slice(last, m.index).replace(/\*/g, ""));
+      if (m[1] !== undefined) {
+        nodes.push(
+          <strong key={key++} style={{ color: boldColor, fontWeight: 700 }}>
+            {m[1]}
+          </strong>
+        );
+      } else {
+        nodes.push(<em key={key++}>{m[2]}</em>);
+      }
+      last = regex.lastIndex;
+    }
+    if (last < text.length) nodes.push(text.slice(last).replace(/\*/g, ""));
+    return nodes;
+  };
+
   const formatCopilotText = (text) => {
     if (!text) return "";
     return text.split("\n").map((line, idx) => {
@@ -59,7 +96,7 @@ export default function VexoWidget() {
               color: "var(--accent)",
             }}
           >
-            {line.replace("### ", "")}
+            {renderInline(line.replace("### ", ""), "var(--accent)")}
           </h4>
         );
       }
@@ -75,21 +112,13 @@ export default function VexoWidget() {
               color: "var(--accent)",
             }}
           >
-            {line.replace("## ", "")}
+            {renderInline(line.replace("## ", ""), "var(--accent)")}
           </h3>
         );
       }
-      if (line.startsWith("* ")) {
-        const parts = line.replace("* ", "").split(/\*\*(.*?)\*\//g);
-        const parsed = parts.map((part, i) =>
-          i % 2 === 1 ? (
-            <strong key={i} style={{ color: "var(--accent)", fontWeight: 700 }}>
-              {part}
-            </strong>
-          ) : (
-            part
-          )
-        );
+      // Bullet lines: "* " or "- " (the space distinguishes a bullet marker
+      // from **bold**).
+      if (line.startsWith("* ") || line.startsWith("- ")) {
         return (
           <li
             key={idx}
@@ -101,21 +130,10 @@ export default function VexoWidget() {
               marginBottom: "4px",
             }}
           >
-            {parsed}
+            {renderInline(line.slice(2), "var(--accent)")}
           </li>
         );
       }
-      // Simple regex bold replacement (split by **)
-      const parts = line.split(/\*\*(.*?)\*\*/g);
-      const content = parts.map((part, i) =>
-        i % 2 === 1 ? (
-          <strong key={i} style={{ color: "var(--text-primary)", fontWeight: 700 }}>
-            {part}
-          </strong>
-        ) : (
-          part
-        )
-      );
       return (
         <p
           key={idx}
@@ -126,7 +144,7 @@ export default function VexoWidget() {
             color: "var(--text-secondary)",
           }}
         >
-          {content}
+          {renderInline(line)}
         </p>
       );
     });
@@ -324,23 +342,38 @@ export default function VexoWidget() {
 
         {/* Chat Input */}
         <div style={{ padding: "20px 24px", borderTop: "1px solid var(--border-subtle)", background: "var(--bg-primary)" }}>
-          <div style={{ display: "flex", gap: "10px", position: "relative" }}>
-            <input
-              type="text"
+          <div style={{ display: "flex", gap: "10px", position: "relative", alignItems: "flex-end" }}>
+            <textarea
+              ref={textareaRef}
+              rows={1}
               value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && sendCopilotMessage()}
+              onChange={(e) => {
+                setChatInput(e.target.value);
+                autosize(e.target);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  sendCopilotMessage();
+                }
+              }}
               placeholder="Ask for a prediction, picks, or analysis..."
               style={{
                 flex: 1,
                 background: "var(--input-bg)",
                 color: "var(--text-primary)",
                 border: "1px solid var(--border-medium)",
-                padding: "14px 16px",
+                padding: "13px 16px",
                 borderRadius: "12px",
                 fontSize: "0.9rem",
                 outline: "none",
                 fontFamily: "inherit",
+                lineHeight: "1.4",
+                resize: "none",
+                maxHeight: MAX_INPUT_HEIGHT + "px",
+                overflowY: "auto",
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-word",
               }}
               disabled={chatLoading}
             />
