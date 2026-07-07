@@ -50,6 +50,23 @@ const TrendingUpIcon = ({ size = 18, color = "currentColor" }) => (
   </svg>
 );
 
+// Ledger/Track Record Icon SVG
+const LedgerIcon = ({ size = 18, color = "currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 3v18h18" />
+    <path d="M7 15l4-4 3 3 5-6" />
+  </svg>
+);
+
+// Backtest / flask Icon SVG
+const BacktestIcon = ({ size = 18, color = "currentColor" }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 2v6l-5 9a2 2 0 0 0 1.8 3h12.4a2 2 0 0 0 1.8-3l-5-9V2" />
+    <path d="M8 2h8" />
+    <path d="M7.5 14h9" />
+  </svg>
+);
+
 // Calculator Icon SVG
 const CalculatorIcon = ({ size = 18, color = "currentColor" }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -93,6 +110,8 @@ const LogOutIcon = ({ size = 18, color = "currentColor" }) => (
 const NAV_LINKS = [
   { href: "/", label: "Dashboard", icon: DashboardIcon },
   { href: "/daily-edge", label: "Daily Edge", icon: TrendingUpIcon },
+  { href: "/track-record", label: "Track Record", icon: LedgerIcon },
+  { href: "/backtest", label: "Backtest", icon: BacktestIcon },
   { href: "/news", label: "News", icon: NewspaperIcon },
   { href: "/advisor", label: "AI Advisor", icon: SparklesIcon },
   { href: "/calculator", label: "Calculator", icon: CalculatorIcon },

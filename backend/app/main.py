@@ -26,6 +26,7 @@ async def lifespan(app: FastAPI):
     from app.repositories.watchlist_repository import WatchlistRepository
     from app.repositories.alert_repository import AlertRepository
     from app.repositories.support_repository import SupportRepository
+    from app.repositories.signal_repository import SignalRepository
 
     try:
         logger.info("Initializing database schemas...")
@@ -35,6 +36,7 @@ async def lifespan(app: FastAPI):
         WatchlistRepository.init_watchlist_db()
         AlertRepository.init_alert_db()
         SupportRepository.init_support_db()
+        SignalRepository.init_signal_ledger_db()
         logger.info("Database schemas initialized successfully.")
     except Exception as e:
         logger.error(f"Failed to initialize database tables: {e}")
@@ -52,6 +54,7 @@ async def lifespan(app: FastAPI):
     # unavailable (single-process/dev), we just run the scheduler locally.
     from app.services.market.market_service import MarketService
     from app.services.market.alert_service import AlertService
+    from app.services.ai.signal_ledger_service import SignalLedgerService
     from app.core.redis import redis_client
 
     _SCHED_LOCK_KEY = "lock:scheduler_leader"
@@ -82,6 +85,20 @@ async def lifespan(app: FastAPI):
         # Evaluate realized outcomes of past Daily Edge picks after NSE close
         # (12:00 UTC = 17:30 IST) so the page can show measured accuracy.
         scheduler.add_job(MarketService.evaluate_pick_outcomes, 'cron', hour=12, minute=0)
+        # ── Signal Ledger (Phase 1) ──────────────────────────────────
+        # Scan the consensus predictor across the watchlist three times per
+        # session and score realized outcomes. Cron hours are UTC (server tz),
+        # matching the evaluate_pick_outcomes convention above:
+        #   03:50 UTC = 09:20 IST (post-open), 06:30 UTC = 12:00 IST (midday),
+        #   09:45 UTC = 15:15 IST (pre-close). Mon–Fri only.
+        scheduler.add_job(SignalLedgerService.generate_signals, 'cron',
+                          day_of_week='mon-fri', hour=3, minute=50)
+        scheduler.add_job(SignalLedgerService.generate_signals, 'cron',
+                          day_of_week='mon-fri', hour=6, minute=30)
+        scheduler.add_job(SignalLedgerService.generate_signals, 'cron',
+                          day_of_week='mon-fri', hour=9, minute=45)
+        # Fill 1h/1d/3d outcomes as horizons elapse (frequent enough for 1h).
+        scheduler.add_job(SignalLedgerService.score_pending_outcomes, 'interval', minutes=30)
         # Renew the leadership lock well before its TTL expires.
         scheduler.add_job(_renew_scheduler_leadership, 'interval', seconds=_SCHED_LOCK_TTL // 3)
         scheduler.start()
