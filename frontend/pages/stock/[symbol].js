@@ -416,8 +416,8 @@ export default function StockDetail() {
               <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
                 <CompanyLogo symbol={cleanSymbol} size={48} radius={10} fontSize="1.3rem" />
                 <div>
-                  <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                    <h1 style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: "clamp(1.5rem, 3.5vw, 2.2rem)", fontWeight: 800, margin: 0, color: "var(--text-primary)", letterSpacing: "-0.02em" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                    <h1 style={{ fontFamily: "Space Grotesk, sans-serif", fontSize: "clamp(1.5rem, 3.5vw, 2.2rem)", fontWeight: 800, margin: 0, marginRight: "6px", color: "var(--text-primary)", letterSpacing: "-0.02em" }}>
                       {companyName}
                     </h1>
                     <button
@@ -426,14 +426,18 @@ export default function StockDetail() {
                         background: "transparent",
                         border: "none",
                         cursor: "pointer",
-                        fontSize: "1.4rem",
                         color: isWatched ? "var(--gold)" : "var(--text-muted)",
-                        transition: "color 0.2s",
-                        padding: "4px"
+                        transition: "color 0.2s, background 0.2s",
+                        padding: "7px",
+                        borderRadius: "9px",
+                        lineHeight: 0,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        justifyContent: "center",
                       }}
                       title={isWatched ? "Remove from watchlist" : "Add to watchlist"}
                     >
-                      <Icon name="star" filled={isWatched} size={18} />
+                      <Icon name="star" filled={isWatched} size={19} />
                     </button>
                     <button
                       onClick={toggleSignalAlert}
@@ -443,14 +447,17 @@ export default function StockDetail() {
                         border: "none",
                         cursor: signalBusy ? "wait" : "pointer",
                         color: signalSubscribed ? "var(--accent)" : "var(--text-muted)",
-                        transition: "color 0.2s",
-                        padding: "4px",
+                        transition: "color 0.2s, background 0.2s",
+                        padding: "7px",
+                        borderRadius: "9px",
+                        lineHeight: 0,
                         display: "inline-flex",
                         alignItems: "center",
+                        justifyContent: "center",
                       }}
                       title={signalSubscribed ? "Buy/sell signal alerts on — click to turn off" : "Get buy/sell signal alerts for this stock"}
                     >
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill={signalSubscribed ? "var(--accent)" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="19" height="19" viewBox="0 0 24 24" fill={signalSubscribed ? "var(--accent)" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ display: "block" }}>
                         <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
                         <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
                       </svg>

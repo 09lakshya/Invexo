@@ -24,11 +24,21 @@ function timeAgo(ts) {
   return `${days}d ago`;
 }
 
+const sectionLabelStyle = {
+  padding: "10px 18px 6px",
+  fontSize: "0.68rem",
+  fontWeight: 700,
+  letterSpacing: "0.08em",
+  textTransform: "uppercase",
+  color: "var(--text-muted)",
+};
+
 export default function NotificationBell() {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(0);
   const [items, setItems] = useState([]);
+  const [subs, setSubs] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const ref = useRef(null);
@@ -53,16 +63,34 @@ export default function NotificationBell() {
 
   const fetchFeed = useCallback(async () => {
     setLoading(true);
-    try {
-      const res = await API.get("/signal-alerts/notifications", { params: { limit: 20 } });
-      setItems(res.data.notifications || []);
-      setUnread(res.data.unread_count || 0);
-    } catch (err) {
+    // Pull the fired-signal feed and the user's subscriptions together so the
+    // bell shows both what has happened and what they're following. A stock the
+    // user just subscribed to shows up under "Following" even before it fires.
+    const [feedRes, subsRes] = await Promise.allSettled([
+      API.get("/signal-alerts/notifications", { params: { limit: 20 } }),
+      API.get("/signal-alerts/subscriptions"),
+    ]);
+    if (feedRes.status === "fulfilled") {
+      setItems(feedRes.value.data.notifications || []);
+      setUnread(feedRes.value.data.unread_count || 0);
+    } else {
       setItems([]);
-    } finally {
-      setLoading(false);
     }
+    if (subsRes.status === "fulfilled") {
+      setSubs(subsRes.value.data || []);
+    }
+    setLoading(false);
   }, []);
+
+  const removeSub = useCallback(async (sub) => {
+    const prev = subs;
+    setSubs((list) => list.filter((s) => s.id !== sub.id)); // optimistic
+    try {
+      await API.delete(`/signal-alerts/subscriptions/${sub.id}`);
+    } catch (err) {
+      setSubs(prev); // revert on failure
+    }
+  }, [subs]);
 
   // Poll the unread badge on mount and every 60s.
   useEffect(() => {
@@ -108,6 +136,11 @@ export default function NotificationBell() {
     }
     setOpen(false);
     router.push(`/stock/${n.symbol}`);
+  };
+
+  const goToStock = (symbol) => {
+    setOpen(false);
+    router.push(`/stock/${symbol}`);
   };
 
   return (
@@ -215,63 +248,138 @@ export default function NotificationBell() {
             <div style={{ padding: "28px 18px", textAlign: "center", color: "var(--text-muted)", fontSize: "0.85rem" }}>
               Loading…
             </div>
-          ) : items.length === 0 ? (
+          ) : items.length === 0 && subs.length === 0 ? (
             <div style={{ padding: "28px 18px", textAlign: "center", color: "var(--text-muted)", fontSize: "0.85rem", lineHeight: 1.6 }}>
               No signals yet.<br />
               Subscribe to a stock, or add it to your watchlist or portfolio, to get buy/sell alerts here.
             </div>
           ) : (
-            items.map((n) => {
-              const isBuy = n.action === "BUY";
-              const color = isBuy ? "var(--green)" : "var(--red)";
-              const bg = isBuy ? "var(--green-dim)" : "var(--red-dim)";
-              return (
-                <button
-                  key={n.id}
-                  onClick={() => openStock(n)}
-                  style={{
-                    width: "100%",
-                    display: "flex",
-                    gap: "12px",
-                    padding: "14px 18px",
-                    background: n.is_read ? "transparent" : "var(--hover-overlay)",
-                    border: "none",
-                    borderBottom: "1px solid var(--border-subtle)",
-                    cursor: "pointer",
-                    textAlign: "left",
-                    fontFamily: "inherit",
-                  }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--hover-overlay)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = n.is_read ? "transparent" : "var(--hover-overlay)")}
-                >
-                  <span
-                    style={{
-                      flexShrink: 0,
-                      alignSelf: "flex-start",
-                      marginTop: "2px",
-                      padding: "3px 8px",
-                      borderRadius: "8px",
-                      background: bg,
-                      color,
-                      fontSize: "0.7rem",
-                      fontWeight: 800,
-                      letterSpacing: "0.03em",
-                    }}
-                  >
-                    {n.action}
-                  </span>
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: "flex", justifyContent: "space-between", gap: "8px", alignItems: "baseline" }}>
-                      <strong style={{ color: "var(--text-primary)", fontSize: "0.88rem" }}>{n.symbol}</strong>
-                      <span style={{ color: "var(--text-muted)", fontSize: "0.72rem", flexShrink: 0 }}>{timeAgo(n.created_at)}</span>
-                    </span>
-                    <span style={{ display: "block", color: "var(--text-muted)", fontSize: "0.78rem", lineHeight: 1.5, marginTop: "3px" }}>
-                      {n.message}
-                    </span>
-                  </span>
-                </button>
-              );
-            })
+            <>
+              {items.length > 0 && (
+                <>
+                  <div style={sectionLabelStyle}>Recent signals</div>
+                  {items.map((n) => {
+                    const isBuy = n.action === "BUY";
+                    const color = isBuy ? "var(--green)" : "var(--red)";
+                    const bg = isBuy ? "var(--green-dim)" : "var(--red-dim)";
+                    return (
+                      <button
+                        key={n.id}
+                        onClick={() => openStock(n)}
+                        style={{
+                          width: "100%",
+                          display: "flex",
+                          gap: "12px",
+                          padding: "14px 18px",
+                          background: n.is_read ? "transparent" : "var(--hover-overlay)",
+                          border: "none",
+                          borderBottom: "1px solid var(--border-subtle)",
+                          cursor: "pointer",
+                          textAlign: "left",
+                          fontFamily: "inherit",
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "var(--hover-overlay)")}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = n.is_read ? "transparent" : "var(--hover-overlay)")}
+                      >
+                        <span
+                          style={{
+                            flexShrink: 0,
+                            alignSelf: "flex-start",
+                            marginTop: "2px",
+                            padding: "3px 8px",
+                            borderRadius: "8px",
+                            background: bg,
+                            color,
+                            fontSize: "0.7rem",
+                            fontWeight: 800,
+                            letterSpacing: "0.03em",
+                          }}
+                        >
+                          {n.action}
+                        </span>
+                        <span style={{ flex: 1, minWidth: 0 }}>
+                          <span style={{ display: "flex", justifyContent: "space-between", gap: "8px", alignItems: "baseline" }}>
+                            <strong style={{ color: "var(--text-primary)", fontSize: "0.88rem" }}>{n.symbol}</strong>
+                            <span style={{ color: "var(--text-muted)", fontSize: "0.72rem", flexShrink: 0 }}>{timeAgo(n.created_at)}</span>
+                          </span>
+                          <span style={{ display: "block", color: "var(--text-muted)", fontSize: "0.78rem", lineHeight: 1.5, marginTop: "3px" }}>
+                            {n.message}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </>
+              )}
+
+              {subs.length > 0 && (
+                <>
+                  <div style={sectionLabelStyle}>Following</div>
+                  {subs.map((s) => (
+                    <div
+                      key={s.id}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "10px",
+                        padding: "12px 18px",
+                        borderBottom: "1px solid var(--border-subtle)",
+                      }}
+                    >
+                      <button
+                        onClick={() => goToStock(s.symbol)}
+                        style={{
+                          flex: 1,
+                          minWidth: 0,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "2px",
+                          background: "transparent",
+                          border: "none",
+                          cursor: "pointer",
+                          textAlign: "left",
+                          fontFamily: "inherit",
+                          padding: 0,
+                        }}
+                      >
+                        <strong style={{ color: "var(--text-primary)", fontSize: "0.88rem" }}>{s.symbol}</strong>
+                        <span style={{ color: "var(--text-muted)", fontSize: "0.74rem" }}>
+                          Alerts at ≥ {s.min_confidence}% confidence
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => removeSub(s)}
+                        aria-label={`Stop following ${s.symbol}`}
+                        title={`Stop following ${s.symbol}`}
+                        style={{
+                          flexShrink: 0,
+                          width: "28px",
+                          height: "28px",
+                          borderRadius: "8px",
+                          border: "1px solid var(--border-subtle)",
+                          background: "transparent",
+                          color: "var(--text-muted)",
+                          cursor: "pointer",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.color = "var(--red)"; e.currentTarget.style.borderColor = "var(--red-dim)"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; e.currentTarget.style.borderColor = "var(--border-subtle)"; }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                          <line x1="6" y1="6" x2="18" y2="18" />
+                          <line x1="18" y1="6" x2="6" y2="18" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                  <div style={{ padding: "10px 18px 4px", color: "var(--text-muted)", fontSize: "0.72rem", lineHeight: 1.5 }}>
+                    Watchlist and portfolio holdings are covered automatically.
+                  </div>
+                </>
+              )}
+            </>
           )}
 
           <div style={{ padding: "10px 18px", textAlign: "center", color: "var(--text-muted)", fontSize: "0.68rem", lineHeight: 1.5 }}>
