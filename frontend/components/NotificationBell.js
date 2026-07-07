@@ -30,7 +30,17 @@ export default function NotificationBell() {
   const [unread, setUnread] = useState(0);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const ref = useRef(null);
+
+  // Track the mobile breakpoint (matches the 768px used across the navbar).
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
 
   const fetchUnread = useCallback(async () => {
     try {
@@ -151,10 +161,13 @@ export default function NotificationBell() {
       {open && (
         <div
           style={{
-            position: "absolute",
-            top: "calc(100% + 8px)",
-            right: 0,
-            width: "min(360px, 92vw)",
+            // On mobile the bell sits left of the avatar/menu, so anchoring the
+            // wide panel to the bell's right edge overflowed off-screen left.
+            // Below 768px, span the viewport with small side margins instead.
+            position: isMobile ? "fixed" : "absolute",
+            top: isMobile ? "calc(clamp(52px, 8vmin, 64px) + 8px)" : "calc(100% + 8px)",
+            ...(isMobile ? { left: "12px", right: "12px" } : { right: 0 }),
+            width: isMobile ? "auto" : "min(360px, 92vw)",
             maxHeight: "70vh",
             overflowY: "auto",
             background: "var(--dropdown-bg)",
