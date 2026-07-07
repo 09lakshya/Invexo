@@ -25,9 +25,9 @@ const inputStyle = {
   fontFamily: "inherit", outline: "none", width: "100%",
 };
 
-function Field({ label, children, hint }) {
+function Field({ label, children, hint, full }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "5px", flex: "1 1 140px", minWidth: "130px" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "5px", minWidth: 0, gridColumn: full ? "1 / -1" : "auto" }}>
       <label style={{ fontSize: "0.64rem", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "var(--text-muted)" }}>{label}</label>
       {children}
       {hint && <span style={{ fontSize: "0.6rem", color: "var(--text-muted)", opacity: 0.7 }}>{hint}</span>}
@@ -120,12 +120,12 @@ export default function BacktestPage() {
 
           {/* Config panel */}
           <div className="glass" style={{ padding: "20px", boxShadow: "var(--shadow-card)", marginBottom: "20px" }}>
-            <div style={{ display: "flex", gap: "14px", flexWrap: "wrap", marginBottom: "14px" }}>
-              <Field label="Symbols (comma-separated)"><input style={inputStyle} value={form.symbols} onChange={(e) => setForm((f) => ({ ...f, symbols: e.target.value }))} /></Field>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "14px", marginBottom: "14px" }}>
+              <Field label="Symbols (comma-separated)" full><input style={inputStyle} value={form.symbols} onChange={(e) => setForm((f) => ({ ...f, symbols: e.target.value }))} /></Field>
               <Field label="From"><input type="date" style={inputStyle} value={form.start} onChange={(e) => setForm((f) => ({ ...f, start: e.target.value }))} /></Field>
               <Field label="To"><input type="date" style={inputStyle} value={form.end} onChange={(e) => setForm((f) => ({ ...f, end: e.target.value }))} /></Field>
             </div>
-            <div style={{ display: "flex", gap: "14px", flexWrap: "wrap" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "14px" }}>
               <Field label="Holding days" hint="1–20"><input type="number" min={1} max={20} style={inputStyle} value={form.holding_days} onChange={(e) => setForm((f) => ({ ...f, holding_days: e.target.value }))} /></Field>
               <Field label="Initial capital (₹)"><input type="number" style={inputStyle} value={form.initial_capital} onChange={(e) => setForm((f) => ({ ...f, initial_capital: e.target.value }))} /></Field>
               <Field label="Trade fraction" hint="of equity/trade"><input type="number" step="0.01" min={0.01} max={1} style={inputStyle} value={form.trade_fraction} onChange={(e) => setForm((f) => ({ ...f, trade_fraction: e.target.value }))} /></Field>
@@ -137,7 +137,7 @@ export default function BacktestPage() {
               {showCosts ? "▾" : "▸"} Cost assumptions {showCosts ? "" : "(defaults: NSE delivery + 10bps slippage)"}
             </button>
             {showCosts && cfg && (
-              <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "12px", padding: "12px", background: "var(--surface-hover)", borderRadius: "12px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "12px", marginTop: "12px", padding: "12px", background: "var(--surface-hover)", borderRadius: "12px" }}>
                 {COST_KEYS.map((k) => (
                   <Field key={k} label={k.replace(/_/g, " ")} hint={cfg.cost_model_docs?.[k]}>
                     <input type="number" step="any" style={inputStyle} value={costs[k]} onChange={(e) => setCosts((c) => ({ ...c, [k]: e.target.value }))} />
