@@ -9,6 +9,7 @@ import { ThemeProvider } from '../context/ThemeContext';
 import { WebSocketProvider } from '../context/WebSocketContext';
 import VexoWidget from '../components/VexoWidget';
 import Icon from '../components/Icon';
+import { applyDensity, getDensity } from '../services/preferences';
 
 // Pages that don't require authentication
 const PUBLIC_PAGES = ['/login'];
@@ -65,6 +66,12 @@ export default function App({ Component, pageProps }) {
       },
     },
   }));
+
+  // Apply the saved display-density preference on every page load so the
+  // choice made in Settings persists across the whole app, like the theme does.
+  useEffect(() => {
+    applyDensity(getDensity());
+  }, []);
 
   return (
     <>

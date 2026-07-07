@@ -96,6 +96,23 @@
   --skeleton-mid: rgba(0,0,0,0.08);
 }
 
+/* ── Display Density ───────────────────────────────────────────────
+   Driven by the Settings page (data-density on <html>). Compact tightens
+   the shared spacing tokens and base type scale so the whole app breathes
+   a little less — a genuine, app-wide effect, not a cosmetic toggle. */
+[data-density="compact"] {
+  --page-gutter: clamp(10px, 2.4vmin, 20px);
+  --page-padding-top: clamp(12px, 3vmin, 24px);
+  --page-padding-bottom: clamp(24px, 5vmin, 48px);
+  --section-gap: clamp(10px, 2.2vmin, 18px);
+  --card-padding: clamp(10px, 2vmin, 16px);
+  --card-radius: clamp(9px, 1.8vmin, 14px);
+}
+
+html[data-density="compact"] {
+  font-size: clamp(12px, 0.9vw + 9px, 15px);
+}
+
 /* ── Base Reset ────────────────────────────────────────────────── */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -1136,6 +1153,102 @@ input[type=number] {
   textarea,
   .input-premium {
     font-size: 16px !important;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   SETTINGS PAGE LAYOUT
+   ════════════════════════════════════════════════════════════════════ */
+
+.settings-shell {
+  display: grid;
+  grid-template-columns: 224px minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+
+.settings-rail {
+  position: sticky;
+  top: 84px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-rail-mobile { display: none; }
+
+.settings-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 11px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease;
+}
+
+.settings-nav-link:hover {
+  background: var(--hover-overlay);
+  color: var(--text-primary);
+}
+
+.settings-nav-link[data-active="true"] {
+  background: var(--accent-dim);
+  color: var(--text-primary);
+  border-color: var(--border-subtle);
+}
+
+.settings-nav-link[data-active="true"] .settings-nav-icon { color: var(--accent); }
+
+.settings-nav-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  display: inline-flex;
+  transition: color 0.18s ease;
+}
+
+.settings-nav-link:hover .settings-nav-icon { color: var(--text-secondary); }
+
+@media (max-width: 860px) {
+  .settings-shell {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .settings-rail { display: none; }
+
+  .settings-rail-mobile {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    position: sticky;
+    top: 60px;
+    z-index: 40;
+    padding: 10px 2px;
+    margin: -4px -2px 2px;
+    background: var(--bg-primary);
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .settings-rail-mobile::-webkit-scrollbar { display: none; }
+
+  .settings-nav-link {
+    width: auto;
+    flex-shrink: 0;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--border-subtle);
+    font-size: 0.82rem;
+    white-space: nowrap;
   }
 }
 

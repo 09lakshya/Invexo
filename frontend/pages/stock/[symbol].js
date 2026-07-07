@@ -8,6 +8,7 @@ import API from "../../services/api";
 import { STOCK_METADATA } from "../../services/stocks";
 import Icon from "../../components/Icon";
 import CompanyLogo from "../../components/CompanyLogo";
+import { getChartDefaults } from "../../services/preferences";
 
 // ── CLIENT-SIDE MATHEMATICAL CALCULATORS ────────────────────────────────────
 
@@ -141,7 +142,16 @@ export default function StockDetail() {
   const [predictionData, setPredictionData] = useState(null);
   const [chartHistory, setChartHistory] = useState([]);
   const [chartPeriod, setChartPeriod] = useState("3m"); // default 3mo period
-  
+  const [chartTypeDefault, setChartTypeDefault] = useState("line");
+
+  // Honour the chart style + default range the user picked in Settings.
+  // Applied after mount to avoid an SSR/CSR hydration mismatch on the period tabs.
+  useEffect(() => {
+    const { chartType, timeframe } = getChartDefaults();
+    setChartTypeDefault(chartType);
+    if (timeframe && timeframe !== "3m") setChartPeriod(timeframe);
+  }, []);
+
   const [loading, setLoading] = useState(true);
   const [chartLoading, setChartLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -536,7 +546,7 @@ export default function StockDetail() {
                   <p style={{ color: "var(--text-muted)", fontSize: "0.85rem" }}>Loading financial candlesticks...</p>
                 </div>
               ) : chartHistory && chartHistory.length > 0 ? (
-                <RealChart data={chartHistory} />
+                <RealChart data={chartHistory} defaultChartType={chartTypeDefault} />
               ) : (
                 <div style={{
                   height: "100%",

@@ -766,10 +766,13 @@ export default function RealChart({
   data,
   chartType: externalChartType,
   setChartType: externalSetChartType,
+  defaultChartType = "line",
   zoomRef: externalZoomRef,
   onZoomStateChange: externalOnZoomStateChange
 }) {
-  const [internalChartType, internalSetChartType] = useState("line");
+  const [internalChartType, internalSetChartType] = useState(
+    defaultChartType === "candle" ? "candle" : "line"
+  );
   const chartType = externalChartType !== undefined ? externalChartType : internalChartType;
   const setChartType = externalSetChartType !== undefined ? externalSetChartType : internalSetChartType;
   const showSwitcher = externalChartType === undefined;
