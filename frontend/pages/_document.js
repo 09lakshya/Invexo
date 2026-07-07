@@ -6,6 +6,14 @@ export default function Document() {
       <Head>
         <meta charSet="UTF-8" />
 
+        {/* Set the theme before paint so new visitors default to dark with no
+            flash of light. Respects a saved preference if one exists. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('invexo_theme');if(t!=='light'&&t!=='dark')t='dark';document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();`,
+          }}
+        />
+
         {/* ── Favicon & Icons ── */}
         <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
