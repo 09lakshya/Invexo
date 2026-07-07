@@ -146,6 +146,8 @@ export default function StockDetail() {
   const [chartLoading, setChartLoading] = useState(true);
   const [error, setError] = useState(null);
   const [watchlist, setWatchlist] = useState([]);
+  const [signalSubscribed, setSignalSubscribed] = useState(false);
+  const [signalBusy, setSignalBusy] = useState(false);
 
   const cleanSymbol = useMemo(() => {
     return symbol ? symbol.toUpperCase().replace(/\.NS$/i, "").replace(/\.BO$/i, "") : "";
@@ -203,6 +205,36 @@ export default function StockDetail() {
     }
   };
 
+  // Fetch whether the user is subscribed to buy/sell signal alerts for this stock
+  const fetchSignalSubscription = async () => {
+    try {
+      const res = await API.get("/signal-alerts/subscriptions");
+      const symbols = (res.data || []).map(s => s.symbol.toUpperCase());
+      setSignalSubscribed(symbols.includes(cleanSymbol));
+    } catch (err) {
+      // Unauthenticated or transient — leave as not subscribed.
+    }
+  };
+
+  const toggleSignalAlert = async () => {
+    if (!cleanSymbol || signalBusy) return;
+    setSignalBusy(true);
+    const wasSubscribed = signalSubscribed;
+    setSignalSubscribed(!wasSubscribed); // optimistic
+    try {
+      if (wasSubscribed) {
+        await API.delete(`/signal-alerts/subscriptions/by-symbol/${cleanSymbol}`);
+      } else {
+        await API.post("/signal-alerts/subscriptions", { symbol: cleanSymbol });
+      }
+    } catch (err) {
+      setSignalSubscribed(wasSubscribed); // revert on failure
+      console.error("Failed to toggle signal alert:", err);
+    } finally {
+      setSignalBusy(false);
+    }
+  };
+
   // Load prediction data and stable indicators (using 3-month history) on mount
   useEffect(() => {
     if (!symbol) return;
@@ -212,6 +244,7 @@ export default function StockDetail() {
       setError(null);
       try {
         await fetchWatchlist();
+        fetchSignalSubscription();
         
         // Fetch AI prediction
         const predRes = await API.get(`/predict/${querySymbol}`);
@@ -391,6 +424,26 @@ export default function StockDetail() {
                       title={isWatched ? "Remove from watchlist" : "Add to watchlist"}
                     >
                       <Icon name="star" filled={isWatched} size={18} />
+                    </button>
+                    <button
+                      onClick={toggleSignalAlert}
+                      disabled={signalBusy}
+                      style={{
+                        background: "transparent",
+                        border: "none",
+                        cursor: signalBusy ? "wait" : "pointer",
+                        color: signalSubscribed ? "var(--accent)" : "var(--text-muted)",
+                        transition: "color 0.2s",
+                        padding: "4px",
+                        display: "inline-flex",
+                        alignItems: "center",
+                      }}
+                      title={signalSubscribed ? "Buy/sell signal alerts on — click to turn off" : "Get buy/sell signal alerts for this stock"}
+                    >
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill={signalSubscribed ? "var(--accent)" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+                        <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+                      </svg>
                     </button>
                   </div>
                   <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", fontWeight: 500, margin: "2px 0 0 0" }}>

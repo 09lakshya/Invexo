@@ -124,6 +124,33 @@ export default function SettingsPage() {
   const [passwordSaving, setPasswordSaving] = useState(false);
   const [passwordMessage, setPasswordMessage] = useState("");
 
+  const [signalSubs, setSignalSubs] = useState([]);
+  const [signalSubsLoading, setSignalSubsLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const res = await API.get("/signal-alerts/subscriptions");
+        if (active) setSignalSubs(res.data || []);
+      } catch {
+        /* unauthenticated or transient — leave empty */
+      } finally {
+        if (active) setSignalSubsLoading(false);
+      }
+    })();
+    return () => { active = false; };
+  }, []);
+
+  const removeSignalSub = async (id) => {
+    try {
+      await API.delete(`/signal-alerts/subscriptions/${id}`);
+      setSignalSubs((prev) => prev.filter((s) => s.id !== id));
+    } catch (err) {
+      console.error("Failed to remove signal subscription:", err);
+    }
+  };
+
   useEffect(() => {
     setProfileName(user?.name || "");
   }, [user?.name]);
@@ -548,6 +575,61 @@ export default function SettingsPage() {
                 disabled
                 onChange={() => {}}
               />
+            </Section>
+
+            {/* Buy/Sell Signal Alerts */}
+            <Section
+              title="Buy / Sell Signal Alerts"
+              subtitle="Get notified (in-app and by email) when Invexo's model flips to a BUY or SELL on a stock. Your watchlist and portfolio holdings are covered automatically; add extra stocks below."
+            >
+              {signalSubsLoading ? (
+                <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", padding: "8px 0" }}>Loading subscriptions…</p>
+              ) : signalSubs.length === 0 ? (
+                <p style={{ color: "var(--text-muted)", fontSize: "0.85rem", padding: "8px 0", lineHeight: 1.6 }}>
+                  You have no extra signal-alert subscriptions. Open any stock and tap the bell icon to subscribe, or
+                  simply add it to your watchlist or portfolio to receive its buy/sell signals.
+                </p>
+              ) : (
+                signalSubs.map((s) => (
+                  <div
+                    key={s.id}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "14px 0",
+                      borderBottom: "1px solid var(--border-subtle)",
+                      gap: "16px",
+                    }}
+                  >
+                    <div>
+                      <p style={{ color: "var(--text-primary)", fontWeight: 700, fontSize: "0.95rem" }}>{s.symbol}</p>
+                      <p style={{ color: "var(--text-muted)", fontSize: "0.8rem", marginTop: "3px" }}>
+                        Notifies at ≥ {s.min_confidence}% model confidence
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => removeSignalSub(s.id)}
+                      style={{
+                        padding: "8px 16px",
+                        borderRadius: "10px",
+                        border: "1px solid var(--red-dim)",
+                        background: "var(--red-dim)",
+                        color: "var(--red)",
+                        fontSize: "0.8rem",
+                        fontWeight: 600,
+                        cursor: "pointer",
+                        flexShrink: 0,
+                      }}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))
+              )}
+              <p style={{ color: "var(--text-muted)", fontSize: "0.72rem", marginTop: "16px", lineHeight: 1.5 }}>
+                Signals are automated model outputs, not investment advice. They can be wrong — always do your own research.
+              </p>
             </Section>
 
             {/* Privacy & Security */}

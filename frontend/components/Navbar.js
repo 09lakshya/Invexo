@@ -5,6 +5,7 @@ import API from "../services/api";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import Icon from "./Icon";
+import NotificationBell from "./NotificationBell";
 
 // Gear icon SVG for Settings
 const GearIcon = ({ size = 18, color = "currentColor" }) => (
@@ -260,6 +261,9 @@ export default function Navbar() {
 
 
 
+
+          {/* Signal notifications (buy/sell alerts) */}
+          {user && <NotificationBell />}
 
           {/* User Menu / Login */}
           {user ? (

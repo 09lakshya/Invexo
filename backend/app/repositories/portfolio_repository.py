@@ -47,6 +47,18 @@ class PortfolioRepository:
         return [dict(r) for r in rows]
 
     @staticmethod
+    def get_all_holdings() -> list[dict]:
+        """Distinct (user_id, symbol) across all portfolios. Used by the signal
+        alert scan to auto-cover holdings. Note: portfolio user_id is stored as
+        text — callers that need an integer must convert."""
+        conn, is_postgres = get_db_connection()
+        c = get_cursor(conn, is_postgres)
+        execute_query(c, "SELECT DISTINCT user_id, symbol FROM portfolio", (), is_postgres)
+        rows = c.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+
+    @staticmethod
     def add_holding(user_id: str, symbol: str, company_name: str, quantity: float, buy_price: float) -> int | None:
         conn, is_postgres = get_db_connection()
         c = get_cursor(conn, is_postgres)

@@ -25,6 +25,7 @@ async def lifespan(app: FastAPI):
     from app.repositories.portfolio_repository import PortfolioRepository
     from app.repositories.watchlist_repository import WatchlistRepository
     from app.repositories.alert_repository import AlertRepository
+    from app.repositories.signal_alert_repository import SignalAlertRepository
     from app.repositories.support_repository import SupportRepository
     from app.repositories.signal_repository import SignalRepository
 
@@ -35,6 +36,7 @@ async def lifespan(app: FastAPI):
         PortfolioRepository.init_portfolio_db()
         WatchlistRepository.init_watchlist_db()
         AlertRepository.init_alert_db()
+        SignalAlertRepository.init_signal_alert_db()
         SupportRepository.init_support_db()
         SignalRepository.init_signal_ledger_db()
         logger.info("Database schemas initialized successfully.")
@@ -54,6 +56,7 @@ async def lifespan(app: FastAPI):
     # unavailable (single-process/dev), we just run the scheduler locally.
     from app.services.market.market_service import MarketService
     from app.services.market.alert_service import AlertService
+    from app.services.market.signal_alert_service import SignalAlertService
     from app.services.ai.signal_ledger_service import SignalLedgerService
     from app.core.redis import redis_client
 
@@ -99,6 +102,17 @@ async def lifespan(app: FastAPI):
                           day_of_week='mon-fri', hour=9, minute=45)
         # Fill 1h/1d/3d outcomes as horizons elapse (frequent enough for 1h).
         scheduler.add_job(SignalLedgerService.score_pending_outcomes, 'interval', minutes=30)
+        # ── Buy/Sell signal alerts ───────────────────────────────────
+        # Scan users' subscriptions + watchlists + holdings and notify on
+        # actionable trend flips. Run a few minutes after each signal-ledger
+        # scan so the consensus caches are warm. Cron hours are UTC:
+        #   04:00 = 09:30 IST, 06:40 = 12:10 IST, 09:55 = 15:25 IST. Mon–Fri.
+        scheduler.add_job(SignalAlertService.scan_and_notify, 'cron',
+                          day_of_week='mon-fri', hour=4, minute=0)
+        scheduler.add_job(SignalAlertService.scan_and_notify, 'cron',
+                          day_of_week='mon-fri', hour=6, minute=40)
+        scheduler.add_job(SignalAlertService.scan_and_notify, 'cron',
+                          day_of_week='mon-fri', hour=9, minute=55)
         # Renew the leadership lock well before its TTL expires.
         scheduler.add_job(_renew_scheduler_leadership, 'interval', seconds=_SCHED_LOCK_TTL // 3)
         scheduler.start()

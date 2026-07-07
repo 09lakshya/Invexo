@@ -81,6 +81,17 @@ class WatchlistRepository:
         return [dict(r) for r in rows]
 
     @staticmethod
+    def get_all_entries() -> list[dict]:
+        """Every (user_id, symbol) pair across all users. Used by the signal
+        alert scan to auto-cover watched stocks."""
+        conn, is_postgres = get_db_connection()
+        c = get_cursor(conn, is_postgres)
+        execute_query(c, "SELECT user_id, symbol FROM watchlists", (), is_postgres)
+        rows = c.fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+
+    @staticmethod
     def is_in_watchlist(user_id: int, symbol: str) -> bool:
         conn, is_postgres = get_db_connection()
         c = get_cursor(conn, is_postgres)
