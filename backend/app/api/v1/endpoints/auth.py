@@ -59,6 +59,8 @@ def handle_signup_verify(payload: VerifySignupInput, request: Request):
 @router.post("/login")
 @limiter.limit("10/minute")
 def handle_login(payload: LoginInput, request: Request):
+    import time
+    t_start = time.perf_counter()
     try:
         user = AuthService.login(payload.email, payload.password)
     except Exception as e:
@@ -67,8 +69,13 @@ def handle_login(payload: LoginInput, request: Request):
     if user is None:
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
+    t_tok = time.perf_counter()
     access_token = create_access_token(user["id"])
     refresh_token = create_refresh_token(user["id"])
+    logger.info(
+        f"login timing: token_creation={(time.perf_counter() - t_tok) * 1000:.0f}ms "
+        f"total_handler={(time.perf_counter() - t_start) * 1000:.0f}ms"
+    )
     return {
         "access_token": access_token,
         "refresh_token": refresh_token,
