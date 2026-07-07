@@ -1,6 +1,7 @@
 import random
 import json
 import os
+import threading
 from datetime import datetime
 from email.mime.text import MIMEText
 from app.repositories.user_repository import UserRepository
@@ -11,6 +12,17 @@ from app.utils.logger import get_logger
 logger = get_logger("auth_service")
 
 class AuthService:
+    @staticmethod
+    def _dispatch_email(*args, **kwargs):
+        """Send an email off the request path. Email delivery (Resend/SMTP) can
+        take 1-2s — or up to 20-30s on timeouts — so it must never block the
+        signup/login/reset response. OTPs are persisted to Redis before this is
+        called, so backgrounding the send is safe."""
+        thread = threading.Thread(
+            target=AuthService._send_email, args=args, kwargs=kwargs, daemon=True
+        )
+        thread.start()
+
     @staticmethod
     def _send_email(to: str, subject: str, text: str, html: str = None, reply_to: str = None) -> bool:
         """Sends an email via Resend API with SMTP fallback. Returns True on success."""
@@ -97,7 +109,7 @@ class AuthService:
             f"Your 6-digit verification code (OTP) is: {otp}\n\n"
             f"This code will expire in 5 minutes. Please do not share it with anyone."
         )
-        AuthService._send_email(email_addr, subject, text_content)
+        AuthService._dispatch_email(email_addr, subject, text_content)
 
     @staticmethod
     def send_welcome_email(email_addr: str, name: str):
@@ -222,7 +234,7 @@ class AuthService:
 </body>
 </html>"""
 
-        AuthService._send_email(email_addr, subject, "", html_content)
+        AuthService._dispatch_email(email_addr, subject, "", html_content)
 
     @staticmethod
     def initiate_signup_otp(email_addr: str, payload: dict) -> str:
@@ -312,7 +324,7 @@ class AuthService:
             f"Your 6-digit verification code (OTP) is: {otp}\n\n"
             f"This code will expire in 5 minutes. If you did not request this, please ignore this email."
         )
-        AuthService._send_email(email_addr, subject, text_content)
+        AuthService._dispatch_email(email_addr, subject, text_content)
 
     @staticmethod
     def verify_forgot_password_otp_only(email_addr: str, otp: str) -> bool:
@@ -395,4 +407,4 @@ class AuthService:
             f"If you did not make this change, please contact our support team immediately.\n\n"
             f"Best regards,\nThe Invexo Team"
         )
-        AuthService._send_email(email_addr, subject, text_content)
+        AuthService._dispatch_email(email_addr, subject, text_content)
