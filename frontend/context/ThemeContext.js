@@ -7,18 +7,18 @@ export function useTheme() {
 }
 
 export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState("light");
+  const [theme, setTheme] = useState("dark");
 
   // On mount — restore theme preference
   useEffect(() => {
     const stored = localStorage.getItem("invexo_theme");
-    if (stored) {
+    if (stored === "light" || stored === "dark") {
       setTheme(stored);
       document.documentElement.setAttribute("data-theme", stored);
     } else {
-      // Default to light
-      setTheme("light");
-      document.documentElement.setAttribute("data-theme", "light");
+      // Default to dark
+      setTheme("dark");
+      document.documentElement.setAttribute("data-theme", "dark");
     }
   }, []);
 
