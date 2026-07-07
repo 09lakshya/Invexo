@@ -900,7 +900,7 @@ export default function Advisor() {
 
             {duration && (
               <p style={{ fontSize: "0.78rem", color: "var(--text-secondary)", marginBottom: "14px", fontWeight: 600 }}>
-                This horizon will generate about {suggestedStockCount} stock picks.
+                This horizon targets up to {suggestedStockCount} stock picks — the final number can be lower if your budget only covers a few shares.
               </p>
             )}
 
@@ -1015,6 +1015,11 @@ export default function Advisor() {
                 }}>
                   Your Personalised Picks
                 </h2>
+                {results.length < suggestedStockCount && (
+                  <p style={{ fontSize: "0.82rem", color: "var(--text-muted)", marginTop: "8px", lineHeight: 1.55 }}>
+                    Showing {results.length} of up to {suggestedStockCount} — an equal split of your ₹{totalInvestment.toLocaleString("en-IN")} only funds a full share in {results.length} {results.length === 1 ? "pick" : "picks"}. Add more to unlock the rest.
+                  </p>
+                )}
               </div>
 
               <div style={{ display: "flex", flexDirection: "column", gap: "14px", marginBottom: "24px" }}>
