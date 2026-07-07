@@ -14,6 +14,11 @@ from app.utils.logger import get_logger
 
 logger = get_logger("prediction_service")
 
+# Version marker for the consensus predictor. Bump whenever the signal
+# logic (indicator set, weighting, confidence calibration) changes so the
+# Signal Ledger can attribute each logged prediction to a specific model.
+MODEL_VERSION = "consensus_v1.0"
+
 class PredictionService:
     @staticmethod
     @ttl_cache(maxsize=100, ttl=86400)
@@ -367,6 +372,16 @@ class PredictionService:
                 "revenue_growth": fundamentals.get("revenue_growth"),
                 # Enterprise Specs: Confidence, Explanations, Prediction
                 "prediction": final_predicted,
+                # ── Signal Ledger fields (see signal_ledger_service) ──────
+                # Explicit market-regime label derived from the same ADX
+                # threshold the consensus weighting already uses (ADX > 25
+                # = a directional/trending tape, else range-bound). Emitted
+                # so every logged signal records the regime it was made in.
+                "regime": "trending" if current_adx > 25 else "range_bound",
+                "adx": round(float(current_adx), 2),
+                # Per-indicator directional votes at signal time.
+                "indicator_states": signals_direction,
+                "model_version": MODEL_VERSION,
                 "explanation": {
                     "summary": f"The model predicts a {trend} movement with a confidence of {confidence}%. Primary driver: {max(feature_impacts, key=lambda k: abs(feature_impacts[k]))}.",
                     "shap_values": feature_impacts

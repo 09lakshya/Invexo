@@ -426,8 +426,9 @@ export function AuthProvider({ children }) {
         user, token, loading, 
         login, signup, initiateSignupOtp, verifySignupOtp, 
         initiateForgotPassword, verifyForgotPasswordOtp, resetPassword,
-        logout, refreshUser, setUser, 
-        avatar, updateAvatar 
+        logout, refreshUser, setUser,
+        refreshAccessToken: performTokenRefresh,
+        avatar, updateAvatar
       }}
     >
       {children}
