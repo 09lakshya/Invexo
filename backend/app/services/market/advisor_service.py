@@ -262,16 +262,32 @@ class AdvisorService:
 
         context = desc if desc else f"{name} is a key player in the {sector} sector."
         
+        # Alignment copy is risk-aware for every goal: a high-risk / opportunistic
+        # pick (sometimes forced into income/retirement baskets) must never be
+        # described as "stable" or a "reliable anchor" — that reads as nonsense
+        # against its own profile. High-risk names are framed as small satellite
+        # bets instead.
+        high_risk = risk == "high"
         if goal == "wealth":
-            alignment = f"As a higher-risk play, it's an aggressive wealth creation candidate over the next {dur}." if risk == "high" else f"It offers steady, compounding wealth creation potential over the next {dur}."
+            alignment = (f"As a higher-risk play, it's an aggressive wealth-creation candidate over the next {dur} — best sized as a small satellite position."
+                         if high_risk else
+                         f"It offers steady, compounding wealth-creation potential over the next {dur}.")
         elif goal == "income":
-            alignment = f"Its stable business model makes it a solid choice for consistent returns."
+            alignment = ("Being a higher-risk name, treat it as a small satellite bet for extra upside rather than a dependable income source, and keep the allocation modest."
+                         if high_risk else
+                         "Its stable business model makes it a solid choice for consistent returns.")
         elif goal == "retirement":
-            alignment = f"Given its profile, it serves as a reliable anchor for a long-term retirement portfolio."
+            alignment = ("As a higher-risk name it's a small satellite allocation for a bit of extra growth, not a core retirement anchor — keep the position modest."
+                         if high_risk else
+                         "Given its profile, it serves as a reliable anchor for a long-term retirement portfolio.")
         elif goal == "education":
-            alignment = f"It balances necessary growth with reasonable safety to help fund education goals over {dur}."
+            alignment = (f"It's a higher-risk growth kicker for your education goal over {dur}, so balance it with steadier holdings."
+                         if high_risk else
+                         f"It balances necessary growth with reasonable safety to help fund education goals over {dur}.")
         elif goal == "safety":
-            alignment = f"This is a defensive, capital-preservation pick designed to weather market volatility."
+            alignment = ("This name carries above-average risk, so treat it as a small opportunistic slice rather than a core capital-preservation holding."
+                         if high_risk else
+                         "This is a defensive, capital-preservation pick designed to weather market volatility.")
         else:
             alignment = f"It aligns well with your {goal} strategy over {dur}."
 
@@ -331,7 +347,8 @@ class AdvisorService:
             f"You are Invexo Advisor, a highly professional AI financial analyst. "
             f"Provide a unique, customized, real-time 2-sentence investment reason/analysis for each of the following stocks "
             f"tailored to the user's financial goal of '{goal}' and a duration of '{dur}'. "
-            f"Synthesize their description, trend, RSI, and news sentiment into a compelling, professional analysis.\n\n"
+            f"Synthesize their description, trend, RSI, and news sentiment into a compelling, professional analysis. "
+            f"The analysis must stay consistent with each stock's risk level: never describe a 'high' risk or speculative/penny name as safe, stable, or a reliable anchor — frame those as small, higher-risk satellite positions.\n\n"
             f"Recommended Stocks Data:\n"
             f"{json.dumps(stocks_info, indent=2)}\n\n"
             f"Return a JSON object where the keys are the exact stock symbols (e.g. 'HDFCBANK.NS') and the values are the 2-sentence analyses. "
