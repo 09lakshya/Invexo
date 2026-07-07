@@ -2,6 +2,7 @@ import random
 import json
 import os
 import threading
+import time
 from datetime import datetime
 from email.mime.text import MIMEText
 from app.repositories.user_repository import UserRepository
@@ -283,10 +284,20 @@ class AuthService:
 
     @staticmethod
     def login(email: str, password: str) -> dict | None:
+        # Stage timing to locate login latency in production logs.
+        t0 = time.perf_counter()
         user = UserRepository.get_user_by_email(email)
+        t1 = time.perf_counter()
         if not user:
+            logger.info(f"login timing: db_lookup={(t1 - t0) * 1000:.0f}ms (user not found)")
             return None
-        if not verify_password(password, user["password_hash"]):
+        ok = verify_password(password, user["password_hash"])
+        t2 = time.perf_counter()
+        logger.info(
+            f"login timing: db_lookup={(t1 - t0) * 1000:.0f}ms "
+            f"bcrypt_verify={(t2 - t1) * 1000:.0f}ms"
+        )
+        if not ok:
             return None
         # Return cleaned dict
         return {
