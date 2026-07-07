@@ -1,5 +1,6 @@
 import bcrypt
 import jwt
+import os
 from datetime import datetime, timedelta, timezone
 from app.core.config import JWT_SECRET, JWT_ALGORITHM, JWT_ACCESS_EXPIRY_MINUTES, JWT_REFRESH_EXPIRY_DAYS
 from app.core.redis import redis_client
@@ -7,9 +8,19 @@ from app.utils.logger import get_logger
 
 logger = get_logger("security")
 
+# bcrypt work factor for NEW/rehashed passwords. Lower = faster login on
+# throttled CPUs (e.g. free Render), less brute-force headroom. Configurable
+# via env; 10 is the widely accepted minimum. Existing hashes keep their own
+# embedded cost until rehashed on next login (see needs_rehash / AuthService).
+try:
+    BCRYPT_ROUNDS = int(os.environ.get("BCRYPT_ROUNDS", "10"))
+except ValueError:
+    BCRYPT_ROUNDS = 10
+BCRYPT_ROUNDS = max(4, min(15, BCRYPT_ROUNDS))  # clamp to sane bounds
+
 def hash_password(password: str) -> str:
-    """Hashes a plain text password using bcrypt."""
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    """Hashes a plain text password using bcrypt at the configured work factor."""
+    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt(BCRYPT_ROUNDS)).decode("utf-8")
 
 def verify_password(password: str, hashed_password: str) -> bool:
     """Verifies a plain text password against a bcrypt hash."""
@@ -17,6 +28,15 @@ def verify_password(password: str, hashed_password: str) -> bool:
         return bcrypt.checkpw(password.encode("utf-8"), hashed_password.encode("utf-8"))
     except Exception as e:
         logger.error(f"Error checking password: {e}")
+        return False
+
+def needs_rehash(hashed_password: str) -> bool:
+    """True if the stored hash's embedded cost differs from BCRYPT_ROUNDS, so
+    it should be re-hashed (used for transparent rehash-on-login upgrades)."""
+    try:
+        cost = int(hashed_password.split("$")[2])
+        return cost != BCRYPT_ROUNDS
+    except Exception:
         return False
 
 def create_access_token(user_id: int) -> str:
