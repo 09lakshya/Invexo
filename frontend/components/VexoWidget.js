@@ -357,13 +357,16 @@ export default function VexoWidget() {
                   sendCopilotMessage();
                 }
               }}
-              placeholder="Ask for a prediction, picks, or analysis..."
+              placeholder="Ask Vexo anything…"
               style={{
                 flex: 1,
+                minWidth: 0,
+                boxSizing: "border-box",
+                minHeight: "46px",
                 background: "var(--input-bg)",
                 color: "var(--text-primary)",
                 border: "1px solid var(--border-medium)",
-                padding: "13px 16px",
+                padding: "12px 16px",
                 borderRadius: "12px",
                 fontSize: "0.9rem",
                 outline: "none",
