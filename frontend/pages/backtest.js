@@ -58,6 +58,7 @@ export default function BacktestPage() {
   const [showCosts, setShowCosts] = useState(false);
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [progress, setProgress] = useState("");
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -68,7 +69,7 @@ export default function BacktestPage() {
   }, []);
 
   const run = async () => {
-    setLoading(true); setError(null); setResult(null);
+    setLoading(true); setError(null); setResult(null); setProgress("Starting…");
     const symbols = form.symbols.split(",").map((s) => s.trim()).filter(Boolean);
     const cost_overrides = {};
     if (cfg) {
@@ -76,18 +77,67 @@ export default function BacktestPage() {
         if (k in cfg.cost_model_defaults && Number(v) !== cfg.cost_model_defaults[k]) cost_overrides[k] = Number(v);
       });
     }
+    const payload = {
+      symbols, start: form.start || null, end: form.end || null,
+      holding_days: Number(form.holding_days), initial_capital: Number(form.initial_capital),
+      trade_fraction: Number(form.trade_fraction), n_folds: Number(form.n_folds), cost_overrides,
+    };
+
+    // Walk-forward runs can outlast the ~100s proxy timeout, so start the job
+    // and poll for it. Each HTTP call stays short, which sidesteps the timeout
+    // that otherwise shows up in the browser as a (misleading) CORS/network error.
+    const finish = (msg) => { setError(msg); setLoading(false); setProgress(""); };
+
     try {
-      const r = await API.post("/backtest/run", {
-        symbols, start: form.start || null, end: form.end || null,
-        holding_days: Number(form.holding_days), initial_capital: Number(form.initial_capital),
-        trade_fraction: Number(form.trade_fraction), n_folds: Number(form.n_folds), cost_overrides,
-      });
-      if (r.data.error) setError(r.data.error);
-      else setResult(r.data);
+      let jobId;
+      try {
+        const startRes = await API.post("/backtest/run-async", payload);
+        jobId = startRes.data?.job_id;
+      } catch (e) {
+        // Backend without the async route yet (e.g. mid-deploy) → run the
+        // synchronous endpoint instead. Small jobs still complete in time.
+        if (e?.response?.status === 404) {
+          setProgress("Running walk-forward…");
+          const r = await API.post("/backtest/run", payload);
+          setResult(r.data); setLoading(false); setProgress("");
+          return;
+        }
+        throw e;
+      }
+
+      if (!jobId) { finish("Couldn't start the backtest. Please try again."); return; }
+
+      setProgress("Running walk-forward…");
+      const startedAt = Date.now();
+      const MAX_WAIT_MS = 5 * 60 * 1000;   // give up after 5 minutes
+      const POLL_MS = 2500;
+      let miss = 0;                        // tolerate transient poll failures (cold start)
+
+      const poll = async () => {
+        try {
+          const s = await API.get(`/backtest/jobs/${jobId}`);
+          miss = 0;
+          if (s.data.status === "done") { setResult(s.data.result); setLoading(false); setProgress(""); return; }
+          if (s.data.status === "error") { finish(s.data.detail || "Backtest failed."); return; }
+        } catch (e) {
+          // A 404 here means the job expired/was pruned; other errors are likely
+          // the instance still waking — retry a few times before giving up.
+          if (e?.response?.status === 404) { finish("Backtest session expired. Please run it again."); return; }
+          if (++miss >= 5) { finish("Lost connection to the backtest service. Please try again."); return; }
+        }
+        if (Date.now() - startedAt > MAX_WAIT_MS) {
+          finish("Backtest is taking too long — try fewer symbols or fewer walk-forward folds.");
+          return;
+        }
+        setProgress(`Running walk-forward… ${Math.round((Date.now() - startedAt) / 1000)}s`);
+        setTimeout(poll, POLL_MS);
+      };
+      poll();
     } catch (e) {
-      setError(e?.response?.data?.detail || "Backtest failed.");
-    } finally {
-      setLoading(false);
+      finish(
+        e?.response?.data?.detail ||
+        "Couldn't reach the backtest service — it may be waking up. Give it a moment and try again."
+      );
     }
   };
 
@@ -148,7 +198,7 @@ export default function BacktestPage() {
 
             <div style={{ marginTop: "16px" }}>
               <button onClick={run} disabled={loading} style={{ padding: "10px 28px", borderRadius: "12px", border: "none", background: "linear-gradient(135deg, var(--accent) 0%, var(--purple) 100%)", color: "var(--bg-primary)", fontWeight: 800, fontSize: "0.9rem", cursor: loading ? "wait" : "pointer", fontFamily: "inherit", opacity: loading ? 0.7 : 1 }}>
-                {loading ? "Running walk-forward…" : "Run Backtest"}
+                {loading ? (progress || "Running walk-forward…") : "Run Backtest"}
               </button>
             </div>
           </div>
