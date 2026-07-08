@@ -315,6 +315,14 @@ export default function NotificationBell() {
               {subs.length > 0 && (
                 <>
                   <div style={sectionLabelStyle}>Following</div>
+                  <div
+                    style={{
+                      // Show ~4 rows, then scroll the rest so a long follow
+                      // list doesn't stretch the whole panel.
+                      maxHeight: "248px",
+                      overflowY: subs.length > 4 ? "auto" : "visible",
+                    }}
+                  >
                   {subs.map((s) => (
                     <div
                       key={s.id}
@@ -374,6 +382,7 @@ export default function NotificationBell() {
                       </button>
                     </div>
                   ))}
+                  </div>
                   <div style={{ padding: "10px 18px 4px", color: "var(--text-muted)", fontSize: "0.72rem", lineHeight: 1.5 }}>
                     Watchlist and portfolio holdings are covered automatically.
                   </div>
