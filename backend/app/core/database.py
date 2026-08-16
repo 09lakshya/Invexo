@@ -14,6 +14,34 @@ _sqlite_db_path = os.path.join(render_disk, "invexo.db")
 
 db_pool = None
 use_sqlite_fallback = False
+_sqlite_initialized = False
+
+def ensure_sqlite_tables_init():
+    global _sqlite_initialized
+    if not _sqlite_initialized:
+        _sqlite_initialized = True
+        try:
+            from app.repositories.user_repository import UserRepository
+            from app.repositories.picks_repository import PicksRepository
+            from app.repositories.portfolio_repository import PortfolioRepository
+            from app.repositories.watchlist_repository import WatchlistRepository
+            from app.repositories.alert_repository import AlertRepository
+            from app.repositories.signal_alert_repository import SignalAlertRepository
+            from app.repositories.support_repository import SupportRepository
+            from app.repositories.signal_repository import SignalRepository
+
+            logger.info("Initializing SQLite schemas for fallback...")
+            UserRepository.init_users_db()
+            PicksRepository.init_daily_picks_db()
+            PortfolioRepository.init_portfolio_db()
+            WatchlistRepository.init_watchlist_db()
+            AlertRepository.init_alert_db()
+            SignalAlertRepository.init_signal_alert_db()
+            SupportRepository.init_support_db()
+            SignalRepository.init_signal_ledger_db()
+            logger.info("SQLite schemas initialized successfully.")
+        except Exception as e:
+            logger.error(f"Error initializing SQLite fallback schemas: {e}")
 
 def init_db_pool():
     global db_pool, use_sqlite_fallback
@@ -28,6 +56,7 @@ def init_db_pool():
         except Exception as e:
             logger.warning(f"Failed to connect to PostgreSQL ({e}). Falling back to SQLite ({_sqlite_db_path}).")
             use_sqlite_fallback = True
+            ensure_sqlite_tables_init()
 
 class PooledConnectionWrapper:
     def __init__(self, conn, pool):
@@ -90,6 +119,7 @@ class PooledConnectionWrapper:
 def get_db_connection():
     global db_pool, use_sqlite_fallback
     if use_sqlite_fallback:
+        ensure_sqlite_tables_init()
         conn = sqlite3.connect(_sqlite_db_path)
         conn.row_factory = sqlite3.Row
         return conn, False
@@ -98,6 +128,7 @@ def get_db_connection():
         init_db_pool()
 
     if use_sqlite_fallback:
+        ensure_sqlite_tables_init()
         conn = sqlite3.connect(_sqlite_db_path)
         conn.row_factory = sqlite3.Row
         return conn, False
@@ -109,6 +140,7 @@ def get_db_connection():
     except Exception as e:
         logger.warning(f"PostgreSQL connection failed ({e}). Falling back to SQLite.")
         use_sqlite_fallback = True
+        ensure_sqlite_tables_init()
         conn = sqlite3.connect(_sqlite_db_path)
         conn.row_factory = sqlite3.Row
         return conn, False
