@@ -1,23 +1,34 @@
+import sqlite3
+import os
 import psycopg2
 from psycopg2.pool import ThreadedConnectionPool
 import psycopg2.extras
-from app.core.config import DATABASE_URL
+from app.core.config import DATABASE_URL, ENV, RENDER
 from app.utils.logger import get_logger
 
 logger = get_logger("database")
 
 db_pool = None
+use_sqlite_fallback = False
+_sqlite_db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "invexo.db")
 
 def init_db_pool():
-    global db_pool
-    if db_pool is None:
+    global db_pool, use_sqlite_fallback
+    if db_pool is None and not use_sqlite_fallback:
         try:
             logger.info("Initializing PostgreSQL Connection Pool...")
-            db_pool = ThreadedConnectionPool(5, 20, dsn=DATABASE_URL)
+            dsn = DATABASE_URL
+            if "connect_timeout" not in dsn:
+                dsn += ("&" if "?" in dsn else "?") + "connect_timeout=2"
+            db_pool = ThreadedConnectionPool(1, 20, dsn=dsn)
             logger.info("PostgreSQL Connection Pool initialized successfully.")
         except Exception as e:
-            logger.error(f"Failed to initialize PostgreSQL connection pool: {e}")
-            raise
+            if ENV != "production" and RENDER != "true":
+                logger.warning(f"Failed to connect to PostgreSQL ({e}). Falling back to SQLite ({_sqlite_db_path}) for local development.")
+                use_sqlite_fallback = True
+            else:
+                logger.error(f"Failed to initialize PostgreSQL connection pool: {e}")
+                raise
 
 class PooledConnectionWrapper:
     def __init__(self, conn, pool):
@@ -75,7 +86,7 @@ class PooledConnectionWrapper:
                 self._conn.rollback()
             except Exception:
                 pass
-        self.close()
+            self.close()
         return False
 
     def __del__(self):
@@ -85,14 +96,31 @@ class PooledConnectionWrapper:
             pass
 
 def get_db_connection():
-    global db_pool
+    global db_pool, use_sqlite_fallback
+    if use_sqlite_fallback:
+        conn = sqlite3.connect(_sqlite_db_path)
+        conn.row_factory = sqlite3.Row
+        return conn, False
+
     if db_pool is None:
         init_db_pool()
+
+    if use_sqlite_fallback:
+        conn = sqlite3.connect(_sqlite_db_path)
+        conn.row_factory = sqlite3.Row
+        return conn, False
+
     try:
         conn = db_pool.getconn()
         wrapped_conn = PooledConnectionWrapper(conn, db_pool)
         return wrapped_conn, True
     except Exception as e:
+        if ENV != "production" and RENDER != "true":
+            logger.warning(f"PostgreSQL connection failed ({e}). Falling back to SQLite.")
+            use_sqlite_fallback = True
+            conn = sqlite3.connect(_sqlite_db_path)
+            conn.row_factory = sqlite3.Row
+            return conn, False
         logger.error(f"Failed to get database connection from pool: {e}")
         raise
 
