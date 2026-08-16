@@ -8,9 +8,12 @@ from app.utils.logger import get_logger
 
 logger = get_logger("database")
 
+base_dir = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+render_disk = os.environ.get("RENDER_DISK_PATH", base_dir)
+_sqlite_db_path = os.path.join(render_disk, "invexo.db")
+
 db_pool = None
 use_sqlite_fallback = False
-_sqlite_db_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "invexo.db")
 
 def init_db_pool():
     global db_pool, use_sqlite_fallback
@@ -23,12 +26,8 @@ def init_db_pool():
             db_pool = ThreadedConnectionPool(1, 20, dsn=dsn)
             logger.info("PostgreSQL Connection Pool initialized successfully.")
         except Exception as e:
-            if ENV != "production" and RENDER != "true":
-                logger.warning(f"Failed to connect to PostgreSQL ({e}). Falling back to SQLite ({_sqlite_db_path}) for local development.")
-                use_sqlite_fallback = True
-            else:
-                logger.error(f"Failed to initialize PostgreSQL connection pool: {e}")
-                raise
+            logger.warning(f"Failed to connect to PostgreSQL ({e}). Falling back to SQLite ({_sqlite_db_path}).")
+            use_sqlite_fallback = True
 
 class PooledConnectionWrapper:
     def __init__(self, conn, pool):
@@ -62,13 +61,6 @@ class PooledConnectionWrapper:
                 self._released = True
 
     # ── Leak safety net ──────────────────────────────────────────────
-    # Many repository methods only call close() on their happy path. If a
-    # query raises before close(), the raw connection would otherwise never
-    # be returned to the pool (max 20) and the pool would eventually exhaust,
-    # hanging the whole API. These guards return the connection on every exit
-    # path without requiring callers to change. Any pending/aborted
-    # transaction is rolled back first so a poisoned connection is never
-    # handed to the next caller.
     def _safe_return(self):
         if not self._released:
             try:
@@ -115,14 +107,11 @@ def get_db_connection():
         wrapped_conn = PooledConnectionWrapper(conn, db_pool)
         return wrapped_conn, True
     except Exception as e:
-        if ENV != "production" and RENDER != "true":
-            logger.warning(f"PostgreSQL connection failed ({e}). Falling back to SQLite.")
-            use_sqlite_fallback = True
-            conn = sqlite3.connect(_sqlite_db_path)
-            conn.row_factory = sqlite3.Row
-            return conn, False
-        logger.error(f"Failed to get database connection from pool: {e}")
-        raise
+        logger.warning(f"PostgreSQL connection failed ({e}). Falling back to SQLite.")
+        use_sqlite_fallback = True
+        conn = sqlite3.connect(_sqlite_db_path)
+        conn.row_factory = sqlite3.Row
+        return conn, False
 
 def get_cursor(conn, is_postgres=True):
     if is_postgres:
