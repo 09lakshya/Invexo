@@ -65,7 +65,7 @@ def handle_login(payload: LoginInput, request: Request):
         user = AuthService.login(payload.email, payload.password)
     except Exception as e:
         logger.error(f"Login failed for '{payload.email}': {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Login service temporarily unavailable. Please try again.")
+        raise HTTPException(status_code=500, detail=f"Login service error: {e}")
     if user is None:
         raise HTTPException(status_code=401, detail="Invalid email or password")
 

@@ -23,6 +23,8 @@ class UserRepository:
                 )
             """)
             c.execute("ALTER TABLE users ENABLE ROW LEVEL SECURITY")
+            c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_photo TEXT")
+            c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'user'")
         else:
             c.execute("""
                 CREATE TABLE IF NOT EXISTS users (
@@ -38,7 +40,7 @@ class UserRepository:
             """)
         conn.commit()
         
-        # Add profile_photo and role columns safely if not exist
+        # Add profile_photo and role columns safely for SQLite or older DBs
         for col_name, col_type in [("profile_photo", "TEXT"), ("role", "VARCHAR(50) DEFAULT 'user'")]:
             try:
                 c.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}")
@@ -51,19 +53,48 @@ class UserRepository:
     def get_user_by_email(email: str) -> dict | None:
         conn, is_postgres = get_db_connection()
         c = get_cursor(conn, is_postgres)
-        execute_query(c, "SELECT id, email, name, age, password_hash, created_at, profile_photo, role FROM users WHERE email = ?", (email.lower().strip(),), is_postgres)
-        row = c.fetchone()
-        conn.close()
-        return dict(row) if row else None
+        try:
+            execute_query(c, "SELECT id, email, name, age, password_hash, created_at, profile_photo, role FROM users WHERE email = ?", (email.lower().strip(),), is_postgres)
+            row = c.fetchone()
+            conn.close()
+            return dict(row) if row else None
+        except Exception as e:
+            logger.warning(f"Full SELECT failed in get_user_by_email for '{email}', attempting fallback: {e}")
+            try:
+                # Fallback query if profile_photo or role column does not exist on legacy DB table
+                execute_query(c, "SELECT id, email, name, age, password_hash, created_at FROM users WHERE email = ?", (email.lower().strip(),), is_postgres)
+                row = c.fetchone()
+                conn.close()
+                if row:
+                    res = dict(row)
+                    res["profile_photo"] = res.get("profile_photo", None)
+                    res["role"] = res.get("role", "user")
+                    return res
+                return None
+            except Exception as e2:
+                logger.error(f"Fallback get_user_by_email failed: {e2}")
+                conn.close()
+                raise e
 
     @staticmethod
     def get_user_by_id(user_id: int) -> dict | None:
         conn, is_postgres = get_db_connection()
         c = get_cursor(conn, is_postgres)
-        execute_query(c, "SELECT id, email, name, age, created_at, profile_photo, role FROM users WHERE id = ?", (user_id,), is_postgres)
-        row = c.fetchone()
-        conn.close()
-        return dict(row) if row else None
+        try:
+            execute_query(c, "SELECT id, email, name, age, created_at, profile_photo, role FROM users WHERE id = ?", (user_id,), is_postgres)
+            row = c.fetchone()
+            conn.close()
+            return dict(row) if row else None
+        except Exception:
+            execute_query(c, "SELECT id, email, name, age, created_at FROM users WHERE id = ?", (user_id,), is_postgres)
+            row = c.fetchone()
+            conn.close()
+            if row:
+                res = dict(row)
+                res["profile_photo"] = res.get("profile_photo", None)
+                res["role"] = res.get("role", "user")
+                return res
+            return None
 
     @staticmethod
     def create_user(email: str, password_hash: str, name: str, age: int, role: str = "user") -> dict | None:
@@ -76,7 +107,7 @@ class UserRepository:
         try:
             if is_postgres:
                 sql = sql.replace("?", "%s") + " RETURNING id"
-                execute_query(c, sql, (email.lower().strip(), password_hash, name.strip(), age, now, role), False)
+                c.execute(sql, (email.lower().strip(), password_hash, name.strip(), age, now, role))
                 user_id = c.fetchone()["id"]
             else:
                 execute_query(c, sql, (email.lower().strip(), password_hash, name.strip(), age, now, role), False)
