@@ -32,26 +32,34 @@ class PortfolioService:
 
     @staticmethod
     def get_portfolio(user_id: str) -> list[dict]:
+        from app.services.market.data_service import DataService
         holdings = PortfolioRepository.get_portfolio(user_id)
-        # Fetch every holding's live price in parallel — a sequential call per
-        # holding made a cold load scale linearly with portfolio size.
-        sig_map = PortfolioService._parallel_map(
-            AdvisorService._fetch_signals,
-            {h["symbol"] for h in holdings if h.get("symbol")},
-        )
+        symbols = {h["symbol"] for h in holdings if h.get("symbol")}
+
+        # Fetch every holding's live market price in parallel using DataService
+        price_map = PortfolioService._parallel_map(DataService.get_stock_price, symbols)
+        # Fetch signals best-effort for technical indicators
+        sig_map = PortfolioService._parallel_map(AdvisorService._fetch_signals, symbols)
+
         enriched = []
         for h in holdings:
             qty = h.get("quantity") or 0
             buy_price = h.get("buy_price") or 0
             invested = qty * buy_price
 
-            # Live price is best-effort: a missing signal must not break the row.
             signals = sig_map.get(h.get("symbol"))
-            curr_price = (signals.get("current_price", 0) or 0) if signals else 0.0
+            live_price = price_map.get(h.get("symbol")) or 0.0
+
+            if live_price > 0:
+                curr_price = live_price
+            elif signals and signals.get("current_price", 0) > 0:
+                curr_price = signals["current_price"]
+            else:
+                curr_price = buy_price
 
             has_price = curr_price > 0
-            current_value = qty * curr_price if has_price else 0.0
-            pnl = current_value - invested if has_price else 0.0
+            current_value = qty * curr_price if has_price else invested
+            pnl = (current_value - invested) if has_price else 0.0
             pnl_percent = (pnl / invested * 100) if (has_price and invested > 0) else 0.0
 
             enriched.append({
@@ -83,6 +91,7 @@ class PortfolioService:
 
     @staticmethod
     def get_portfolio_analytics(user_id: str) -> dict:
+        from app.services.market.data_service import DataService
         holdings = PortfolioRepository.get_portfolio(user_id)
         if not holdings:
             return {
@@ -110,13 +119,10 @@ class PortfolioService:
         total_investment = 0.0
         total_current_value = 0.0
         
-        # Intermediate calculated list of holdings
         holding_details = []
 
-        # Resolve live prices and canonical tickers for all symbols in parallel
-        # so a cold analytics load doesn't do 2 sequential network calls per
-        # holding.
         symbols = {h["symbol"] for h in holdings if h.get("symbol")}
+        price_map = PortfolioService._parallel_map(DataService.get_stock_price, symbols)
         sig_map = PortfolioService._parallel_map(AdvisorService._fetch_signals, symbols)
         tick_map = PortfolioService._parallel_map(_working_ticker, symbols)
 
@@ -127,14 +133,19 @@ class PortfolioService:
             purchase_value = qty * buy_price
             total_investment += purchase_value
 
-            # Fetch current price
+            live_price = price_map.get(symbol) or 0.0
             signals = sig_map.get(symbol)
-            curr_price = buy_price
             trend = "BULLISH"
             rsi = 50.0
 
+            if live_price > 0:
+                curr_price = live_price
+            elif signals and signals.get("current_price", 0) > 0:
+                curr_price = signals["current_price"]
+            else:
+                curr_price = buy_price
+
             if signals:
-                curr_price = signals.get("current_price", buy_price)
                 trend = signals.get("trend", "BULLISH")
                 rsi = signals.get("rsi", 50.0)
 

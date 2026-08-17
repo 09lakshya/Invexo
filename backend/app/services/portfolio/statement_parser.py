@@ -38,12 +38,14 @@ _NAME_ALIASES = [
 ]
 _QTY_ALIASES = [
     "quantity available", "quantity", "qty", "shares", "holding qty",
-    "net qty", "closing qty", "free qty", "quantity long term",
+    "net qty", "closing qty", "free qty", "quantity long term", "qty.",
+    "total qty", "cur. qty", "available qty",
 ]
 _PRICE_ALIASES = [
     "average price", "avg price", "average buy price", "avg buy price",
     "avg cost", "average cost", "buy price", "buy avg", "buy average",
-    "purchase price", "cost price", "avg. price",
+    "purchase price", "cost price", "avg. price", "avg. cost", "buy rate",
+    "avg rate", "cost / share", "avg price / share", "buy avg.",
 ]
 
 # Prefer these column *kinds* for the symbol, per broker.
