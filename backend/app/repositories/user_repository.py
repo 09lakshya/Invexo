@@ -1,8 +1,30 @@
 from app.core.database import get_db_connection, get_cursor, execute_query
 from app.utils.logger import get_logger
 from datetime import datetime
+import json
+import os
 
 logger = get_logger("user_repository")
+
+_BACKUP_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data_cache", "users_backup.json")
+
+def _load_user_backup() -> list[dict]:
+    if os.path.exists(_BACKUP_FILE):
+        try:
+            with open(_BACKUP_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data if isinstance(data, list) else []
+        except Exception:
+            return []
+    return []
+
+def _save_user_backup(users: list[dict]):
+    try:
+        os.makedirs(os.path.dirname(_BACKUP_FILE), exist_ok=True)
+        with open(_BACKUP_FILE, "w", encoding="utf-8") as f:
+            json.dump(users, f, indent=2)
+    except Exception as e:
+        logger.error(f"Failed to save user backup: {e}")
 
 class UserRepository:
     @staticmethod
@@ -47,6 +69,36 @@ class UserRepository:
                 conn.commit()
             except Exception:
                 conn.rollback()
+
+        # Check if users table is empty and restore from persistent backup
+        try:
+            c.execute("SELECT COUNT(*) as cnt FROM users" if is_postgres else "SELECT COUNT(*) FROM users")
+            row = c.fetchone()
+            count = (row["cnt"] if is_postgres else row[0]) if row else 0
+            if count == 0:
+                backup = _load_user_backup()
+                if backup:
+                    logger.info(f"Restoring {len(backup)} registered users from persistent backup...")
+                    for u in backup:
+                        try:
+                            if is_postgres:
+                                c.execute("""
+                                    INSERT INTO users (email, password_hash, name, age, created_at, profile_photo, role)
+                                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                                    ON CONFLICT (email) DO NOTHING
+                                """, (u["email"].lower().strip(), u["password_hash"], u["name"], u.get("age", 25), u.get("created_at", ""), u.get("profile_photo"), u.get("role", "user")))
+                            else:
+                                c.execute("""
+                                    INSERT INTO users (email, password_hash, name, age, created_at, profile_photo, role)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                                    ON CONFLICT(email) DO NOTHING
+                                """, (u["email"].lower().strip(), u["password_hash"], u["name"], u.get("age", 25), u.get("created_at", ""), u.get("profile_photo"), u.get("role", "user")))
+                        except Exception as re:
+                            logger.error(f"Error restoring user {u.get('email')}: {re}")
+                    conn.commit()
+        except Exception as e:
+            logger.error(f"Error checking user count for restoration: {e}")
+
         conn.close()
 
     @staticmethod
@@ -61,7 +113,6 @@ class UserRepository:
         except Exception as e:
             logger.warning(f"Full SELECT failed in get_user_by_email for '{email}', attempting fallback: {e}")
             try:
-                # Fallback query if profile_photo or role column does not exist on legacy DB table
                 execute_query(c, "SELECT id, email, name, age, password_hash, created_at FROM users WHERE email = ?", (email.lower().strip(),), is_postgres)
                 row = c.fetchone()
                 conn.close()
@@ -114,7 +165,16 @@ class UserRepository:
                 user_id = c.lastrowid
             conn.commit()
             conn.close()
-            return {"id": user_id, "email": email.lower().strip(), "name": name.strip(), "age": age, "profile_photo": None, "role": role}
+
+            user_dict = {"id": user_id, "email": email.lower().strip(), "password_hash": password_hash, "name": name.strip(), "age": age, "created_at": now, "profile_photo": None, "role": role}
+            
+            # Sync to persistent backup file
+            backup = _load_user_backup()
+            backup = [u for u in backup if u.get("email", "").lower() != email.lower().strip()]
+            backup.append(user_dict)
+            _save_user_backup(backup)
+
+            return user_dict
         except Exception as e:
             logger.error(f"Error creating user: {e}")
             conn.close()
@@ -146,6 +206,15 @@ class UserRepository:
             conn.commit()
             updated = c.rowcount > 0
             conn.close()
+
+            if updated:
+                backup = _load_user_backup()
+                for u in backup:
+                    if str(u.get("id")) == str(user_id):
+                        for k, v in fields.items():
+                            u[k] = v
+                _save_user_backup(backup)
+
             return updated
         except Exception as e:
             logger.error(f"Error updating profile fields: {e}")
@@ -161,6 +230,14 @@ class UserRepository:
             conn.commit()
             updated = c.rowcount > 0
             conn.close()
+
+            if updated:
+                backup = _load_user_backup()
+                for u in backup:
+                    if str(u.get("id")) == str(user_id):
+                        u["password_hash"] = new_password_hash
+                _save_user_backup(backup)
+
             return updated
         except Exception as e:
             logger.error(f"Error updating password: {e}")
