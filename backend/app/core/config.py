@@ -17,6 +17,7 @@ JWT_REFRESH_EXPIRY_DAYS = 7
 
 DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://postgres:password@localhost:5432/invexo")
 REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
+USE_SQLITE = os.environ.get("USE_SQLITE", "false").lower() in ("true", "1", "yes")
 
 # Security and Fail Startup Check
 if not JWT_SECRET:

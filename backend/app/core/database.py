@@ -3,7 +3,7 @@ import os
 import psycopg2
 from psycopg2.pool import ThreadedConnectionPool
 import psycopg2.extras
-from app.core.config import DATABASE_URL, ENV, RENDER
+from app.core.config import DATABASE_URL, ENV, RENDER, USE_SQLITE
 from app.utils.logger import get_logger
 
 logger = get_logger("database")
@@ -45,6 +45,11 @@ def ensure_sqlite_tables_init():
 
 def init_db_pool():
     global db_pool, use_sqlite_fallback
+    if USE_SQLITE:
+        use_sqlite_fallback = True
+        ensure_sqlite_tables_init()
+        return
+
     if db_pool is None and not use_sqlite_fallback:
         try:
             logger.info("Initializing PostgreSQL Connection Pool...")
