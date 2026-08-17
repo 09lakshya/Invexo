@@ -283,14 +283,14 @@ class AuthService:
         return UserRepository.create_user(email, pwd_hash, name, age, role)
 
     @staticmethod
-    def login(email: str, password: str) -> dict | None:
+    def login(email: str, password: str) -> dict | str:
         # Stage timing to locate login latency in production logs.
         t0 = time.perf_counter()
         user = UserRepository.get_user_by_email(email)
         t1 = time.perf_counter()
         if not user:
             logger.info(f"login timing: db_lookup={(t1 - t0) * 1000:.0f}ms (user not found)")
-            return None
+            return "NOT_FOUND"
         ok = verify_password(password, user["password_hash"])
         t2 = time.perf_counter()
         logger.info(
@@ -298,7 +298,7 @@ class AuthService:
             f"bcrypt_verify={(t2 - t1) * 1000:.0f}ms"
         )
         if not ok:
-            return None
+            return "INVALID_PASSWORD"
 
         # Rehash-on-login: if this user's hash still uses an older, slower
         # bcrypt cost, transparently upgrade it to the current work factor so

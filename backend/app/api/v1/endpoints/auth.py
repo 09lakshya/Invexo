@@ -66,8 +66,10 @@ def handle_login(payload: LoginInput, request: Request):
     except Exception as e:
         logger.error(f"Login failed for '{payload.email}': {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Login service error: {e}")
-    if user is None:
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+    if user == "NOT_FOUND":
+        raise HTTPException(status_code=404, detail="Account not found with this email. Please sign up.")
+    if user == "INVALID_PASSWORD" or not user or not isinstance(user, dict):
+        raise HTTPException(status_code=401, detail="Invalid password. Please check your password and try again.")
 
     t_tok = time.perf_counter()
     access_token = create_access_token(user["id"])
