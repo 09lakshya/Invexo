@@ -28,6 +28,42 @@ def _save_user_backup(users: list[dict]):
 
 class UserRepository:
     @staticmethod
+    def restore_users_from_backup(conn, is_postgres: bool) -> int:
+        """Restores registered users from persistent JSON backup file into the active database."""
+        backup = _load_user_backup()
+        if not backup:
+            return 0
+        restored_count = 0
+        try:
+            c = conn.cursor()
+            for u in backup:
+                try:
+                    email_clean = u.get("email", "").lower().strip()
+                    if not email_clean:
+                        continue
+                    if is_postgres:
+                        c.execute("""
+                            INSERT INTO users (email, password_hash, name, age, created_at, profile_photo, role)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (email) DO NOTHING
+                        """, (email_clean, u.get("password_hash", ""), u.get("name", "User"), u.get("age", 25), u.get("created_at", ""), u.get("profile_photo"), u.get("role", "user")))
+                    else:
+                        c.execute("""
+                            INSERT INTO users (email, password_hash, name, age, created_at, profile_photo, role)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                            ON CONFLICT(email) DO NOTHING
+                        """, (email_clean, u.get("password_hash", ""), u.get("name", "User"), u.get("age", 25), u.get("created_at", ""), u.get("profile_photo"), u.get("role", "user")))
+                    restored_count += 1
+                except Exception as re:
+                    logger.error(f"Error restoring user {u.get('email')}: {re}")
+            conn.commit()
+            if restored_count > 0:
+                logger.info(f"Successfully restored {restored_count} users from persistent backup.")
+        except Exception as e:
+            logger.error(f"Error in restore_users_from_backup: {e}")
+        return restored_count
+
+    @staticmethod
     def init_users_db():
         conn, is_postgres = get_db_connection()
         c = conn.cursor()
@@ -44,7 +80,10 @@ class UserRepository:
                     role          VARCHAR(50) DEFAULT 'user'
                 )
             """)
-            c.execute("ALTER TABLE users ENABLE ROW LEVEL SECURITY")
+            try:
+                c.execute("ALTER TABLE users DISABLE ROW LEVEL SECURITY")
+            except Exception:
+                pass
             c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_photo TEXT")
             c.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(50) DEFAULT 'user'")
         else:
@@ -68,34 +107,15 @@ class UserRepository:
                 c.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_type}")
                 conn.commit()
             except Exception:
-                conn.rollback()
+                pass
 
         # Check if users table is empty and restore from persistent backup
         try:
             c.execute("SELECT COUNT(*) as cnt FROM users" if is_postgres else "SELECT COUNT(*) FROM users")
             row = c.fetchone()
-            count = (row["cnt"] if is_postgres else row[0]) if row else 0
+            count = (row["cnt"] if is_postgres and isinstance(row, dict) else row[0]) if row else 0
             if count == 0:
-                backup = _load_user_backup()
-                if backup:
-                    logger.info(f"Restoring {len(backup)} registered users from persistent backup...")
-                    for u in backup:
-                        try:
-                            if is_postgres:
-                                c.execute("""
-                                    INSERT INTO users (email, password_hash, name, age, created_at, profile_photo, role)
-                                    VALUES (%s, %s, %s, %s, %s, %s, %s)
-                                    ON CONFLICT (email) DO NOTHING
-                                """, (u["email"].lower().strip(), u["password_hash"], u["name"], u.get("age", 25), u.get("created_at", ""), u.get("profile_photo"), u.get("role", "user")))
-                            else:
-                                c.execute("""
-                                    INSERT INTO users (email, password_hash, name, age, created_at, profile_photo, role)
-                                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                                    ON CONFLICT(email) DO NOTHING
-                                """, (u["email"].lower().strip(), u["password_hash"], u["name"], u.get("age", 25), u.get("created_at", ""), u.get("profile_photo"), u.get("role", "user")))
-                        except Exception as re:
-                            logger.error(f"Error restoring user {u.get('email')}: {re}")
-                    conn.commit()
+                UserRepository.restore_users_from_backup(conn, is_postgres)
         except Exception as e:
             logger.error(f"Error checking user count for restoration: {e}")
 
@@ -103,18 +123,40 @@ class UserRepository:
 
     @staticmethod
     def get_user_by_email(email: str) -> dict | None:
+        if not email:
+            return None
+        clean_email = email.lower().strip()
         conn, is_postgres = get_db_connection()
         c = get_cursor(conn, is_postgres)
         try:
-            execute_query(c, "SELECT id, email, name, age, password_hash, created_at, profile_photo, role FROM users WHERE email = ?", (email.lower().strip(),), is_postgres)
+            execute_query(c, "SELECT id, email, name, age, password_hash, created_at, profile_photo, role FROM users WHERE LOWER(email) = ?", (clean_email,), is_postgres)
             row = c.fetchone()
+            if not row:
+                # Check if table is empty and restore from backup if needed
+                c_cnt = conn.cursor()
+                c_cnt.execute("SELECT COUNT(*) as cnt FROM users" if is_postgres else "SELECT COUNT(*) FROM users")
+                cnt_row = c_cnt.fetchone()
+                cnt = (cnt_row["cnt"] if is_postgres and isinstance(cnt_row, dict) else cnt_row[0]) if cnt_row else 0
+                if cnt == 0:
+                    UserRepository.restore_users_from_backup(conn, is_postgres)
+                    execute_query(c, "SELECT id, email, name, age, password_hash, created_at, profile_photo, role FROM users WHERE LOWER(email) = ?", (clean_email,), is_postgres)
+                    row = c.fetchone()
             conn.close()
             return dict(row) if row else None
         except Exception as e:
-            logger.warning(f"Full SELECT failed in get_user_by_email for '{email}', attempting fallback: {e}")
+            logger.warning(f"Full SELECT failed in get_user_by_email for '{clean_email}', attempting fallback: {e}")
             try:
-                execute_query(c, "SELECT id, email, name, age, password_hash, created_at FROM users WHERE email = ?", (email.lower().strip(),), is_postgres)
+                execute_query(c, "SELECT id, email, name, age, password_hash, created_at FROM users WHERE LOWER(email) = ?", (clean_email,), is_postgres)
                 row = c.fetchone()
+                if not row:
+                    c_cnt = conn.cursor()
+                    c_cnt.execute("SELECT COUNT(*) as cnt FROM users" if is_postgres else "SELECT COUNT(*) FROM users")
+                    cnt_row = c_cnt.fetchone()
+                    cnt = (cnt_row["cnt"] if is_postgres and isinstance(cnt_row, dict) else cnt_row[0]) if cnt_row else 0
+                    if cnt == 0:
+                        UserRepository.restore_users_from_backup(conn, is_postgres)
+                        execute_query(c, "SELECT id, email, name, age, password_hash, created_at FROM users WHERE LOWER(email) = ?", (clean_email,), is_postgres)
+                        row = c.fetchone()
                 conn.close()
                 if row:
                     res = dict(row)
@@ -134,6 +176,15 @@ class UserRepository:
         try:
             execute_query(c, "SELECT id, email, name, age, created_at, profile_photo, role FROM users WHERE id = ?", (user_id,), is_postgres)
             row = c.fetchone()
+            if not row:
+                c_cnt = conn.cursor()
+                c_cnt.execute("SELECT COUNT(*) as cnt FROM users" if is_postgres else "SELECT COUNT(*) FROM users")
+                cnt_row = c_cnt.fetchone()
+                cnt = (cnt_row["cnt"] if is_postgres and isinstance(cnt_row, dict) else cnt_row[0]) if cnt_row else 0
+                if cnt == 0:
+                    UserRepository.restore_users_from_backup(conn, is_postgres)
+                    execute_query(c, "SELECT id, email, name, age, created_at, profile_photo, role FROM users WHERE id = ?", (user_id,), is_postgres)
+                    row = c.fetchone()
             conn.close()
             return dict(row) if row else None
         except Exception:

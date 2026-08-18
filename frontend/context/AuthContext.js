@@ -265,7 +265,8 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = async (email, password, rememberMe = false) => {
-    const res = await API.post("/auth/login", { email, password });
+    const cleanEmail = (email || "").trim();
+    const res = await API.post("/auth/login", { email: cleanEmail, password });
     const { token, access_token, refresh_token, user: u } = res.data;
     const tk = token || access_token;
     setToken(tk);

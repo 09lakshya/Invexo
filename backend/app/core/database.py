@@ -41,6 +41,7 @@ def ensure_sqlite_tables_init():
             SignalRepository.init_signal_ledger_db()
             logger.info("SQLite schemas initialized successfully.")
         except Exception as e:
+            _sqlite_initialized = False
             logger.error(f"Error initializing SQLite fallback schemas: {e}")
 
 def init_db_pool():
