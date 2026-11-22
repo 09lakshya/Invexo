@@ -195,10 +195,13 @@ async def add_security_headers(request, call_next):
 # CORS Configuration
 default_origins = "https://invexo-one.vercel.app,https://invexo.co.in,https://www.invexo.co.in,http://localhost:3000,http://localhost:3001"
 raw_origins = os.getenv("CORS_ORIGINS", "")
-if raw_origins:
-    allowed_origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
-else:
-    allowed_origins = [origin.strip() for origin in default_origins.split(",") if origin.strip()]
+# Env-provided origins are merged with the defaults (not a replacement), so setting
+# CORS_ORIGINS on a host never silently locks out the main site or local dev.
+allowed_origins = list(dict.fromkeys(
+    origin.strip()
+    for origin in f"{default_origins},{raw_origins}".split(",")
+    if origin.strip()
+))
 
 if "*" in allowed_origins:
     app.add_middleware(
@@ -226,7 +229,8 @@ def read_root():
 
 @app.get("/health")
 def health_check():
-    return {"status": "healthy"}
+    from app.core.database import get_db_backend
+    return {"status": "healthy", "db": get_db_backend()}
 
 
 

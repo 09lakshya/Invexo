@@ -69,7 +69,11 @@ export default function LoginPage() {
       if (Array.isArray(msg)) {
         msg = msg[0]?.msg || "Validation error";
       }
-      msg = typeof msg === "string" ? msg : "Something went wrong. Please try again.";
+      if (typeof msg !== "string") {
+        msg = !err?.response
+          ? "Can't reach the server. Check your connection or that the backend is running, then try again."
+          : "Something went wrong. Please try again.";
+      }
       
       if (
         msg.toLowerCase().includes("email not found") || 
