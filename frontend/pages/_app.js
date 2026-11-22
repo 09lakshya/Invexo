@@ -40,8 +40,11 @@ function AuthGuard({ children }) {
       >
         <div style={{ textAlign: 'center' }}>
           <div className="spinner" style={{ margin: '0 auto 16px' }} />
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+          <p style={{ color: 'var(--text-primary)', fontSize: '0.95rem', fontWeight: 600, margin: '0 0 6px' }}>
             Loading Invexo…
+          </p>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', margin: 0 }}>
+            Please stay put while we get everything ready.
           </p>
         </div>
       </div>
